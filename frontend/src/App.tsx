@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertCircle,
   ArrowUpRight,
@@ -102,7 +102,13 @@ function App() {
   const [formUrl, setFormUrl] = useState('')
   const [sourceStatus, setSourceStatus] = useState('No external form loaded')
   const [detectedQuestions, setDetectedQuestions] = useState<string[]>([])
-  const [showWorkspace, setShowWorkspace] = useState(false)
+  const [route, setRoute] = useState(window.location.pathname || '/')
+
+  useEffect(() => {
+    const handlePopState = () => setRoute(window.location.pathname || '/')
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   function loadQuestions(questions: string[], source: string) {
     setDetectedQuestions(questions)
@@ -131,8 +137,17 @@ function App() {
     catch (error) { setSourceStatus(`Could not read form: ${(error as Error).message}`) }
   }
 
+  function navigate(path: string) {
+    window.history.pushState({}, '', path)
+    setRoute(path)
+  }
+
+  function openImport() {
+    navigate('/response/import')
+  }
+
   function openWorkspace() {
-    setShowWorkspace(true)
+    navigate('/response/workspace/demo')
   }
 
   async function generateAnswer() {
@@ -198,7 +213,7 @@ function App() {
       </aside>
 
       <main className="main-content">
-        {!showWorkspace ? <section className="home-screen"><p className="eyebrow">Start a response</p><h1>Bring in your questionnaire</h1><p className="home-subtitle">Choose how you want to load the seller form.</p><div className="home-feature-grid"><div className="home-feature"><span className="home-feature-number">01</span><div className="home-feature-icon"><Link size={22} /></div><h2>Paste a form URL</h2><p>Load a hosted questionnaire and extract its questions for review.</p><div className="home-url-row"><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="https://buyer.example/form" /><button className="primary-button" onClick={async () => { await loadFormUrl(); openWorkspace(); }} disabled={!formUrl.trim()}>Load URL <ArrowUpRight size={15} /></button></div><small>Works when the page permits browser access.</small></div><div className="home-feature"><span className="home-feature-number">02</span><div className="home-feature-icon upload-icon"><Upload size={22} /></div><h2>Upload form data</h2><p>Import an HTML, JSON, or CSV questionnaire from your computer.</p><label className="home-upload-button"><Upload size={16} /> Choose a form file<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={async (event) => { await loadFormFile(event); openWorkspace(); }} /></label><small>Questions are extracted locally in your browser.</small></div></div></section> : <>
+        {route === '/' ? <section className="home-screen"><p className="eyebrow">Start a response</p><h1>Bring in your questionnaire</h1><p className="home-subtitle">Choose how you want to load the seller form.</p><div className="home-feature-grid"><div className="home-feature"><span className="home-feature-number">01</span><div className="home-feature-icon"><Link size={22} /></div><h2>Paste a form URL</h2><p>Load a hosted questionnaire and extract its questions for review.</p><div className="home-url-row"><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="https://buyer.example/form" /><button className="primary-button" onClick={async () => { openImport(); await loadFormUrl(); }} disabled={!formUrl.trim()}>Load URL <ArrowUpRight size={15} /></button></div><small>Works when the page permits browser access.</small></div><div className="home-feature"><span className="home-feature-number">02</span><div className="home-feature-icon upload-icon"><Upload size={22} /></div><h2>Upload form data</h2><p>Import an HTML, JSON, or CSV questionnaire from your computer.</p><label className="home-upload-button"><Upload size={16} /> Choose a form file<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={async (event) => { openImport(); await loadFormFile(event); }} /></label><small>Questions are extracted locally in your browser.</small></div></div></section> : <>
         <div className="page-heading">
           <div><p className="breadcrumb">Responses <span>/</span> Northstar security review</p><h1>Response workspace</h1><p className="subtitle">Draft accurate answers from your approved knowledge base.</p></div>
           <button className="outline-button"><Upload size={16} /> Import RFP</button>
@@ -207,7 +222,7 @@ function App() {
         <section className="source-panel panel">
           <div className="panel-label"><span className="step-number">00</span><div><p className="eyebrow">Form source</p><span className="label-hint">Load a hosted questionnaire or upload form data</span></div></div>
           <div className="source-input-row"><div className="source-url-field"><Link size={16} /><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="Paste form URL, e.g. https://buyer.example/questionnaire" /><button className="source-button" onClick={loadFormUrl} disabled={!formUrl.trim()}>Load URL</button></div><label className="upload-form-button"><Upload size={15} /> Upload HTML, JSON, or CSV<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={loadFormFile} /></label></div>
-          <p className="source-status"><span className="status-dot" /> {sourceStatus}</p>
+          <div className="source-status-row"><p className="source-status"><span className="status-dot" /> {sourceStatus}</p>{route === '/response/import' && detectedQuestions.length > 0 && <button className="source-button" onClick={openWorkspace}>Continue to workspace <ArrowUpRight size={14} /></button>}</div>
         </section>
 
         <section className="question-panel panel">
