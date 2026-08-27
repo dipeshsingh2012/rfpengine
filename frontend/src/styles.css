@@ -15,7 +15,7 @@ button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .7; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; grid-template-rows: 64px 1fr; }
 .topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 28px; border-bottom: 1px solid var(--line); background: #faf9f5; z-index: 3; }
-.brand-mark { width: 29px; height: 29px; background: var(--navy); color: var(--lime); display: grid; place-items: center; font-family: 'Space Grotesk'; font-weight: 700; transform: rotate(-6deg); }
+.brand-mark { width: 29px; height: 29px; border: 0; padding: 0; background: var(--navy); color: var(--lime); display: grid; place-items: center; font-family: 'Space Grotesk'; font-weight: 700; transform: rotate(-6deg); }
 .brand-mark span { transform: rotate(6deg); }
 .brand-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; letter-spacing: -.5px; }.brand-name span { color: var(--blue); }
 .workspace-switcher { margin-left: 30px; display: flex; align-items: center; gap: 8px; color: #515957; font-size: 13px; padding: 9px 12px; border: 1px solid var(--line); background: #fff; }.workspace-dot, .status-dot { width: 7px; height: 7px; background: #5db578; border-radius: 50%; display: inline-block; }.topbar-spacer { flex: 1; }.icon-button, .avatar, .mobile-menu { border: 0; background: transparent; color: #606762; display: grid; place-items: center; }.icon-button { padding: 8px; }.avatar { width: 32px; height: 32px; background: var(--coral); color: #fff; border-radius: 50%; font-weight: 700; font-size: 11px; }.mobile-menu { display: none; }
