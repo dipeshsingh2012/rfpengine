@@ -147,6 +147,7 @@ function App() {
   const [answersByQuestion, setAnswersByQuestion] = useState<
     Record<string, string>
   >({ [starterQuestions[0]]: demoResponse.suggested_answer });
+  const [reviewStatusByQuestion, setReviewStatusByQuestion] = useState<Record<string, string>>({});
   const [activeSource, setActiveSource] = useState(demoResponse.sources[0].id);
   const [isGenerating, setIsGenerating] = useState(false);
   const [answerStatus, setAnswerStatus] = useState<
@@ -212,6 +213,7 @@ function App() {
       sourceLabel: string;
       sourceUrl?: string;
       answers: Record<string, string>;
+      reviewStatuses?: Record<string, string>;
     };
     setResponseId(id);
     setDetectedQuestions(stored.questions);
@@ -219,6 +221,7 @@ function App() {
     setSourceLabel(stored.sourceLabel);
     setFormUrl(stored.sourceUrl || "");
     setAnswersByQuestion(stored.answers);
+    setReviewStatusByQuestion(stored.reviewStatuses || {});
     if (stored.questions[0]) {
       setQuestion(stored.questions[0]);
       setAnswer(stored.answers[stored.questions[0]] || "");
@@ -240,6 +243,7 @@ function App() {
         sourceLabel: source,
         sourceUrl: mode === "url" ? formUrl : "",
         answers: {},
+        reviewStatuses: {},
       }),
     );
     localStorage.setItem("rfpengine.latest", id);
@@ -312,7 +316,13 @@ function App() {
   }
 
   function openOriginalForm() {
-    if (formUrl) window.open(formUrl, "_blank", "noopener,noreferrer");
+    if (!formUrl) return;
+    const approvedQuestions = detectedQuestions.filter((item) => ["Approved", "Final approved"].includes(reviewStatusByQuestion[item]));
+    if (!approvedQuestions.length) { setNotice("Approve at least one answer before opening the original form"); return; }
+    const approvedAnswers = Object.fromEntries(approvedQuestions.map((item) => [item, answersByQuestion[item] || ""]));
+    const handoff = encodeURIComponent(JSON.stringify({ questions: approvedQuestions, answers: approvedAnswers }));
+    const target = `${formUrl.split("#")[0]}#rfpengine=${handoff}`;
+    window.open(target, "_blank", "noopener,noreferrer");
   }
 
   function exportAnswers() {
@@ -341,6 +351,13 @@ function App() {
       key,
       JSON.stringify({ ...saved, answers: nextAnswers }),
     );
+  }
+
+  function saveReviewStatuses(nextStatuses: Record<string, string>) {
+    if (!responseId) return;
+    const key = `rfpengine.response.${responseId}`;
+    const saved = JSON.parse(localStorage.getItem(key) || "{}");
+    localStorage.setItem(key, JSON.stringify({ ...saved, reviewStatuses: nextStatuses }));
   }
 
   async function generateAnswer() {
@@ -382,6 +399,31 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function generateAllAnswers() {
+    if (!detectedQuestions.length || isGenerating) return;
+    setIsGenerating(true);
+    setNotice("Generating answers for the full questionnaire...");
+    const generated: Record<string, string> = { ...answersByQuestion };
+    for (const item of detectedQuestions) {
+      try {
+        const result = await fetch(`${apiBaseUrl}/v1/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
+        });
+        if (!result.ok) throw new Error("API unavailable");
+        generated[item] = ((await result.json()) as SearchResponse).suggested_answer;
+      } catch {
+        generated[item] = demoAnswerFor(item).suggested_answer;
+      }
+    }
+    setAnswersByQuestion(generated);
+    saveAnswers(generated);
+    setAnswer(generated[question] || generated[detectedQuestions[0]] || "");
+    setNotice("All answers ready for human review");
+    setIsGenerating(false);
   }
 
   if (route.startsWith("/review/")) {
@@ -813,7 +855,7 @@ function App() {
                 </div>
                 <button
                   className="primary-button"
-                  onClick={generateAnswer}
+                  onClick={detectedQuestions.length ? generateAllAnswers : generateAnswer}
                   disabled={isGenerating}
                 >
                   {isGenerating ? (
@@ -821,14 +863,15 @@ function App() {
                   ) : (
                     <Sparkles size={16} />
                   )}
-                  {isGenerating ? "Generating" : "Generate answer"}{" "}
+                  {isGenerating ? "Generating" : detectedQuestions.length ? "Generate all answers" : "Generate answer"}{" "}
                   <ArrowUpRight size={15} />
                 </button>
               </div>
             </section>
 
             <div className="workspace-grid">
-              <section className="answer-column">
+              <section className={`answer-column ${detectedQuestions.length ? "has-question-list" : ""}`}>
+                {detectedQuestions.length > 0 && <div className="question-review-list">{detectedQuestions.map((item, index) => <article className="question-review-card panel" key={`${item}-${index}`}><div className="question-review-header"><span className="source-rank">Q{String(index + 1).padStart(2, "0")}</span><span className="review-status">{reviewStatusByQuestion[item] || (answersByQuestion[item] ? "DRAFT READY" : "NOT GENERATED")}</span></div><h2>{item}</h2><textarea className="question-review-answer" value={answersByQuestion[item] || ""} placeholder="Generate all answers to populate this response." onChange={(event) => { const nextAnswers = { ...answersByQuestion, [item]: event.target.value }; setAnswersByQuestion(nextAnswers); saveAnswers(nextAnswers); }} /><div className="question-review-actions"><button className="reject-button" onClick={() => { const nextStatuses = { ...reviewStatusByQuestion, [item]: "Changes requested" }; setReviewStatusByQuestion(nextStatuses); saveReviewStatuses(nextStatuses); }}><ThumbsDown size={14} /> Request changes</button><button className="approve-button" onClick={() => { const nextStatuses = { ...reviewStatusByQuestion, [item]: "Approved" }; setReviewStatusByQuestion(nextStatuses); saveReviewStatuses(nextStatuses); }}><Check size={14} /> Approve</button></div></article>)}</div>}
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">02 / Draft response</p>

@@ -49,6 +49,15 @@ async function scan() {
 }
 
 async function generateAnswer(field, controls) {
+  if (field.handoffAnswer) {
+    controls.answer.value = field.handoffAnswer;
+    controls.confidence.textContent = 'Approved workspace draft';
+    controls.sourceBox.innerHTML = '<div class="source-line"><strong>rfpengine</strong> Draft handed off from the seller workspace</div>';
+    controls.sourceBox.hidden = false;
+    controls.approve.hidden = false;
+    controls.reject.hidden = false;
+    return;
+  }
   try {
     const result = await fetch(`${API_URL}/api/v1/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenant_id: document.querySelector('#tenant').value, question: field.question, top_k: Number(document.querySelector('#top-k').value) }) });
     if (!result.ok) throw new Error('API returned an error.');

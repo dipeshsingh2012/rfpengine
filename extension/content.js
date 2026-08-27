@@ -14,7 +14,14 @@ function fieldQuestion(field) {
   return nearby?.innerText.trim() || field.placeholder?.trim() || '';
 }
 
+function formHandoff() {
+  const value = new URLSearchParams(location.hash.slice(1)).get('rfpengine');
+  if (!value) return null;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
 function scanFields() {
+  const handoff = formHandoff();
   return [...document.querySelectorAll('textarea, input:not([type="hidden"]), [contenteditable="true"]')]
     .map((field, index) => ({
       index,
@@ -22,6 +29,7 @@ function scanFields() {
       type: field.getAttribute('contenteditable') === 'true' ? 'contenteditable' : field.type || 'textarea',
       value: field.value || field.innerText || '',
       required: field.required || field.getAttribute('aria-required') === 'true',
+      handoffAnswer: handoff?.answers?.[fieldQuestion(field)] || '',
     }))
     .filter((field) => field.question && field.type !== 'submit');
 }

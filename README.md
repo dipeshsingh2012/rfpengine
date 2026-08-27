@@ -233,6 +233,8 @@ Final approval unlocks the response for insertion or export.
 
 RFPEngine should never automatically submit a buyer questionnaire. The seller remains responsible for the final submission.
 
+For a URL-sourced response, the **Open original form** action transfers only answers marked `Approved` or `Final approved` to the original URL. The browser extension reads those approved drafts from the URL handoff, asks the seller to approve them again, and then inserts them into matching form fields. This POC uses the URL fragment for the handoff; production should replace it with an authenticated, short-lived response token so answer content is not exposed in the URL.
+
 ### Answer lifecycle
 
 ```text
