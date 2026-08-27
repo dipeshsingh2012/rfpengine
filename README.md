@@ -94,6 +94,11 @@ npm run dev
 
 Open [http://localhost:5173/](http://localhost:5173/). The frontend proxies `/api` requests to the backend on port 8000. It displays demo content when the API is unavailable.
 
+The main workspace also accepts a form source before answer generation:
+
+- Paste a hosted form URL and choose **Load URL**. The page must allow browser access with CORS enabled; otherwise use the browser extension for a live third-party form.
+- Upload an HTML, JSON, or CSV questionnaire. The app extracts the detected questions and lets you select them for generation.
+
 ## 5. Test the browser-extension POC
 
 The extension scans an existing seller questionnaire, generates answers, and inserts only answers that the seller explicitly approves. It does not submit the form.
@@ -105,7 +110,7 @@ The extension scans an existing seller questionnaire, generates answers, and ins
 5. Select the repository's `extension/` directory.
 6. Return to the mock questionnaire and click the RFQEngine extension icon.
 7. Click **Scan page** in the side panel.
-8. Generate an answer, review or edit it, and click **Insert answer**.
+8. Click **Generate all answers**, review the drafts, and click **Insert answer** for each approved response.
 
 More extension-specific notes are in [extension/README.md](extension/README.md).
 

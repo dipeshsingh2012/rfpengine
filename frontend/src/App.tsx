@@ -9,6 +9,7 @@ import {
   FolderOpen,
   History,
   LayoutGrid,
+  Link,
   Menu,
   Plus,
   RefreshCw,
@@ -69,6 +70,21 @@ const starterQuestions = [
   'What support is included with the platform?',
 ]
 
+function extractFormQuestions(text: string, fileName: string) {
+  if (fileName.endsWith('.json')) {
+    const parsed = JSON.parse(text)
+    const records = Array.isArray(parsed) ? parsed : parsed.questions || []
+    return records.map((record: { question?: string; text?: string }) => record.question || record.text || '').filter(Boolean)
+  }
+  if (fileName.endsWith('.csv')) {
+    return text.split(/\r?\n/).slice(1).map((line) => line.split(',')[2] || line.split(',')[0]).filter(Boolean)
+  }
+  const document = new DOMParser().parseFromString(text, 'text/html')
+  return [...document.querySelectorAll('textarea, input:not([type="hidden"]), [contenteditable="true"]')]
+    .map((field) => document.querySelector(`label[for="${CSS.escape(field.id)}"]`)?.textContent?.trim() || field.getAttribute('aria-label') || field.getAttribute('placeholder') || '')
+    .filter(Boolean)
+}
+
 function formatScore(score: number) {
   return `${Math.round(score * 100)}%`
 }
@@ -83,6 +99,41 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [notice, setNotice] = useState('Demo data loaded')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [formUrl, setFormUrl] = useState('')
+  const [sourceStatus, setSourceStatus] = useState('No external form loaded')
+  const [detectedQuestions, setDetectedQuestions] = useState<string[]>([])
+  const [showWorkspace, setShowWorkspace] = useState(false)
+
+  function loadQuestions(questions: string[], source: string) {
+    setDetectedQuestions(questions)
+    if (questions[0]) setQuestion(questions[0])
+    setSourceStatus(`${source} · ${questions.length} question${questions.length === 1 ? '' : 's'} detected`)
+    setNotice(questions.length ? 'Form questions loaded' : 'No questions found')
+  }
+
+  async function loadFormUrl() {
+    try {
+      const url = new URL(formUrl)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Use an http or https URL.')
+      setSourceStatus('Fetching form...')
+      const result = await fetch(url.href)
+      if (!result.ok) throw new Error(`Could not fetch form (${result.status})`)
+      loadQuestions(extractFormQuestions(await result.text(), url.pathname.toLowerCase()), url.hostname)
+    } catch (error) {
+      setSourceStatus(error instanceof TypeError ? 'The form blocked browser access. Enable CORS or use file upload.' : (error as Error).message)
+    }
+  }
+
+  async function loadFormFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try { loadQuestions(extractFormQuestions(await file.text(), file.name.toLowerCase()), file.name) }
+    catch (error) { setSourceStatus(`Could not read form: ${(error as Error).message}`) }
+  }
+
+  function openWorkspace() {
+    setShowWorkspace(true)
+  }
 
   async function generateAnswer() {
     if (!question.trim()) return
@@ -147,14 +198,22 @@ function App() {
       </aside>
 
       <main className="main-content">
+        {!showWorkspace ? <section className="home-screen"><p className="eyebrow">Start a response</p><h1>Bring in your questionnaire</h1><p className="home-subtitle">Choose how you want to load the seller form.</p><div className="home-feature-grid"><div className="home-feature"><span className="home-feature-number">01</span><div className="home-feature-icon"><Link size={22} /></div><h2>Paste a form URL</h2><p>Load a hosted questionnaire and extract its questions for review.</p><div className="home-url-row"><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="https://buyer.example/form" /><button className="primary-button" onClick={async () => { await loadFormUrl(); openWorkspace(); }} disabled={!formUrl.trim()}>Load URL <ArrowUpRight size={15} /></button></div><small>Works when the page permits browser access.</small></div><div className="home-feature"><span className="home-feature-number">02</span><div className="home-feature-icon upload-icon"><Upload size={22} /></div><h2>Upload form data</h2><p>Import an HTML, JSON, or CSV questionnaire from your computer.</p><label className="home-upload-button"><Upload size={16} /> Choose a form file<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={async (event) => { await loadFormFile(event); openWorkspace(); }} /></label><small>Questions are extracted locally in your browser.</small></div></div></section> : <>
         <div className="page-heading">
           <div><p className="breadcrumb">Responses <span>/</span> Northstar security review</p><h1>Response workspace</h1><p className="subtitle">Draft accurate answers from your approved knowledge base.</p></div>
           <button className="outline-button"><Upload size={16} /> Import RFP</button>
         </div>
 
+        <section className="source-panel panel">
+          <div className="panel-label"><span className="step-number">00</span><div><p className="eyebrow">Form source</p><span className="label-hint">Load a hosted questionnaire or upload form data</span></div></div>
+          <div className="source-input-row"><div className="source-url-field"><Link size={16} /><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="Paste form URL, e.g. https://buyer.example/questionnaire" /><button className="source-button" onClick={loadFormUrl} disabled={!formUrl.trim()}>Load URL</button></div><label className="upload-form-button"><Upload size={15} /> Upload HTML, JSON, or CSV<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={loadFormFile} /></label></div>
+          <p className="source-status"><span className="status-dot" /> {sourceStatus}</p>
+        </section>
+
         <section className="question-panel panel">
           <div className="panel-label"><span className="step-number">01</span><div><p className="eyebrow">Question to answer</p><span className="label-hint">Ask a question or paste one from your RFP</span></div></div>
           <textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={3} />
+          {detectedQuestions.length > 1 && <div className="detected-list">{detectedQuestions.map((detectedQuestion, index) => <button key={`${detectedQuestion}-${index}`} className={detectedQuestion === question ? 'detected-active' : ''} onClick={() => setQuestion(detectedQuestion)}>Q{String(index + 1).padStart(2, '0')} {detectedQuestion}</button>)}</div>}
           <div className="question-footer"><div className="question-meta"><span className="status-dot" /> Knowledge base connected <span className="divider" /> Tenant: <select value={tenantId} onChange={(event) => setTenantId(event.target.value)}><option value="acme-corp">acme-corp</option><option value="demo-tenant">demo-tenant</option></select></div><button className="primary-button" onClick={generateAnswer} disabled={isGenerating}>{isGenerating ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}{isGenerating ? 'Generating' : 'Generate answer'} <ArrowUpRight size={15} /></button></div>
         </section>
 
@@ -173,6 +232,7 @@ function App() {
         </div>
 
         <div className="bottom-strip"><div className="confidence"><div className="confidence-ring"><span>{Math.round(response.confidence_score * 100)}</span></div><div><p className="eyebrow">Confidence score</p><strong>Strong source alignment</strong><small>Based on semantic and keyword retrieval</small></div></div><div className="shortcut-hint"><span className="key">⌘</span><span className="key">↵</span> Generate answer</div><button className="send-button" title="Send for review"><Send size={16} /> Send for review</button></div>
+        </>}
       </main>
     </div>
   )
