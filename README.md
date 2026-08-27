@@ -193,10 +193,11 @@ RFPEngine separates questionnaire ownership from subject-matter approval. The pe
 1. Open the seller workspace.
 2. Paste a hosted questionnaire URL or upload an HTML, JSON, or CSV form.
 3. Review the questions detected on `/review`.
-4. Continue to the response workspace and generate drafts.
-5. Assign technical, security, product, or legal questions to the appropriate reviewer.
-6. Track which answers are approved, in review, or need revision.
-7. Consolidate approved answers for final approval.
+4. Continue to `/response/workspace/:responseId`; the imported questions and drafts are restored from browser local storage when that identifier is reopened.
+5. Generate drafts and review them.
+6. Assign technical, security, product, or legal questions to the appropriate reviewer.
+7. Track which answers are approved, in review, or need revision.
+8. Consolidate approved answers for final approval.
 
 ### SME reviewer
 

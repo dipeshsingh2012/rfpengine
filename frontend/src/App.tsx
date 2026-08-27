@@ -106,6 +106,10 @@ function formatScore(score: number) {
   return `${Math.round(score * 100)}%`
 }
 
+function responseIdFromPath(path: string) {
+  return path.match(/^\/response\/workspace\/([^/]+)$/)?.[1] || ''
+}
+
 function App() {
   const [question, setQuestion] = useState(starterQuestions[0])
   const [tenantId, setTenantId] = useState('acme-corp')
@@ -125,6 +129,7 @@ function App() {
   const [sourceMode, setSourceMode] = useState<SourceMode>('upload')
   const [sourceLabel, setSourceLabel] = useState('Demo questionnaire')
   const [route, setRoute] = useState(window.location.pathname || '/')
+  const [responseId, setResponseId] = useState(() => responseIdFromPath(window.location.pathname))
 
   useEffect(() => {
     const handlePopState = () => setRoute(window.location.pathname || '/')
@@ -143,7 +148,25 @@ function App() {
     return () => { approveButton.removeEventListener('click', approve); rejectButton.removeEventListener('click', reject) }
   }, [route, answerStatus, role])
 
+  useEffect(() => {
+    const id = responseIdFromPath(route)
+    if (!id) return
+    const saved = localStorage.getItem(`rfpengine.response.${id}`)
+    if (!saved) return
+    const stored = JSON.parse(saved) as { questions: string[]; sourceMode: SourceMode; sourceLabel: string; sourceUrl?: string; answers: Record<string, string> }
+    setResponseId(id)
+    setDetectedQuestions(stored.questions)
+    setSourceMode(stored.sourceMode)
+    setSourceLabel(stored.sourceLabel)
+    setFormUrl(stored.sourceUrl || '')
+    setAnswersByQuestion(stored.answers)
+    if (stored.questions[0]) { setQuestion(stored.questions[0]); setAnswer(stored.answers[stored.questions[0]] || '') }
+  }, [route])
+
   function loadQuestions(questions: string[], source: string, mode: SourceMode) {
+    const id = `${mode}-${Date.now().toString(36)}`
+    localStorage.setItem(`rfpengine.response.${id}`, JSON.stringify({ id, questions, sourceMode: mode, sourceLabel: source, sourceUrl: mode === 'url' ? formUrl : '', answers: {} }))
+    setResponseId(id)
     setDetectedQuestions(questions)
     setSourceMode(mode)
     setSourceLabel(source)
@@ -182,7 +205,7 @@ function App() {
   }
 
   function openWorkspace() {
-    navigate('/response/workspace/demo')
+    navigate(`/response/workspace/${responseId || 'demo'}`)
   }
 
   function openOriginalForm() {
@@ -199,6 +222,13 @@ function App() {
     URL.revokeObjectURL(link.href)
   }
 
+  function saveAnswers(nextAnswers: Record<string, string>) {
+    if (!responseId) return
+    const key = `rfpengine.response.${responseId}`
+    const saved = JSON.parse(localStorage.getItem(key) || '{}')
+    localStorage.setItem(key, JSON.stringify({ ...saved, answers: nextAnswers }))
+  }
+
   async function generateAnswer() {
     if (!question.trim()) return
     setIsGenerating(true)
@@ -213,7 +243,9 @@ function App() {
       const data = (await result.json()) as SearchResponse
       setResponse(data)
       setAnswer(data.suggested_answer)
-      setAnswersByQuestion((current) => ({ ...current, [question]: data.suggested_answer }))
+      const nextAnswers = { ...answersByQuestion, [question]: data.suggested_answer }
+      setAnswersByQuestion(nextAnswers)
+      saveAnswers(nextAnswers)
       setAnswerStatus('Draft')
       setActiveSource(data.sources[0]?.id ?? '')
       setNotice('Draft generated from live sources')
@@ -221,7 +253,9 @@ function App() {
       const fallback = demoAnswerFor(question)
       setResponse(fallback)
       setAnswer(fallback.suggested_answer)
-      setAnswersByQuestion((current) => ({ ...current, [question]: fallback.suggested_answer }))
+      const nextAnswers = { ...answersByQuestion, [question]: fallback.suggested_answer }
+      setAnswersByQuestion(nextAnswers)
+      saveAnswers(nextAnswers)
       setAnswerStatus('Draft')
       setActiveSource(demoResponse.sources[0].id)
       setNotice('Demo answer generated. Connect the API for live retrieval.')
@@ -271,7 +305,7 @@ function App() {
       </aside>
 
       <main className="main-content">
-        {route === '/response/workspace/demo' && <div className="role-bar"><div className="role-selector"><span className="eyebrow">Viewing as</span><select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option>Proposal manager</option><option>Security SME</option><option>Legal reviewer</option><option>Final approver</option></select></div><div className="queue-summary"><span><strong>12</strong> total</span><span><strong>8</strong> approved</span><span className="queue-warning"><strong>2</strong> SME review</span><span><strong>1</strong> revision</span></div><span className="workflow-status">{answerStatus === 'Draft' ? 'Draft in progress' : answerStatus}</span></div>}
+        {route.startsWith('/response/workspace/') && <div className="role-bar"><div className="role-selector"><span className="eyebrow">Viewing as</span><select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option>Proposal manager</option><option>Security SME</option><option>Legal reviewer</option><option>Final approver</option></select></div><div className="queue-summary"><span><strong>12</strong> total</span><span><strong>8</strong> approved</span><span className="queue-warning"><strong>2</strong> SME review</span><span><strong>1</strong> revision</span></div><span className="workflow-status">{answerStatus === 'Draft' ? 'Draft in progress' : answerStatus}</span></div>}
         {route === '/' ? <section className="home-screen"><p className="eyebrow">Start a response</p><h1>Bring in your questionnaire</h1><p className="home-subtitle">Choose how you want to load the seller form.</p><div className="home-feature-grid"><div className="home-feature"><span className="home-feature-number">01</span><div className="home-feature-icon"><Link size={22} /></div><h2>Paste a form URL</h2><p>Load a hosted questionnaire and extract its questions for review.</p><div className="home-url-row"><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="https://buyer.example/form" /><button className="primary-button" onClick={async () => { openImport(); await loadFormUrl(); }} disabled={!formUrl.trim()}>Load URL <ArrowUpRight size={15} /></button></div><small>Works when the page permits browser access.</small></div><div className="home-feature"><span className="home-feature-number">02</span><div className="home-feature-icon upload-icon"><Upload size={22} /></div><h2>Upload form data</h2><p>Import an HTML, JSON, or CSV questionnaire from your computer.</p><label className="home-upload-button"><Upload size={16} /> Choose a form file<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={async (event) => { openImport(); await loadFormFile(event); }} /></label><small>Questions are extracted locally in your browser.</small></div></div></section> : <>
         <div className="page-heading">
           <div><p className="breadcrumb">Responses <span>/</span> Northstar security review</p><h1>Response workspace</h1><p className="subtitle">Draft accurate answers from your approved knowledge base.</p></div>
