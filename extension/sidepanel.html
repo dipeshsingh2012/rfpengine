@@ -4,7 +4,7 @@
   <body>
     <header><div class="logo">R</div><div><strong>RFQ<span>Engine</span></strong><small>Response assistant</small></div><button id="scan" class="scan-button">Scan page</button></header>
     <main>
-      <div id="page-state" class="page-state">Open a questionnaire and scan the page.</div>
+      <div class="page-actions"><div id="page-state" class="page-state">Open a questionnaire and scan the page.</div><button id="generate-all" class="generate-all" disabled>Generate all answers</button></div>
       <div class="settings"><label>Tenant <input id="tenant" value="acme-corp"></label><label>Sources <select id="top-k"><option>3</option><option selected>5</option><option>10</option></select></label></div>
       <div id="questions" class="questions"></div>
     </main>

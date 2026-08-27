@@ -2,6 +2,7 @@ const API_URL = 'http://localhost:8000';
 const questions = document.querySelector('#questions');
 const template = document.querySelector('#question-template');
 const pageState = document.querySelector('#page-state');
+const generateAllButton = document.querySelector('#generate-all');
 let scannedFields = [];
 
 function currentTab() {
@@ -23,9 +24,32 @@ async function scan() {
     const result = await askTab({ type: 'SCAN_PAGE' });
     scannedFields = result.fields;
     questions.replaceChildren();
+    generateAllButton.disabled = scannedFields.length === 0;
     pageState.textContent = `${result.title || 'Current page'} · ${scannedFields.length} question${scannedFields.length === 1 ? '' : 's'} detected`;
     scannedFields.forEach((field, index) => renderQuestion(field, index));
   } catch (error) { pageState.innerHTML = `<span class="error">${error.message}</span>`; }
+}
+
+async function generateAnswer(field, controls) {
+  controls.generate.disabled = true;
+  controls.generate.textContent = 'Searching...';
+  try {
+    const result = await fetch(`${API_URL}/api/v1/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenant_id: document.querySelector('#tenant').value, question: field.question, top_k: Number(document.querySelector('#top-k').value) }) });
+    if (!result.ok) throw new Error('API returned an error.');
+    const data = await result.json();
+    controls.answer.value = data.suggested_answer;
+    controls.confidence.textContent = `${Math.round(data.confidence_score * 100)}% confidence`;
+    controls.sourceBox.innerHTML = data.sources.map((source) => `<div class="source-line"><strong>${source.id}</strong> ${source.question}</div>`).join('');
+    controls.sourceBox.hidden = false;
+    controls.insert.hidden = false;
+    controls.generate.textContent = 'Regenerate';
+  } catch (error) {
+    controls.confidence.textContent = 'API unavailable';
+    controls.sourceBox.innerHTML = `<span class="error">${error.message} Start the backend or use the main app.</span>`;
+    controls.sourceBox.hidden = false;
+    controls.generate.textContent = 'Retry';
+  }
+  controls.generate.disabled = false;
 }
 
 function renderQuestion(field, index) {
@@ -38,24 +62,21 @@ function renderQuestion(field, index) {
   const insert = card.querySelector('.insert');
   const confidence = card.querySelector('.confidence');
   const sourceBox = card.querySelector('.sources');
-  generate.addEventListener('click', async () => {
-    generate.disabled = true;
-    generate.textContent = 'Searching...';
-    try {
-      const result = await fetch(`${API_URL}/api/v1/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenant_id: document.querySelector('#tenant').value, question: field.question, top_k: Number(document.querySelector('#top-k').value) }) });
-      if (!result.ok) throw new Error('API returned an error.');
-      const data = await result.json();
-      answer.value = data.suggested_answer;
-      confidence.textContent = `${Math.round(data.confidence_score * 100)}% confidence`;
-      sourceBox.innerHTML = data.sources.map((source) => `<div class="source-line"><strong>${source.id}</strong> ${source.question}</div>`).join('');
-      sourceBox.hidden = false;
-      insert.hidden = false;
-      generate.textContent = 'Regenerate';
-    } catch (error) { confidence.textContent = 'API unavailable'; sourceBox.innerHTML = `<span class="error">${error.message} Start the backend or use the main app.</span>`; sourceBox.hidden = false; generate.textContent = 'Retry'; }
-    generate.disabled = false;
-  });
+  const controls = { answer, generate, insert, confidence, sourceBox };
+  generate.addEventListener('click', () => generateAnswer(field, controls));
   insert.addEventListener('click', async () => { const result = await askTab({ type: 'FILL_FIELD', index, answer: answer.value }); if (result.ok) { insert.textContent = 'Inserted'; insert.disabled = true; } });
   questions.append(card);
 }
 
 document.querySelector('#scan').addEventListener('click', scan);
+generateAllButton.addEventListener('click', async () => {
+  generateAllButton.disabled = true;
+  for (let index = 0; index < scannedFields.length; index += 1) {
+    pageState.textContent = `Generating answer ${index + 1} of ${scannedFields.length}...`;
+    const card = questions.children[index];
+    card.querySelector('.generate').click();
+    while (card.querySelector('.generate').disabled) await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  pageState.textContent = `${scannedFields.length} answers ready for review`;
+  generateAllButton.disabled = false;
+});
