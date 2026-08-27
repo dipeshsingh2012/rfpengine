@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
     await app.state.opensearch.close()
 
 
-app = FastAPI(title="RFQEngine API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="RFPEngine API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),

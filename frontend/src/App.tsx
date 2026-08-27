@@ -168,7 +168,7 @@ function App() {
           {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="brand-mark"><span>R</span></div>
-        <div className="brand-name">RFQ<span>Engine</span></div>
+        <div className="brand-name">RFP<span>Engine</span></div>
         <div className="workspace-switcher"><span className="workspace-dot" /> Acme Corporation <ChevronDown size={15} /></div>
         <div className="topbar-spacer" />
         <button className="icon-button" title="Open notifications"><AlertCircle size={18} /></button>

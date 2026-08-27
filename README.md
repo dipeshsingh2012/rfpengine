@@ -1,6 +1,6 @@
-# RFQEngine
+# RFPEngine
 
-RFQEngine is a seller-side RFP response assistant. It retrieves approved answers from a tenant knowledge base, drafts a response with OpenAI, and lets a seller review and insert the answer into an online questionnaire through a browser extension.
+RFPEngine is a seller-side RFP response assistant. It retrieves approved answers from a tenant knowledge base, drafts a response with OpenAI, and lets a seller review and insert the answer into an online questionnaire through a browser extension.
 
 ## Prerequisites
 
@@ -33,14 +33,14 @@ The frontend can run in demo mode without an API key, but live retrieval require
 The following command starts a local single-node development instance with the security plugin disabled:
 
 ```bash
-docker run -d --name rfqengine-opensearch \
+docker run -d --name rfpengine-opensearch \
 	-p 9200:9200 \
 	-e discovery.type=single-node \
 	-e DISABLE_SECURITY_PLUGIN=true \
 	opensearchproject/opensearch:2.17.1
 ```
 
-Wait for OpenSearch to respond, then create the RFQEngine index:
+Wait for OpenSearch to respond, then create the RFPEngine index:
 
 ```bash
 curl http://localhost:9200
@@ -108,7 +108,7 @@ The extension scans an existing seller questionnaire, generates answers, and ins
 3. Enable **Developer mode**.
 4. Choose **Load unpacked**.
 5. Select the repository's `extension/` directory.
-6. Return to the mock questionnaire and click the RFQEngine extension icon.
+6. Return to the mock questionnaire and click the RFPEngine extension icon.
 7. Click **Scan page** in the side panel.
 8. Click **Generate all answers**, review the drafts, and click **Insert answer** for each approved response.
 
@@ -139,7 +139,7 @@ python3 -m compileall -q backend
 cd frontend && npm run build
 
 # Stop the local OpenSearch container
-docker stop rfqengine-opensearch
+docker stop rfpengine-opensearch
 ```
 
 The current POC expects knowledge records to already exist in OpenSearch. Document upload, question extraction from uploaded files, authentication, persistence of approved answers, and export workflows are planned next layers.
