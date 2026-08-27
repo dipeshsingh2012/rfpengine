@@ -183,3 +183,63 @@ CORS_ORIGINS=https://your-domain.com,https://www.your-domain.com
 ```
 
 Create `api.your-domain.com` in the backend host's custom-domain settings and add the DNS record it provides. Do not put `OPENAI_API_KEY` or OpenSearch credentials in Vercel frontend variables; variables beginning with `VITE_` are shipped to the browser.
+
+## User-type workflows
+
+RFPEngine separates questionnaire ownership from subject-matter approval. The person who imports an RFP does not have to approve every answer.
+
+### Proposal manager
+
+1. Open the seller workspace.
+2. Paste a hosted questionnaire URL or upload an HTML, JSON, or CSV form.
+3. Review the questions detected on `/review`.
+4. Continue to the response workspace and generate drafts.
+5. Assign technical, security, product, or legal questions to the appropriate reviewer.
+6. Track which answers are approved, in review, or need revision.
+7. Consolidate approved answers for final approval.
+
+### SME reviewer
+
+1. Open questions assigned to their domain.
+2. Review the generated answer and supporting knowledge-base sources.
+3. Edit inaccurate or incomplete wording.
+4. Approve the answer or reject it with a requested revision.
+
+Security, product, implementation, compliance, and support SMEs can follow the same review process for their respective areas.
+
+### Legal reviewer
+
+1. Review assigned contractual, privacy, retention, and regulatory responses.
+2. Check that the response uses approved legal language.
+3. Approve the answer or request changes.
+
+Legal-sensitive answers should not be inserted into a buyer form until legal review is complete.
+
+### Final approver
+
+1. Review the consolidated response and unresolved questions.
+2. Confirm required SME and legal reviews are complete.
+3. Approve the final response.
+
+Final approval unlocks the response for insertion or export.
+
+### Submitter
+
+1. Open the approved response in the browser extension or export workflow.
+2. Insert only answers marked approved or final approved.
+3. Check the populated buyer form.
+4. Submit the questionnaire through the buyer's portal.
+
+RFPEngine should never automatically submit a buyer questionnaire. The seller remains responsible for the final submission.
+
+### Answer lifecycle
+
+```text
+Draft
+	-> SME review
+	-> Approved by SME
+	-> Final approval
+	-> Inserted
+```
+
+Any reviewer can send an answer back to `Changes requested`. Low-confidence, unsupported, legal, pricing, and security-sensitive answers should require explicit review before insertion.

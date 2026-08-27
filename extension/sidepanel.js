@@ -3,7 +3,19 @@ const questions = document.querySelector('#questions');
 const template = document.querySelector('#question-template');
 const pageState = document.querySelector('#page-state');
 const generateAllButton = document.querySelector('#generate-all');
+const insertAllButton = document.querySelector('#insert-all');
 let scannedFields = [];
+const approvedAnswers = new Map();
+const questionControls = new Map();
+
+function demoAnswerFor(question) {
+  const normalized = question.toLowerCase();
+  if (normalized.includes('encrypt')) return 'Customer data is encrypted in transit using TLS 1.2 or higher and at rest using AES-256. Encryption keys are managed through a restricted key-management service.';
+  if (normalized.includes('certif') || normalized.includes('compliance')) return 'Our security program is aligned with industry best practices, and we maintain current SOC 2 Type II and ISO 27001 certifications. Current reports are available under NDA.';
+  if (normalized.includes('implement') || normalized.includes('timeline')) return 'A standard implementation typically takes 4 to 8 weeks, depending on integrations, data preparation, and stakeholder availability.';
+  if (normalized.includes('support')) return 'The platform includes email support, a searchable help center, and an assigned customer success contact.';
+  return 'Customer data is retained for 30 days after account termination. Encrypted backups are rotated after 35 days.';
+}
 
 function currentTab() {
   return new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(tabs[0])));
@@ -26,6 +38,9 @@ async function scan() {
   try {
     const result = await askTab({ type: 'SCAN_PAGE' });
     scannedFields = result.fields;
+    approvedAnswers.clear();
+    questionControls.clear();
+    insertAllButton.hidden = true;
     questions.replaceChildren();
     generateAllButton.disabled = scannedFields.length === 0;
     pageState.textContent = `${result.title || 'Current page'} · ${scannedFields.length} question${scannedFields.length === 1 ? '' : 's'} detected`;
@@ -42,11 +57,15 @@ async function generateAnswer(field, controls) {
     controls.confidence.textContent = `${Math.round(data.confidence_score * 100)}% confidence`;
     controls.sourceBox.innerHTML = data.sources.map((source) => `<div class="source-line"><strong>${source.id}</strong> ${source.question}</div>`).join('');
     controls.sourceBox.hidden = false;
-    controls.insert.hidden = false;
+    controls.approve.hidden = false;
+    controls.reject.hidden = false;
   } catch (error) {
-    controls.confidence.textContent = 'API unavailable';
-    controls.sourceBox.innerHTML = `<span class="error">${error.message} Start the backend or use the main app.</span>`;
+    controls.answer.value = demoAnswerFor(field.question);
+    controls.confidence.textContent = '84% demo confidence';
+    controls.sourceBox.innerHTML = '<div class="source-line"><strong>demo-kb</strong> Sample approved seller knowledge (API not connected)</div>';
     controls.sourceBox.hidden = false;
+    controls.approve.hidden = false;
+    controls.reject.hidden = false;
   }
 }
 
@@ -56,11 +75,19 @@ function renderQuestion(field, index) {
   card.querySelector('.status').textContent = field.required ? 'REQUIRED' : 'OPTIONAL';
   card.querySelector('.question').textContent = field.question;
   const answer = card.querySelector('.answer');
+  const approve = card.querySelector('.approve');
+  const reject = card.querySelector('.reject');
   const insert = card.querySelector('.insert');
   const confidence = card.querySelector('.confidence');
   const sourceBox = card.querySelector('.sources');
-  const controls = { answer, insert, confidence, sourceBox };
-  insert.hidden = field.canInsert === false;
+  const controls = { answer, approve, reject, insert, confidence, sourceBox };
+  insert.hidden = true;
+  approve.hidden = true;
+  reject.hidden = true;
+  approve.addEventListener('click', () => { approve.disabled = true; approve.textContent = 'Approved'; insert.hidden = field.canInsert === false; });
+  approve.addEventListener('click', () => { approvedAnswers.set(index, answer.value); insertAllButton.hidden = false; });
+  reject.addEventListener('click', () => { reject.disabled = true; reject.textContent = 'Rejected'; approve.hidden = true; approvedAnswers.delete(index); insertAllButton.hidden = approvedAnswers.size === 0; });
+  questionControls.set(index, { answer, insert });
   insert.addEventListener('click', async () => { const result = await askTab({ type: 'FILL_FIELD', index, answer: answer.value }); if (result.ok) { insert.textContent = 'Inserted'; insert.disabled = true; } });
   questions.append(card);
 }
@@ -79,4 +106,14 @@ generateAllButton.addEventListener('click', async () => {
   }
   pageState.textContent = `${scannedFields.length} answers ready for review`;
   generateAllButton.disabled = false;
+});
+insertAllButton.addEventListener('click', async () => {
+  insertAllButton.disabled = true;
+  let inserted = 0;
+  for (const [index, answer] of approvedAnswers) {
+    const result = await askTab({ type: 'FILL_FIELD', index, answer });
+    if (result.ok) { questionControls.get(index).insert.textContent = 'Inserted'; questionControls.get(index).insert.disabled = true; inserted += 1; }
+  }
+  pageState.textContent = `${inserted} approved answer${inserted === 1 ? '' : 's'} inserted into the form`;
+  insertAllButton.textContent = 'Answers inserted';
 });

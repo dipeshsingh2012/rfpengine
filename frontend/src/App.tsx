@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  Download,
   FileText,
   FolderOpen,
   History,
@@ -35,6 +36,8 @@ type SearchResponse = {
   confidence_score: number
   sources: Source[]
 }
+
+type SourceMode = 'url' | 'upload' | 'extension'
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 
@@ -70,6 +73,20 @@ const starterQuestions = [
   'What support is included with the platform?',
 ]
 
+function demoAnswerFor(question: string): SearchResponse {
+  const normalized = question.toLowerCase()
+  const answer = normalized.includes('encrypt')
+    ? 'Customer data is encrypted in transit using TLS 1.2 or higher and at rest using AES-256. Encryption keys are managed through a restricted key-management service.'
+    : normalized.includes('certif') || normalized.includes('compliance')
+      ? 'Our security program is aligned with industry best practices, and we maintain current SOC 2 Type II and ISO 27001 certifications. Current reports are available under NDA.'
+      : normalized.includes('implement') || normalized.includes('timeline')
+        ? 'A standard implementation typically takes 4 to 8 weeks, depending on integrations, data preparation, and stakeholder availability. A dedicated implementation manager coordinates the rollout.'
+        : normalized.includes('support')
+          ? 'The platform includes email support, a searchable help center, and an assigned customer success contact. Premium plans add priority response times and dedicated support.'
+          : demoResponse.suggested_answer
+  return { ...demoResponse, suggested_answer: answer, confidence_score: 0.84 }
+}
+
 function extractFormQuestions(text: string, fileName: string) {
   if (fileName.endsWith('.json')) {
     const parsed = JSON.parse(text)
@@ -95,13 +112,18 @@ function App() {
   const [topK, setTopK] = useState(5)
   const [response, setResponse] = useState<SearchResponse>(demoResponse)
   const [answer, setAnswer] = useState(demoResponse.suggested_answer)
+  const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, string>>({ [starterQuestions[0]]: demoResponse.suggested_answer })
   const [activeSource, setActiveSource] = useState(demoResponse.sources[0].id)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [answerStatus, setAnswerStatus] = useState<'Draft' | 'Approved' | 'Rejected'>('Draft')
+  const [role, setRole] = useState<'Proposal manager' | 'Security SME' | 'Legal reviewer' | 'Final approver'>('Proposal manager')
   const [notice, setNotice] = useState('Demo data loaded')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [formUrl, setFormUrl] = useState('')
   const [sourceStatus, setSourceStatus] = useState('No external form loaded')
   const [detectedQuestions, setDetectedQuestions] = useState<string[]>([])
+  const [sourceMode, setSourceMode] = useState<SourceMode>('upload')
+  const [sourceLabel, setSourceLabel] = useState('Demo questionnaire')
   const [route, setRoute] = useState(window.location.pathname || '/')
 
   useEffect(() => {
@@ -110,8 +132,21 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  function loadQuestions(questions: string[], source: string) {
+  useEffect(() => {
+    const approveButton = document.querySelector<HTMLButtonElement>('.approve-button')
+    const rejectButton = document.querySelector<HTMLButtonElement>('.reject-button')
+    if (!approveButton || !rejectButton) return
+    const approve = () => { const nextStatus = role === 'Proposal manager' ? 'SME review' : role === 'Final approver' ? 'Final approved' : 'Approved by SME'; setAnswerStatus(nextStatus as 'Approved'); setNotice(`${nextStatus} · ${role}`) }
+    const reject = () => { setAnswerStatus('Rejected'); setNotice('Answer rejected and needs revision') }
+    approveButton.addEventListener('click', approve)
+    rejectButton.addEventListener('click', reject)
+    return () => { approveButton.removeEventListener('click', approve); rejectButton.removeEventListener('click', reject) }
+  }, [route, answerStatus, role])
+
+  function loadQuestions(questions: string[], source: string, mode: SourceMode) {
     setDetectedQuestions(questions)
+    setSourceMode(mode)
+    setSourceLabel(source)
     if (questions[0]) setQuestion(questions[0])
     setSourceStatus(`${source} · ${questions.length} question${questions.length === 1 ? '' : 's'} detected`)
     setNotice(questions.length ? 'Form questions loaded' : 'No questions found')
@@ -124,7 +159,7 @@ function App() {
       setSourceStatus('Fetching form...')
       const result = await fetch(url.href)
       if (!result.ok) throw new Error(`Could not fetch form (${result.status})`)
-      loadQuestions(extractFormQuestions(await result.text(), url.pathname.toLowerCase()), url.hostname)
+      loadQuestions(extractFormQuestions(await result.text(), url.pathname.toLowerCase()), url.hostname, 'url')
     } catch (error) {
       setSourceStatus(error instanceof TypeError ? 'The form blocked browser access. Enable CORS or use file upload.' : (error as Error).message)
     }
@@ -133,7 +168,7 @@ function App() {
   async function loadFormFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-    try { loadQuestions(extractFormQuestions(await file.text(), file.name.toLowerCase()), file.name) }
+    try { loadQuestions(extractFormQuestions(await file.text(), file.name.toLowerCase()), file.name, 'upload') }
     catch (error) { setSourceStatus(`Could not read form: ${(error as Error).message}`) }
   }
 
@@ -143,11 +178,25 @@ function App() {
   }
 
   function openImport() {
-    navigate('/response/import')
+    navigate('/review')
   }
 
   function openWorkspace() {
     navigate('/response/workspace/demo')
+  }
+
+  function openOriginalForm() {
+    if (formUrl) window.open(formUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  function exportAnswers() {
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+    const rows = ['question,answer', ...detectedQuestions.map((item) => `${escapeCsv(item)},${escapeCsv(answersByQuestion[item] || '')}`)]
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }))
+    link.download = `${sourceLabel.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'rfpengine-response'}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
   }
 
   async function generateAnswer() {
@@ -164,19 +213,24 @@ function App() {
       const data = (await result.json()) as SearchResponse
       setResponse(data)
       setAnswer(data.suggested_answer)
+      setAnswersByQuestion((current) => ({ ...current, [question]: data.suggested_answer }))
+      setAnswerStatus('Draft')
       setActiveSource(data.sources[0]?.id ?? '')
       setNotice('Draft generated from live sources')
     } catch {
-      setResponse(demoResponse)
-      setAnswer(demoResponse.suggested_answer)
+      const fallback = demoAnswerFor(question)
+      setResponse(fallback)
+      setAnswer(fallback.suggested_answer)
+      setAnswersByQuestion((current) => ({ ...current, [question]: fallback.suggested_answer }))
+      setAnswerStatus('Draft')
       setActiveSource(demoResponse.sources[0].id)
-      setNotice('Showing demo result. Connect the API for live retrieval.')
+      setNotice('Demo answer generated. Connect the API for live retrieval.')
     } finally {
       setIsGenerating(false)
     }
   }
 
-  if (route === '/response/import') {
+  if (route === '/review') {
     return <div className="import-page"><header className="import-header"><div className="brand-mark"><span>R</span></div><div className="brand-name">RFP<span>Engine</span></div><span className="import-header-label">Response assistant</span></header><main className="import-main"><p className="breadcrumb">Responses <span>/</span> New response</p><h1>Review your questionnaire</h1><p className="subtitle">Confirm the questions found before drafting answers.</p><section className="import-source panel"><div className="panel-label"><span className="step-number">01</span><div><p className="eyebrow">Form source</p><span className="label-hint">Load a hosted questionnaire or upload form data</span></div></div><div className="source-input-row"><div className="source-url-field"><Link size={16} /><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="https://buyer.example/questionnaire" /><button className="source-button" onClick={loadFormUrl} disabled={!formUrl.trim()}>Load URL</button></div><label className="upload-form-button"><Upload size={15} /> Upload HTML, JSON, or CSV<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={loadFormFile} /></label></div><p className="source-status"><span className="status-dot" /> {sourceStatus}</p></section><section className="import-questions panel"><div className="import-question-heading"><div><p className="eyebrow">02 / Detected questions</p><h2>{detectedQuestions.length ? `${detectedQuestions.length} questions ready` : 'No questions detected'}</h2></div><span className="source-count">Review before continuing</span></div>{detectedQuestions.length ? <div className="import-question-list">{detectedQuestions.map((detectedQuestion, index) => <div className="import-question" key={`${detectedQuestion}-${index}`}><span className="source-rank">Q{String(index + 1).padStart(2, '0')}</span><span>{detectedQuestion}</span><Check size={15} /></div>)}</div> : <p className="empty-import">Load a URL or upload a form file to see its questions here.</p>}<button className="primary-button continue-button" onClick={openWorkspace} disabled={!detectedQuestions.length}>Continue to workspace <ArrowUpRight size={15} /></button></section></main></div>
   }
 
@@ -217,6 +271,7 @@ function App() {
       </aside>
 
       <main className="main-content">
+        {route === '/response/workspace/demo' && <div className="role-bar"><div className="role-selector"><span className="eyebrow">Viewing as</span><select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option>Proposal manager</option><option>Security SME</option><option>Legal reviewer</option><option>Final approver</option></select></div><div className="queue-summary"><span><strong>12</strong> total</span><span><strong>8</strong> approved</span><span className="queue-warning"><strong>2</strong> SME review</span><span><strong>1</strong> revision</span></div><span className="workflow-status">{answerStatus === 'Draft' ? 'Draft in progress' : answerStatus}</span></div>}
         {route === '/' ? <section className="home-screen"><p className="eyebrow">Start a response</p><h1>Bring in your questionnaire</h1><p className="home-subtitle">Choose how you want to load the seller form.</p><div className="home-feature-grid"><div className="home-feature"><span className="home-feature-number">01</span><div className="home-feature-icon"><Link size={22} /></div><h2>Paste a form URL</h2><p>Load a hosted questionnaire and extract its questions for review.</p><div className="home-url-row"><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="https://buyer.example/form" /><button className="primary-button" onClick={async () => { openImport(); await loadFormUrl(); }} disabled={!formUrl.trim()}>Load URL <ArrowUpRight size={15} /></button></div><small>Works when the page permits browser access.</small></div><div className="home-feature"><span className="home-feature-number">02</span><div className="home-feature-icon upload-icon"><Upload size={22} /></div><h2>Upload form data</h2><p>Import an HTML, JSON, or CSV questionnaire from your computer.</p><label className="home-upload-button"><Upload size={16} /> Choose a form file<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={async (event) => { openImport(); await loadFormFile(event); }} /></label><small>Questions are extracted locally in your browser.</small></div></div></section> : <>
         <div className="page-heading">
           <div><p className="breadcrumb">Responses <span>/</span> Northstar security review</p><h1>Response workspace</h1><p className="subtitle">Draft accurate answers from your approved knowledge base.</p></div>
@@ -226,9 +281,10 @@ function App() {
         <section className="source-panel panel">
           <div className="panel-label"><span className="step-number">00</span><div><p className="eyebrow">Form source</p><span className="label-hint">Load a hosted questionnaire or upload form data</span></div></div>
           <div className="source-input-row"><div className="source-url-field"><Link size={16} /><input value={formUrl} onChange={(event) => setFormUrl(event.target.value)} placeholder="Paste form URL, e.g. https://buyer.example/questionnaire" /><button className="source-button" onClick={loadFormUrl} disabled={!formUrl.trim()}>Load URL</button></div><label className="upload-form-button"><Upload size={15} /> Upload HTML, JSON, or CSV<input type="file" accept=".html,.htm,.json,.csv,text/html,application/json,text/csv" onChange={loadFormFile} /></label></div>
-          <div className="source-status-row"><p className="source-status"><span className="status-dot" /> {sourceStatus}</p>{route === '/response/import' && detectedQuestions.length > 0 && <button className="source-button" onClick={openWorkspace}>Continue to workspace <ArrowUpRight size={14} /></button>}</div>
+          <div className="source-status-row"><p className="source-status"><span className="status-dot" /> {sourceStatus}</p>{route === '/review' && detectedQuestions.length > 0 && <button className="source-button" onClick={openWorkspace}>Continue to workspace <ArrowUpRight size={14} /></button>}</div>
         </section>
 
+        <div className="source-actions"><span className="source-badge">{sourceMode === 'url' ? 'Hosted form' : sourceMode === 'upload' ? 'Uploaded form' : 'Live page'} · {sourceLabel}</span><div>{sourceMode === 'url' && <button className="outline-button" onClick={openOriginalForm}><Link size={15} /> Open original form</button>}{sourceMode === 'upload' && <button className="outline-button" onClick={exportAnswers}><Download size={15} /> Export CSV</button>}</div></div>
         <section className="question-panel panel">
           <div className="panel-label"><span className="step-number">01</span><div><p className="eyebrow">Question to answer</p><span className="label-hint">Ask a question or paste one from your RFP</span></div></div>
           <textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={3} />
