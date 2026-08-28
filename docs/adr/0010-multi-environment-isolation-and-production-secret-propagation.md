@@ -69,3 +69,4 @@ We implement a comprehensive **Multi-Environment Isolation and Secret Propagatio
 
 ### Negative / Trade-offs
 - Changing production secrets requires updating Secret Manager versions (handled via `npm run secrets:sync` or Terraform).
+

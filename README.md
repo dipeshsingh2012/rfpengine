@@ -82,6 +82,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
 - [ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning](docs/adr/0009-passage-based-document-ingestion-and-llm-reasoning.md)
 - [ADR 0010: Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation](docs/adr/0010-multi-environment-isolation-and-production-secret-propagation.md)
+- [ADR 0011: Continuous Deployment to Google Cloud Run via GitHub Actions](docs/adr/0011-continuous-deployment-to-cloud-run-via-github-actions.md)
 
 ---
 
@@ -434,6 +435,16 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 - **Cloud Run API**: `https://rfpengine-api-714049712844.us-central1.run.app`
 - **Swagger Documentation**: `https://rfpengine-api-714049712844.us-central1.run.app/docs`
 - **CORS Allowed Origins**: `http://localhost:5173`, `http://localhost:3000`, `https://www.rfpengine.net`, `https://rfpengine.net`, and Chrome Extensions (`chrome-extension://*`).
+
+### 4. Continuous Deployment via GitHub Actions
+Backend deployments are fully automated via [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml):
+1. Runs document parser tests and validation (`pytest`).
+2. Builds `linux/amd64` container image using Docker Buildx and pushes to **Google Artifact Registry** tagged with `${{ github.sha }}` and `latest`.
+3. Deploys container revision to **Google Cloud Run** (`rfpengine-api` in `us-central1`).
+4. Executes live smoke test verifying `HTTP 200 OK` on `/health`.
+
+**Repository Secret Required**:
+- **`GCP_SA_KEY`**: Service account JSON credentials for `rfpengine-admin@rfpengine.iam.gserviceaccount.com`.
 
 ---
 
