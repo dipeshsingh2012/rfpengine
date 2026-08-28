@@ -175,39 +175,127 @@ Open [http://localhost:5173/](http://localhost:5173/).
 
 ---
 
-## GCP Deployment with Terraform & Cloud Run
+## GCP Deployment & Secrets Management with Terraform
 
-The repository contains full **Terraform** configurations in [`terraform/`](terraform/) to provision Secret Manager, Cloud Run v2 (scale to zero), Artifact Registry, and IAM permissions.
+All cloud infrastructure — including **Google Cloud Secret Manager secrets**, **Cloud Run v2**, **IAM Service Accounts**, and **Artifact Registry** — is managed declaratively via **Terraform** in the [`terraform/`](terraform/) directory.
 
-### 1. Terraform Deployment
+---
+
+### Managing Secrets with Terraform
+
+All sensitive credentials (`DATABASE_URL`, `OPENAI_API_KEY`, `PINECONE_API_KEY`, etc.) are declared as sensitive variables in Terraform, provisioned in GCP Secret Manager, and injected directly into Cloud Run at container boot.
+
+#### 1. How to Update or Rotate an Existing Secret
+
+To update a database password, OpenAI key, or Pinecone API key:
+
+1. Open `terraform/terraform.tfvars` (or pass `-var="variable_name=new_value"`).
+2. Update the variable value:
+   ```hcl
+   # terraform/terraform.tfvars
+   database_url   = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
+   openai_api_key = "sk-proj-NEW_OPENAI_KEY..."
+   ```
+3. Apply the Terraform update:
+   ```bash
+   npm run tf:apply
+   # or: cd terraform && terraform apply
+   ```
+4. **Zero Downtime**: Terraform creates a new secret version in GCP Secret Manager and automatically triggers a new Cloud Run revision using the latest secret value.
+
+---
+
+#### 2. How to Add a Brand New Secret (Step-by-Step)
+
+If you introduce a new third-party service (e.g. `COHERE_API_KEY` or `SLACK_WEBHOOK_URL`):
+
+1. **Declare the Variable** in [`terraform/variables.tf`](terraform/variables.tf):
+   ```hcl
+   variable "cohere_api_key" {
+     type        = string
+     description = "Cohere API key for reranking"
+     sensitive   = true
+     default     = ""
+   }
+   ```
+
+2. **Define the Secret Manager Resource** in [`terraform/secrets.tf`](terraform/secrets.tf):
+   ```hcl
+   resource "google_secret_manager_secret" "cohere_api_key" {
+     secret_id = "${var.app_name}-cohere-api-key"
+     replication {
+       auto {}
+     }
+     depends_on = [google_project_service.enabled_apis]
+   }
+
+   resource "google_secret_manager_secret_version" "cohere_api_key_val" {
+     count       = var.cohere_api_key != "" ? 1 : 0
+     secret      = google_secret_manager_secret.cohere_api_key.id
+     secret_data = var.cohere_api_key
+   }
+   ```
+
+3. **Grant IAM Access to Cloud Run** in [`terraform/iam.tf`](terraform/iam.tf):
+   ```hcl
+   resource "google_secret_manager_secret_iam_member" "cohere_key_access" {
+     secret_id = google_secret_manager_secret.cohere_api_key.id
+     role      = "roles/secretmanager.secretAccessor"
+     member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+   }
+   ```
+
+4. **Mount Secret as Environment Variable** in [`terraform/cloud_run.tf`](terraform/cloud_run.tf):
+   ```hcl
+   dynamic "env" {
+     for_each = var.cohere_api_key != "" ? [1] : []
+     content {
+       name = "COHERE_API_KEY"
+       value_source {
+         secret_key_ref {
+           secret  = google_secret_manager_secret.cohere_api_key.secret_id
+           version = "latest"
+         }
+       }
+     }
+   }
+   ```
+
+5. **Set the Value & Apply**:
+   Add `cohere_api_key = "..."` in `terraform/terraform.tfvars` and run `npm run tf:apply`.
+
+---
+
+### Complete GCP Deployment Workflow
+
+#### 1. Initial Infrastructure Provisioning
 
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
-# Fill in project_id, database_url (Neon), openai_api_key, etc.
+# Fill in project_id, database_url (Neon), credentials_file ("../gcp-key.json")
 
-# Authenticate with Google Cloud
-gcloud auth login
-gcloud auth application-default login
+# Initialize and preview
+npm run tf:init
+npm run tf:plan
 
-# Initialize & Apply Terraform Plan
-terraform init
-terraform apply
+# Provision GCP Secret Manager, Cloud Run, Artifact Registry, and IAM
+npm run tf:apply
 ```
 
-### 2. Build & Deploy Backend Container to Cloud Run
+#### 2. Build & Push Backend Container to Artifact Registry
 
 ```bash
-# Set variables from Terraform outputs
-PROJECT_ID=$(terraform output -raw project_id)
+# Retrieve variables from Terraform outputs
+PROJECT_ID="rfpengine"
 REGION="us-central1"
-REPO_URL=$(terraform output -raw artifact_registry_repo)
+REPO_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/rfpengine-repo"
 
-# Build and Push Container Image
+# Build and Push Container Image to Google Artifact Registry
 cd ../backend
 gcloud builds submit --tag "${REPO_URL}/backend:latest" .
 
-# Update Cloud Run to use the newly pushed image
+# Update Cloud Run to deploy the pushed image
 gcloud run deploy rfpengine-api \
   --image "${REPO_URL}/backend:latest" \
   --region "${REGION}"
