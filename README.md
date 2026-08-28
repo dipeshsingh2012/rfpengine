@@ -80,6 +80,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0006: Centralized Secrets Management with GCP Secret Manager and Terraform](docs/adr/0006-centralized-secrets-management-with-gcp-secret-manager.md)
 - [ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy](docs/adr/0007-knowledge-base-chunking-and-search-index-ingestion.md)
 - [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
+- [ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning](docs/adr/0009-passage-based-document-ingestion-and-llm-reasoning.md)
 
 ---
 
@@ -93,24 +94,24 @@ Future roadmap items and upcoming architecture enhancements are tracked in [`doc
 
 ---
 
-## Knowledge Base Ingestion & Chunking
+## Knowledge Base Ingestion & Passage Chunking
 
-RFPEngine supports uploading documents directly through the React UI or the API (`POST /api/v1/knowledge-base/upload`):
+RFPEngine ingests arbitrary enterprise documentation (whitepapers, contracts, SLAs, technical manuals, employee handbooks) and chunks them into semantic **narrative passages**, leaving question-to-passage reasoning to **Gemini 2.5 Flash**:
 
-| File Type | Parsing & Chunking Strategy | Target Chunk Size | Synthesized Topic Header |
+| File Type | Parsing & Chunking Strategy | Target Chunk Size | Section Title / Header Mapping |
 | :--- | :--- | :--- | :--- |
-| **CSV / TSV** | **Atomic Q&A Pairs** (1 row = 1 record) | 100–300 tokens | Column: `question` / `prompt` |
-| **JSON / JSONL** | **Structured Objects / Lines** | 100–300 tokens | Key: `question` / `prompt` |
-| **Markdown (`.md`)** | **Heading-Aware Hierarchy** (`#`, `##`, `###`) | 300–500 tokens | Heading text (`## Data Encryption`) |
-| **DOCX (`.docx`)** | **Document & Heading Hierarchy** | 300–500 tokens | Heading / section title |
-| **PDF (`.pdf`)** | **Page & Paragraph Sliding Window** | 300–500 tokens (~1.6k chars) | Page number + first sentence |
-| **Text (`.txt`)** | **Recursive Character Sliding Window** | 300–500 tokens (50-tok overlap) | Document title + sentence |
+| **Markdown (`.md`)** | **Heading-Aware Hierarchy** (`#`, `##`, `###`) | 300–500 tokens | Heading text (e.g. `2.2 Encryption at Rest`) |
+| **DOCX (`.docx`)** | **Document & Heading Hierarchy** | 300–500 tokens | Heading / section title (e.g. `1. REST API Architecture`) |
+| **PDF (`.pdf`)** | **Page & Paragraph Sliding Window** | 300–500 tokens (~1.6k chars) | Document title + page number + section |
+| **Text (`.txt`)** | **Recursive Character Sliding Window** | 300–500 tokens (50-tok overlap) | Document title + topical clause |
+| **CSV / TSV** | **Row Extraction** (1 row = 1 record) | 100–300 tokens | Column: `topic` / `question` / `title` |
+| **JSON / JSONL** | **Structured Objects / Lines** | 100–300 tokens | Key: `topic` / `question` / `title` |
 
 ### Embedding Specifications
 * **Primary Model**: Google Cloud Vertex AI `text-embedding-004` (768 dimensions)
 * **Similarity Metric**: Cosine Similarity in Pinecone Serverless
-* **Chunk Text Format**: `Topic: {section_or_question}\n{chunk_text}`
-* **Storage Separation**: Document chunks are stored directly in **Elasticsearch** (text document store + BM25) and **Pinecone** (dense vectors + citation metadata). High-volume raw chunks bypass PostgreSQL.
+* **Passage Format**: `Title: {title}\n\nContent: {content}`
+* **Storage Synchronization**: Passage chunks are synchronized idempotently across **PostgreSQL** (`kb_entries`), **Elastic Cloud** (BM25 sparse search), and **Pinecone Serverless** (dense vector k-NN).
 
 ---
 
