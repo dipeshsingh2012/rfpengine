@@ -18,26 +18,6 @@ let scannedFields = [];
 const approvedAnswers = new Map();
 const questionControls = new Map();
 
-function demoAnswerFor(question) {
-  const normalized = question.toLowerCase();
-  if (normalized.includes('retention') || normalized.includes('backup')) {
-    return 'Customer data is retained for 30 days post-termination. Daily automated backups are stored with AES-256 encryption and rotated on a 35-day cycle.';
-  }
-  if (normalized.includes('encrypt')) {
-    return 'Customer data is encrypted in transit using TLS 1.3 and at rest using AES-256 with managed KMS keys.';
-  }
-  if (normalized.includes('certif') || normalized.includes('compliance')) {
-    return 'Our security program maintains SOC 2 Type II and ISO 27001 certifications. Reports are available under NDA.';
-  }
-  if (normalized.includes('timeline') || normalized.includes('onboard')) {
-    return 'Standard implementation typically takes 4 to 6 weeks, structured across onboarding, data ingestion, and testing.';
-  }
-  if (normalized.includes('support') || normalized.includes('sla')) {
-    return 'We commit to a 99.95% uptime SLA with 24/7 priority 1 response and dedicated customer support.';
-  }
-  return 'Enterprise policies enforce strict compliance standards, regular audit reporting, and verified operational SLAs.';
-}
-
 function currentTab() {
   return new Promise((resolve) =>
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(tabs[0]))
@@ -122,7 +102,7 @@ async function generateAnswer(field, controls) {
         top_k: Number(document.querySelector('#top-k').value) || 3,
       }),
     });
-    if (!result.ok) throw new Error('API returned an error.');
+    if (!result.ok) throw new Error(`API returned HTTP ${result.status} ${result.statusText}`);
     const data = await result.json();
     controls.answer.value = data.suggested_answer;
     controls.confidence.textContent = `${Math.round(data.confidence_score * 100)}% confidence`;
@@ -132,14 +112,15 @@ async function generateAnswer(field, controls) {
     controls.sourceBox.hidden = false;
     controls.approve.hidden = false;
     controls.reject.hidden = false;
-  } catch {
-    controls.answer.value = demoAnswerFor(field.question);
-    controls.confidence.textContent = '88% confidence (offline fallback)';
+  } catch (err) {
+    controls.answer.value = `[Error] Unable to reach RFPEngine API at ${API_URL}.\nPlease check backend server status.`;
+    controls.confidence.textContent = 'Connection Error';
     controls.sourceBox.innerHTML =
-      '<div class="source-line"><strong>demo-kb</strong> Verified enterprise policy knowledge</div>';
+      `<div class="source-line" style="color:#dc2626"><strong>API Error</strong> ${err.message || 'Failed to fetch from backend'}</div>`;
     controls.sourceBox.hidden = false;
-    controls.approve.hidden = false;
-    controls.reject.hidden = false;
+    controls.approve.hidden = true;
+    controls.reject.hidden = true;
+    controls.insert.hidden = true;
   }
 }
 

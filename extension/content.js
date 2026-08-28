@@ -139,42 +139,14 @@ async function generateAnswerForQuestion(question) {
     });
     if (res.ok) {
       const data = await res.json();
-      return data.suggested_answer;
+      return data.suggested_answer || '';
     }
+    console.error(`RFPEngine API Error: HTTP ${res.status} ${res.statusText}`);
+    return '';
   } catch (err) {
-    console.warn('RFPEngine: Live query failed, using heuristic fallback', err);
+    console.error('RFPEngine: Failed to reach Cloud Run API', err);
+    return '';
   }
-
-  // Fallback demo knowledge
-  const norm = normalizeText(question);
-  if (norm.includes('retention') || norm.includes('backup')) {
-    return 'Customer data is retained for active subscription duration plus 30 days post-termination. Encrypted automated backups are generated daily and rotated after 35 days in geo-redundant storage.';
-  }
-  if (norm.includes('encrypt')) {
-    return 'All customer data is encrypted in transit using TLS 1.3 and at rest using AES-256 with customer-managed AWS KMS keys rotated annually.';
-  }
-  if (norm.includes('certif') || norm.includes('compliance') || norm.includes('soc')) {
-    return 'We maintain annual SOC 2 Type II compliance, ISO/IEC 27001:2022 certification, and strict adherence to GDPR and HIPAA frameworks. Reports are available under NDA.';
-  }
-  if (norm.includes('sla') || norm.includes('uptime')) {
-    return 'We commit to a 99.95% monthly uptime SLA with 24/7/365 priority 1 incident response guaranteed within 15 minutes for critical outages.';
-  }
-  if (norm.includes('timeline') || norm.includes('onboard')) {
-    return 'Standard implementation timeline spans 4 to 6 weeks, structured across kickoff, data ingestion, SSO integration, and user acceptance testing phases.';
-  }
-  if (norm.includes('sso') || norm.includes('saml') || norm.includes('auth')) {
-    return 'We support SAML 2.0 and OpenID Connect (OIDC) Single Sign-On with Okta, Azure AD, Google Workspace, automated SCIM provisioning, and mandatory MFA.';
-  }
-  if (norm.includes('battery') || norm.includes('thermal')) {
-    return 'Titan drone batteries utilize Lithium-Iron-Phosphate (LiFePO4) chemistry with 800W GaN ground charging. Active thermal monitoring triggers automated emergency landing if cell temperatures reach 55°C.';
-  }
-  if (norm.includes('bvlos') || norm.includes('faa')) {
-    return 'Operations are conducted under FAA BVLOS Waiver Certificate FAA-W-2026-TITAN-09 with a 380-foot AGL ceiling, dual 360-degree LiDAR, and 978/1090 MHz ADS-B transponders.';
-  }
-  if (norm.includes('teleop') || norm.includes('pilot')) {
-    return 'Pilot-in-Command supervisory ratio is 1:12 over private 5G mmWave networks with Starlink satellite failover, guaranteeing sub-25ms round-trip control latency.';
-  }
-  return 'Enterprise policies enforce strict compliance standards, regular audit reporting, and verified operational SLAs across all customer deployments.';
 }
 
 // --- In-Page Injection Floating Overlay ---
