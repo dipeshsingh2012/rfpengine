@@ -45,8 +45,6 @@ button:disabled { cursor: wait; opacity: .7; }
 .kb-alert-success { background: #eaf5e9; color: #2e6930; border: 1px solid #c2e2bf; }
 .kb-alert-error { background: #fdf0ed; color: #9c3621; border: 1px solid #f7c9be; }
 .kb-records-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-.kb-search-bar { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; padding: 6px 12px; flex: 1; min-width: 250px; }
-.kb-search-bar input { border: 0; outline: 0; flex: 1; font-size: 12px; }
 .kb-records-grid { display: grid; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
 .kb-record-card { background: #fff; border: 1px solid var(--line); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; position: relative; }
 .kb-record-card:hover { border-color: #a9b8f1; }
@@ -66,4 +64,37 @@ button:disabled { cursor: wait; opacity: .7; }
 .kb-sample-pill:hover { background: #e0e7ff; border-color: var(--blue); color: var(--blue); transform: translateY(-1px); }
 .kb-sample-name { white-space: nowrap; }
 .kb-sample-badge { font-family: 'DM Mono', monospace; font-size: 9px; padding: 1px 4px; background: #fff; border: 1px solid #dcd8cf; border-radius: 2px; color: var(--muted); }
+
+/* --- Modal Navigation Tabs --- */
+.kb-modal-tabs { display: flex; gap: 8px; align-items: center; }
+.kb-tab-btn { background: transparent; border: 0; padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; transition: all .15s ease; }
+.kb-tab-btn:hover { color: var(--ink); background: #f0eee6; }
+.kb-tab-btn.active { color: var(--blue); background: #e0e7ff; }
+
+/* --- Playground Styles --- */
+.kb-playground-container { display: flex; flex-direction: column; gap: 20px; }
+.kb-playground-input-card { background: #fff; border: 1px solid var(--line); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.kb-playground-form { display: flex; gap: 10px; }
+.kb-playground-form input { flex: 1; padding: 10px 14px; border: 1px solid var(--line); font-size: 13px; outline: 0; background: #faf9f5; }
+.kb-playground-form input:focus { border-color: var(--blue); background: #fff; }
+.kb-playground-run-btn { background: var(--blue); color: #fff; border: 0; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border-radius: 4px; transition: all .15s ease; white-space: nowrap; }
+.kb-playground-run-btn:hover { background: #2643a3; }
+.kb-playground-run-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.kb-playground-starters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.kb-starter-chip { background: #f4f6fc; border: 1px solid #c9d4f5; color: var(--navy); padding: 4px 10px; font-size: 11px; border-radius: 12px; cursor: pointer; transition: all .15s ease; text-align: left; }
+.kb-starter-chip:hover { background: #e0e7ff; border-color: var(--blue); }
+.kb-playground-output { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
+@media (max-width: 800px) { .kb-playground-output { grid-template-columns: 1fr; } }
+.kb-answer-card { background: #fff; border: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.kb-answer-header { display: flex; justify-content: space-between; align-items: center; }
+.kb-confidence-badge { font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 3px; font-weight: 600; }
+.confidence-high { background: #eaf5e9; color: #2e6930; border: 1px solid #c2e2bf; }
+.confidence-med { background: #fff8e1; color: #8d6b00; border: 1px solid #ffe082; }
+.kb-answer-text { font-size: 13px; line-height: 1.65; color: var(--ink); white-space: pre-wrap; }
+.kb-sources-card { background: #fff; border: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 480px; overflow-y: auto; }
+.kb-source-item { border: 1px solid #e2ded5; padding: 12px 14px; background: #faf9f5; display: flex; flex-direction: column; gap: 6px; border-radius: 3px; }
+.kb-source-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.kb-source-method { font-family: 'DM Mono', monospace; font-size: 9px; padding: 1px 5px; border-radius: 2px; background: #eef2ff; color: var(--blue); font-weight: 600; }
+.kb-source-score { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
+.kb-source-passage { font-size: 11px; color: #5a625f; line-height: 1.5; }
 

@@ -26,6 +26,8 @@ import {
   Trash2,
   Upload,
   X,
+  Zap,
+  Play,
 } from "lucide-react";
 
 type Source = {
@@ -63,6 +65,15 @@ const sampleDemoFiles = [
   { name: "Vendor Security Q&A", file: "04_Standard_Vendor_Security_Questionnaire.csv", format: "CSV" },
   { name: "API & Integrations", file: "05_Product_Features_and_API_Integrations.docx", format: "DOCX" },
   { name: "Code of Conduct / HR", file: "06_Employee_Code_of_Conduct_and_HR_Policies.txt", format: "TXT" },
+];
+
+const playgroundStarterQueries = [
+  "What encryption standards are enforced for databases at rest?",
+  "What are our Recovery Point Objective (RPO) and Recovery Time Objective (RTO)?",
+  "Are we compliant with SOC 2 Type II and ISO 27001?",
+  "Who are our authorized subprocessors and where are they located?",
+  "What is our policy for employee background checks?",
+  "What are the rate limits and authentication methods for the REST API?",
 ];
 
 const demoResponse: SearchResponse = {
@@ -194,11 +205,49 @@ function App() {
 
   // Knowledge Base State
   const [showKBModal, setShowKBModal] = useState(false);
+  const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
   const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
-  const [kbSearch, setKbSearch] = useState("");
   const [isUploadingKB, setIsUploadingKB] = useState(false);
   const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Playground State
+  const [playgroundQuery, setPlaygroundQuery] = useState("");
+  const [playgroundTopK, setPlaygroundTopK] = useState(5);
+  const [playgroundLoading, setPlaygroundLoading] = useState(false);
+  const [playgroundResult, setPlaygroundResult] = useState<SearchResponse | null>(null);
+  const [playgroundError, setPlaygroundError] = useState<string | null>(null);
+
+  async function handlePlaygroundSearch(queryText?: string) {
+    const query = (queryText || playgroundQuery).trim();
+    if (!query) return;
+    if (queryText) {
+      setPlaygroundQuery(queryText);
+    }
+    setPlaygroundLoading(true);
+    setPlaygroundError(null);
+    try {
+      const res = await fetch(`${apiBaseUrl}/v1/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          question: query,
+          top_k: playgroundTopK,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Search request failed" }));
+        throw new Error(err.detail || "Search request failed");
+      }
+      const data: SearchResponse = await res.json();
+      setPlaygroundResult(data);
+    } catch (err: any) {
+      setPlaygroundError(err.message || "Failed to execute hybrid search");
+    } finally {
+      setPlaygroundLoading(false);
+    }
+  }
 
   async function fetchKBEntries() {
     try {
@@ -252,7 +301,7 @@ function App() {
 
   function closeKBModal() {
     setShowKBModal(false);
-    if (route === "/knowledge-base") {
+    if (route === "/knowledge-base" || route === "/playground") {
       navigate("/");
     }
   }
@@ -293,8 +342,14 @@ function App() {
 
   useEffect(() => {
     if (route === "/knowledge-base") {
+      setKbModalTab("upload");
       setShowKBModal(true);
       fetchKBEntries();
+      return;
+    }
+    if (route === "/playground") {
+      setKbModalTab("playground");
+      setShowKBModal(true);
       return;
     }
 
@@ -666,12 +721,22 @@ function App() {
               <span className="nav-count">12</span>
             </button>
             <button
-              className={`nav-item ${route === "/knowledge-base" || showKBModal ? "active" : ""}`}
+              className={`nav-item ${route === "/knowledge-base" && showKBModal && kbModalTab === "upload" ? "active" : ""}`}
               onClick={() => {
+                setKbModalTab("upload");
                 navigate("/knowledge-base");
               }}
             >
               <FolderOpen size={17} /> Knowledge base
+            </button>
+            <button
+              className={`nav-item ${route === "/playground" || (showKBModal && kbModalTab === "playground") ? "active" : ""}`}
+              onClick={() => {
+                setKbModalTab("playground");
+                navigate("/playground");
+              }}
+            >
+              <Zap size={17} /> KB Playground
             </button>
             <button className="nav-item">
               <History size={17} /> Activity
@@ -1082,9 +1147,26 @@ function App() {
         <div className="kb-modal-backdrop" onClick={closeKBModal}>
           <div className="kb-modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="kb-modal-header">
-              <h2>
-                <Database size={20} color="var(--blue)" /> Knowledge Base Library
-              </h2>
+              <div className="kb-modal-tabs">
+                <button
+                  className={`kb-tab-btn ${kbModalTab === "upload" ? "active" : ""}`}
+                  onClick={() => {
+                    setKbModalTab("upload");
+                    navigate("/knowledge-base");
+                  }}
+                >
+                  <FolderOpen size={16} /> Documents & Ingestion
+                </button>
+                <button
+                  className={`kb-tab-btn ${kbModalTab === "playground" ? "active" : ""}`}
+                  onClick={() => {
+                    setKbModalTab("playground");
+                    navigate("/playground");
+                  }}
+                >
+                  <Zap size={16} /> Retrieval Playground
+                </button>
+              </div>
               <button
                 className="icon-button"
                 onClick={closeKBModal}
@@ -1095,160 +1177,291 @@ function App() {
             </div>
 
             <div className="kb-modal-body">
-              {/* Upload Card */}
-              <div
-                className={`kb-upload-card ${isDragOver ? "drag-over" : ""}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(true);
-                }}
-                onDragLeave={() => setIsDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(false);
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) handleKBUpload(file);
-                }}
-              >
-                <div className="kb-upload-icon">
-                  <Upload size={24} />
-                </div>
-                <div>
-                  <strong style={{ fontSize: "14px" }}>
-                    Upload Knowledge Base Files
-                  </strong>
-                  <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                    Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code> (300-500 token chunking & auto-categorization)
-                  </p>
-                </div>
+              {kbModalTab === "upload" ? (
+                <>
+                  {/* Upload Card */}
+                  <div
+                    className={`kb-upload-card ${isDragOver ? "drag-over" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(true);
+                    }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleKBUpload(file);
+                    }}
+                  >
+                    <div className="kb-upload-icon">
+                      <Upload size={24} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: "14px" }}>
+                        Upload Knowledge Base Files
+                      </strong>
+                      <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
+                        Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code> (300-500 token chunking & auto-categorization)
+                      </p>
+                    </div>
 
-                <div className="kb-upload-action">
-                  <label className="kb-upload-btn">
-                    {isUploadingKB ? (
-                      <>
-                        <RefreshCw size={14} className="spin" /> Ingesting & Categorizing...
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={14} /> Browse & Ingest Document
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept=".csv,.tsv,.json,.jsonl,.pdf,.docx,.txt,.md"
-                      disabled={isUploadingKB}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleKBUpload(file);
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
+                    <div className="kb-upload-action">
+                      <label className="kb-upload-btn">
+                        {isUploadingKB ? (
+                          <>
+                            <RefreshCw size={14} className="spin" /> Ingesting & Categorizing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} /> Browse & Ingest Document
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept=".csv,.tsv,.json,.jsonl,.pdf,.docx,.txt,.md"
+                          disabled={isUploadingKB}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleKBUpload(file);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
 
-              {/* Sample Files Download Bar for Live Demo */}
-              <div className="kb-samples-card">
-                <div className="kb-samples-header">
-                  <span className="eyebrow" style={{ color: "var(--blue)" }}>Demo Sample Knowledge Documents</span>
-                  <small style={{ color: "var(--muted)", fontSize: "11px" }}>Single-click to download sample files for live upload demonstration</small>
-                </div>
-                <div className="kb-samples-grid">
-                  {sampleDemoFiles.map((sample) => (
-                    <a
-                      key={sample.file}
-                      href={`/sample_docs/${sample.file}`}
-                      download={sample.file}
-                      className="kb-sample-pill"
-                      title={`Download ${sample.file}`}
-                    >
-                      <Download size={13} />
-                      <span className="kb-sample-name">{sample.name}</span>
-                      <span className="kb-sample-badge">{sample.format}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-
-              {/* Status Alert */}
-              {kbUploadMsg && (
-                <div
-                  className={`kb-alert ${
-                    kbUploadMsg.isError ? "kb-alert-error" : "kb-alert-success"
-                  }`}
-                >
-                  {kbUploadMsg.isError ? (
-                    <AlertCircle size={16} />
-                  ) : (
-                    <CheckCircle2 size={16} />
-                  )}
-                  <span>{kbUploadMsg.text}</span>
-                </div>
-              )}
-
-              {/* Records Section */}
-              <div className="kb-records-header">
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
-                  <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                    {kbEntries.length} record{kbEntries.length === 1 ? "" : "s"} synchronized with PostgreSQL, Elasticsearch, and Pinecone
-                  </p>
-                </div>
-                <div className="kb-search-bar">
-                  <Search size={14} color="var(--muted)" />
-                  <input
-                    type="text"
-                    placeholder="Filter questions or answers..."
-                    value={kbSearch}
-                    onChange={(e) => setKbSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="kb-records-grid">
-                {kbEntries
-                  .filter(
-                    (entry) =>
-                      !kbSearch.trim() ||
-                      entry.question.toLowerCase().includes(kbSearch.toLowerCase()) ||
-                      entry.answer.toLowerCase().includes(kbSearch.toLowerCase()) ||
-                      (entry.category && entry.category.toLowerCase().includes(kbSearch.toLowerCase()))
-                  )
-                  .map((entry) => (
-                    <div key={entry.id} className="kb-record-card">
-                      <div className="kb-record-top">
-                        <div className="kb-record-title">{entry.question}</div>
-                        <button
-                          className="kb-delete-btn"
-                          title="Delete knowledge entry"
-                          onClick={() => handleDeleteKBEntry(entry.id)}
+                  {/* Sample Files Download Bar for Live Demo */}
+                  <div className="kb-samples-card">
+                    <div className="kb-samples-header">
+                      <span className="eyebrow" style={{ color: "var(--blue)" }}>Demo Sample Knowledge Documents</span>
+                      <small style={{ color: "var(--muted)", fontSize: "11px" }}>Single-click to download sample files for live upload demonstration</small>
+                    </div>
+                    <div className="kb-samples-grid">
+                      {sampleDemoFiles.map((sample) => (
+                        <a
+                          key={sample.file}
+                          href={`/sample_docs/${sample.file}`}
+                          download={sample.file}
+                          className="kb-sample-pill"
+                          title={`Download ${sample.file}`}
                         >
-                          <Trash2 size={14} />
-                        </button>
+                          <Download size={13} />
+                          <span className="kb-sample-name">{sample.name}</span>
+                          <span className="kb-sample-badge">{sample.format}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Status Alert */}
+                  {kbUploadMsg && (
+                    <div
+                      className={`kb-alert ${
+                        kbUploadMsg.isError ? "kb-alert-error" : "kb-alert-success"
+                      }`}
+                    >
+                      {kbUploadMsg.isError ? (
+                        <AlertCircle size={16} />
+                      ) : (
+                        <CheckCircle2 size={16} />
+                      )}
+                      <span>{kbUploadMsg.text}</span>
+                    </div>
+                  )}
+
+                  {/* Records Section without filter */}
+                  <div className="kb-records-header">
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
+                      <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
+                        {kbEntries.length} record{kbEntries.length === 1 ? "" : "s"} indexed in Elasticsearch & Pinecone
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="kb-records-grid">
+                    {kbEntries.map((entry) => (
+                      <div key={entry.id} className="kb-record-card">
+                        <div className="kb-record-top">
+                          <div className="kb-record-title">{entry.question}</div>
+                          <button
+                            className="kb-delete-btn"
+                            title="Delete knowledge entry"
+                            onClick={() => handleDeleteKBEntry(entry.id)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                        <div className="kb-record-answer">{entry.answer}</div>
+                        <div className="kb-record-tags">
+                          {entry.category && (
+                            <span className="kb-tag">
+                              <Tag size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
+                              {entry.category}
+                            </span>
+                          )}
+                          {entry.metadata?.source_file && (
+                            <span className="kb-tag kb-tag-file">
+                              <FileText size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
+                              {entry.metadata.source_file}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="kb-record-answer">{entry.answer}</div>
-                      <div className="kb-record-tags">
-                        {entry.category && (
-                          <span className="kb-tag">
-                            <Tag size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
-                            {entry.category}
-                          </span>
-                        )}
-                        {entry.metadata?.source_file && (
-                          <span className="kb-tag kb-tag-file">
-                            <FileText size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
-                            {entry.metadata.source_file}
-                          </span>
-                        )}
+                    ))}
+
+                    {kbEntries.length === 0 && (
+                      <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
+                        No knowledge records found. Upload a file above or click a sample document to get started.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Playground Tab */
+                <div className="kb-playground-container">
+                  <div className="kb-playground-input-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <strong style={{ fontSize: "14px" }}>Hybrid Search & Generation Playground</strong>
+                        <p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: "11px" }}>
+                          Test queries across Elasticsearch (BM25 sparse) and Pinecone (dense vector) with live RRF fusion
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--muted)" }}>
+                        <span>Top K:</span>
+                        <select
+                          value={playgroundTopK}
+                          onChange={(e) => setPlaygroundTopK(Number(e.target.value))}
+                          style={{ padding: "4px 8px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px" }}
+                        >
+                          <option value={3}>3</option>
+                          <option value={5}>5</option>
+                          <option value={8}>8</option>
+                          <option value={10}>10</option>
+                        </select>
                       </div>
                     </div>
-                  ))}
 
-                {kbEntries.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
-                    No knowledge records found. Upload a file above to get started.
+                    <form
+                      className="kb-playground-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handlePlaygroundSearch();
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Type any question to test retrieval (e.g. Describe your encryption and key rotation policy)..."
+                        value={playgroundQuery}
+                        onChange={(e) => setPlaygroundQuery(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        className="kb-playground-run-btn"
+                        disabled={playgroundLoading || !playgroundQuery.trim()}
+                      >
+                        {playgroundLoading ? (
+                          <>
+                            <RefreshCw size={14} className="spin" /> Searching...
+                          </>
+                        ) : (
+                          <>
+                            <Play size={14} /> Run Search
+                          </>
+                        )}
+                      </button>
+                    </form>
+
+                    <div className="kb-playground-starters">
+                      <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>Try sample questions:</span>
+                      {playgroundStarterQueries.map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          className="kb-starter-chip"
+                          onClick={() => {
+                            setPlaygroundQuery(q);
+                            handlePlaygroundSearch(q);
+                          }}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {playgroundError && (
+                    <div className="kb-alert kb-alert-error">
+                      <AlertCircle size={16} />
+                      <span>{playgroundError}</span>
+                    </div>
+                  )}
+
+                  {playgroundResult && (
+                    <div className="kb-playground-output">
+                      <div className="kb-answer-card">
+                        <div className="kb-answer-header">
+                          <strong style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Sparkles size={15} color="var(--blue)" /> Grounded AI Formulation
+                          </strong>
+                          <span
+                            className={`kb-confidence-badge ${
+                              playgroundResult.confidence_score >= 0.85 ? "confidence-high" : "confidence-med"
+                            }`}
+                          >
+                            {Math.round(playgroundResult.confidence_score * 100)}% Confidence
+                          </span>
+                        </div>
+                        <div className="kb-answer-text">
+                          {playgroundResult.suggested_answer}
+                        </div>
+                      </div>
+
+                      <div className="kb-sources-card">
+                        <strong style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Database size={15} color="var(--navy)" /> Retrieved Source Chunks ({playgroundResult.sources.length})
+                        </strong>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                          {playgroundResult.sources.map((src, idx) => (
+                            <div key={src.id || idx} className="kb-source-item">
+                              <div className="kb-source-top">
+                                <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--ink)" }}>
+                                  #{idx + 1} {src.question || src.id}
+                                </span>
+                                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                  <span className="kb-source-method">
+                                    {(src as any).source_type || "hybrid"}
+                                  </span>
+                                  <span className="kb-source-score">
+                                    RRF: {(src.score || 0).toFixed(4)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="kb-source-passage">{src.answer}</div>
+                            </div>
+                          ))}
+                          {playgroundResult.sources.length === 0 && (
+                            <div style={{ fontSize: "12px", color: "var(--muted)", padding: "10px 0" }}>
+                              No matching sources found in knowledge base for this query.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!playgroundResult && !playgroundLoading && (
+                    <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", background: "#fff", border: "1px solid var(--line)" }}>
+                      <Zap size={28} color="var(--blue)" style={{ marginBottom: "8px" }} />
+                      <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>Test Hybrid Retrieval & AI Answering</div>
+                      <p style={{ margin: "4px auto 0", maxWidth: "450px", fontSize: "12px" }}>
+                        Click any starter question above or type a custom inquiry to inspect how Elasticsearch (BM25) and Pinecone (Dense Vectors) retrieve and formulate answers.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

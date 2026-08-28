@@ -72,3 +72,4 @@ This backlog tracks prioritized architectural enhancements, AI optimizations, an
 - [ ] **Task 3.1**: Add department/role metadata tagging to Knowledge Base upload pipeline.
 - [ ] **Task 4.1**: Create Excel `.xlsx` multi-sheet questionnaire extractor.
 - [ ] **Task 5.1**: Implement hallucination check validator in `HybridSearchService`.
+
