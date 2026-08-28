@@ -51,8 +51,8 @@ class KBEntryUpdate(BaseModel):
 class KBEntryResponse(KBEntryBase):
     id: str
     tenant_id: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

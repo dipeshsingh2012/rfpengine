@@ -135,3 +135,56 @@ class ElasticsearchService:
             logger.warning("Elasticsearch search failed or index not ready: %s", exc)
             return []
 
+    async def list_documents(
+        self,
+        tenant_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        category: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        try:
+            filters = [{"term": {"tenant_id": tenant_id}}]
+            if category:
+                filters.append({"term": {"category": category}})
+
+            body = {
+                "from": offset,
+                "size": limit,
+                "query": {"bool": {"filter": filters}},
+                "sort": [{"_score": {"order": "desc"}}],
+            }
+            response = await self.client.search(index=self.index_name, body=body)
+            hits = response.get("hits", {}).get("hits", [])
+            return [
+                {
+                    "id": hit["_id"],
+                    "tenant_id": hit["_source"].get("tenant_id", tenant_id),
+                    "question": hit["_source"].get("question", ""),
+                    "answer": hit["_source"].get("answer", ""),
+                    "category": hit["_source"].get("category", ""),
+                    "metadata": hit["_source"].get("metadata", {}),
+                }
+                for hit in hits
+            ]
+        except Exception as exc:
+            logger.warning("Elasticsearch list_documents failed: %s", exc)
+            return []
+
+    async def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            res = await self.client.get(index=self.index_name, id=doc_id)
+            if res and res.get("found"):
+                source = res.get("_source", {})
+                return {
+                    "id": doc_id,
+                    "tenant_id": source.get("tenant_id", ""),
+                    "question": source.get("question", ""),
+                    "answer": source.get("answer", ""),
+                    "category": source.get("category", ""),
+                    "metadata": source.get("metadata", {}),
+                }
+            return None
+        except Exception as exc:
+            logger.warning("Elasticsearch get_document failed for %s: %s", doc_id, exc)
+            return None
+

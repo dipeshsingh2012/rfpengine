@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import List, Optional
 from fastapi import (
     APIRouter,
-    Depends,
     File,
     Form,
     HTTPException,
@@ -13,9 +13,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_db_session
 from app.models.schemas import (
     KBEntryCreate,
     KBEntryResponse,
@@ -24,7 +22,6 @@ from app.models.schemas import (
     KBUploadResponse,
 )
 from app.services.document_parser_service import DocumentParserService
-from app.services.postgres_service import PostgresService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/knowledge-base", tags=["Knowledge Base"])
@@ -32,44 +29,55 @@ router = APIRouter(prefix="/api/v1/knowledge-base", tags=["Knowledge Base"])
 
 @router.get("", response_model=List[KBEntryResponse])
 async def list_knowledge_base_entries(
+    request: Request,
     tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db_session),
 ) -> List[KBEntryResponse]:
-    entries = await PostgresService.list_kb_entries(db, tenant_id=tenant_id, limit=limit, offset=offset)
+    """
+    Lists indexed knowledge entries directly from Elasticsearch.
+    """
+    es_service = getattr(request.app.state, "elasticsearch", None)
+    if not es_service:
+        return []
+
+    docs = await es_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
     return [
         KBEntryResponse(
-            id=e.id,
-            tenant_id=e.tenant_id,
-            question=e.question,
-            answer=e.answer,
-            category=e.category,
-            metadata=e.metadata_json,
-            created_at=e.created_at,
-            updated_at=e.updated_at,
+            id=d["id"],
+            tenant_id=d["tenant_id"],
+            question=d["question"],
+            answer=d["answer"],
+            category=d["category"],
+            metadata=d["metadata"],
         )
-        for e in entries
+        for d in docs
     ]
 
 
 @router.get("/{entry_id}", response_model=KBEntryResponse)
 async def get_knowledge_base_entry(
+    request: Request,
     entry_id: str,
-    db: AsyncSession = Depends(get_db_session),
 ) -> KBEntryResponse:
-    entry = await PostgresService.get_kb_entry(db, entry_id)
-    if not entry:
+    """
+    Retrieves an indexed knowledge entry from Elasticsearch.
+    """
+    es_service = getattr(request.app.state, "elasticsearch", None)
+    if not es_service:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Search index unavailable")
+
+    doc = await es_service.get_document(entry_id)
+    if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge entry not found")
+
     return KBEntryResponse(
-        id=entry.id,
-        tenant_id=entry.tenant_id,
-        question=entry.question,
-        answer=entry.answer,
-        category=entry.category,
-        metadata=entry.metadata_json,
-        created_at=entry.created_at,
-        updated_at=entry.updated_at,
+        id=doc["id"],
+        tenant_id=doc["tenant_id"],
+        question=doc["question"],
+        answer=doc["answer"],
+        category=doc["category"],
+        metadata=doc["metadata"],
     )
 
 
@@ -77,49 +85,50 @@ async def get_knowledge_base_entry(
 async def create_knowledge_base_entry(
     request: Request,
     payload: KBEntryCreate,
-    db: AsyncSession = Depends(get_db_session),
 ) -> KBEntryResponse:
-    # 1. Save to PostgreSQL
-    db_entry = await PostgresService.create_kb_entry(db, payload)
+    """
+    Indexes a single knowledge entry directly into Elasticsearch and Pinecone.
+    """
+    doc_id = payload.id or f"kb-{uuid.uuid4().hex[:8]}"
 
-    # 2. Index in Elasticsearch
-    es_service = request.app.state.elasticsearch
-    await es_service.index_document(
-        doc_id=db_entry.id,
-        tenant_id=db_entry.tenant_id,
-        question=db_entry.question,
-        answer=db_entry.answer,
-        category=db_entry.category,
-        metadata=db_entry.metadata_json,
-    )
+    # 1. Index in Elasticsearch (BM25 + text storage)
+    es_service = getattr(request.app.state, "elasticsearch", None)
+    if es_service:
+        await es_service.index_document(
+            doc_id=doc_id,
+            tenant_id=payload.tenant_id,
+            question=payload.question,
+            answer=payload.answer,
+            category=payload.category,
+            metadata=payload.metadata,
+        )
 
-    # 3. Vectorize and index in Pinecone
-    hybrid_search = request.app.state.hybrid_search
-    pinecone_service = request.app.state.pinecone
-    if pinecone_service.is_configured():
-        embedding = await hybrid_search.generate_embedding(db_entry.question)
+    # 2. Vectorize and index in Pinecone (Semantic Vector Search)
+    hybrid_search = getattr(request.app.state, "hybrid_search", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    if pinecone_service and pinecone_service.is_configured() and hybrid_search:
+        embed_text = f"Topic: {payload.question}\n{payload.answer}"
+        embedding = await hybrid_search.generate_embedding(embed_text)
         if embedding:
             await pinecone_service.upsert_vector(
-                doc_id=db_entry.id,
+                doc_id=doc_id,
                 vector=embedding,
                 metadata={
-                    "tenant_id": db_entry.tenant_id,
-                    "doc_id": db_entry.id,
-                    "question": db_entry.question,
-                    "answer": db_entry.answer,
-                    "category": db_entry.category or "",
+                    "tenant_id": payload.tenant_id,
+                    "doc_id": doc_id,
+                    "question": payload.question,
+                    "answer": payload.answer[:1000],
+                    "category": payload.category or "",
                 },
             )
 
     return KBEntryResponse(
-        id=db_entry.id,
-        tenant_id=db_entry.tenant_id,
-        question=db_entry.question,
-        answer=db_entry.answer,
-        category=db_entry.category,
-        metadata=db_entry.metadata_json,
-        created_at=db_entry.created_at,
-        updated_at=db_entry.updated_at,
+        id=doc_id,
+        tenant_id=payload.tenant_id,
+        question=payload.question,
+        answer=payload.answer,
+        category=payload.category,
+        metadata=payload.metadata,
     )
 
 
@@ -127,56 +136,57 @@ async def create_knowledge_base_entry(
 async def batch_import_knowledge_base(
     request: Request,
     payload: KBBatchImportRequest,
-    db: AsyncSession = Depends(get_db_session),
 ) -> List[KBEntryResponse]:
-    created_entries = await PostgresService.create_batch_kb_entries(
-        db, tenant_id=payload.tenant_id, entries=payload.entries
-    )
+    """
+    Batch indexes knowledge entries into Elasticsearch and Pinecone.
+    """
+    es_service = getattr(request.app.state, "elasticsearch", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
-    es_service = request.app.state.elasticsearch
-    pinecone_service = request.app.state.pinecone
-    hybrid_search = request.app.state.hybrid_search
+    created_responses: List[KBEntryResponse] = []
 
-    for db_entry in created_entries:
-        # Index in Elasticsearch
-        await es_service.index_document(
-            doc_id=db_entry.id,
-            tenant_id=db_entry.tenant_id,
-            question=db_entry.question,
-            answer=db_entry.answer,
-            category=db_entry.category,
-            metadata=db_entry.metadata_json,
-        )
+    for entry in payload.entries:
+        doc_id = f"kb-{uuid.uuid4().hex[:8]}"
 
-        # Index in Pinecone
-        if pinecone_service.is_configured():
-            embedding = await hybrid_search.generate_embedding(db_entry.question)
+        if es_service:
+            await es_service.index_document(
+                doc_id=doc_id,
+                tenant_id=payload.tenant_id,
+                question=entry.question,
+                answer=entry.answer,
+                category=entry.category,
+                metadata=entry.metadata,
+            )
+
+        if pinecone_service and pinecone_service.is_configured() and hybrid_search:
+            embed_text = f"Topic: {entry.question}\n{entry.answer}"
+            embedding = await hybrid_search.generate_embedding(embed_text)
             if embedding:
                 await pinecone_service.upsert_vector(
-                    doc_id=db_entry.id,
+                    doc_id=doc_id,
                     vector=embedding,
                     metadata={
-                        "tenant_id": db_entry.tenant_id,
-                        "doc_id": db_entry.id,
-                        "question": db_entry.question,
-                        "answer": db_entry.answer,
-                        "category": db_entry.category or "",
+                        "tenant_id": payload.tenant_id,
+                        "doc_id": doc_id,
+                        "question": entry.question,
+                        "answer": entry.answer[:1000],
+                        "category": entry.category or "",
                     },
                 )
 
-    return [
-        KBEntryResponse(
-            id=e.id,
-            tenant_id=e.tenant_id,
-            question=e.question,
-            answer=e.answer,
-            category=e.category,
-            metadata=e.metadata_json,
-            created_at=e.created_at,
-            updated_at=e.updated_at,
+        created_responses.append(
+            KBEntryResponse(
+                id=doc_id,
+                tenant_id=payload.tenant_id,
+                question=entry.question,
+                answer=entry.answer,
+                category=entry.category,
+                metadata=entry.metadata,
+            )
         )
-        for e in created_entries
-    ]
+
+    return created_responses
 
 
 @router.post("/upload", response_model=KBUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -185,17 +195,16 @@ async def upload_knowledge_base_file(
     file: UploadFile = File(..., description="Document file (.csv, .tsv, .json, .jsonl, .pdf, .docx, .txt, .md)"),
     tenant_id: str = Form(default="acme-corp", description="Tenant ID"),
     category: Optional[str] = Form(default=None, description="Optional default category override"),
-    db: AsyncSession = Depends(get_db_session),
 ) -> KBUploadResponse:
     """
-    Parses an uploaded knowledge file, applies 300-500 token chunking, stores records in PostgreSQL,
-    and synchronizes them into Elasticsearch (BM25) and Pinecone (Dense Vectors).
+    Parses an uploaded knowledge file, applies 300-500 token chunking, and indexes chunks
+    directly into Elasticsearch (BM25) and Pinecone (Dense Vectors) without storing chunks in PostgreSQL.
     """
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
 
-    # 1. Parse document into KBEntryCreate chunks
+    # 1. Parse document into KBEntryCreate chunks (300-500 tokens)
     try:
         parsed_entries = DocumentParserService.parse_document(
             content=content,
@@ -216,72 +225,68 @@ async def upload_knowledge_base_file(
             detail="Could not extract any valid knowledge records or chunks from the uploaded file.",
         )
 
-    # 2. Persist to PostgreSQL in batch
-    created_entries = await PostgresService.create_batch_kb_entries(
-        db, tenant_id=tenant_id, entries=parsed_entries
-    )
-
-    # 3. Synchronize to Elasticsearch & Pinecone
+    # 2. Index into Elasticsearch & Pinecone
     es_service = getattr(request.app.state, "elasticsearch", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
-    for db_entry in created_entries:
+    created_responses: List[KBEntryResponse] = []
+
+    for entry in parsed_entries:
+        doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+
         if es_service:
             try:
                 await es_service.index_document(
-                    doc_id=db_entry.id,
-                    tenant_id=db_entry.tenant_id,
-                    question=db_entry.question,
-                    answer=db_entry.answer,
-                    category=db_entry.category,
-                    metadata=db_entry.metadata_json,
+                    doc_id=doc_id,
+                    tenant_id=entry.tenant_id,
+                    question=entry.question,
+                    answer=entry.answer,
+                    category=entry.category,
+                    metadata=entry.metadata,
                 )
             except Exception as es_err:
-                logger.warning("ES indexing deferred for entry %s: %s", db_entry.id, es_err)
+                logger.warning("ES indexing deferred for doc %s: %s", doc_id, es_err)
 
         if pinecone_service and pinecone_service.is_configured() and hybrid_search:
             try:
-                # Embed question + answer context
-                embed_text = f"Topic: {db_entry.question}\n{db_entry.answer}"
+                embed_text = f"Topic: {entry.question}\n{entry.answer}"
                 embedding = await hybrid_search.generate_embedding(embed_text)
                 if embedding:
                     await pinecone_service.upsert_vector(
-                        doc_id=db_entry.id,
+                        doc_id=doc_id,
                         vector=embedding,
                         metadata={
-                            "tenant_id": db_entry.tenant_id,
-                            "doc_id": db_entry.id,
-                            "question": db_entry.question,
-                            "answer": db_entry.answer[:1000],  # truncated for Pinecone metadata
-                            "category": db_entry.category or "",
+                            "tenant_id": entry.tenant_id,
+                            "doc_id": doc_id,
+                            "question": entry.question,
+                            "answer": entry.answer[:1000],
+                            "category": entry.category or "",
                             "source_file": file.filename or "uploaded_file",
                         },
                     )
             except Exception as pc_err:
-                logger.warning("Pinecone indexing deferred for entry %s: %s", db_entry.id, pc_err)
+                logger.warning("Pinecone indexing deferred for doc %s: %s", doc_id, pc_err)
 
-    categories_found = sorted({e.category for e in created_entries if e.category})
-    preview_responses = [
-        KBEntryResponse(
-            id=e.id,
-            tenant_id=e.tenant_id,
-            question=e.question,
-            answer=e.answer,
-            category=e.category,
-            metadata=e.metadata_json,
-            created_at=e.created_at,
-            updated_at=e.updated_at,
+        created_responses.append(
+            KBEntryResponse(
+                id=doc_id,
+                tenant_id=entry.tenant_id,
+                question=entry.question,
+                answer=entry.answer,
+                category=entry.category,
+                metadata=entry.metadata,
+            )
         )
-        for e in created_entries[:10]
-    ]
+
+    categories_found = sorted({e.category for e in created_responses if e.category})
 
     return KBUploadResponse(
         filename=file.filename or "uploaded_file",
-        records_created=len(created_entries),
+        records_created=len(created_responses),
         tenant_id=tenant_id,
         categories=categories_found,
-        preview=preview_responses,
+        preview=created_responses[:10],
     )
 
 
@@ -289,15 +294,14 @@ async def upload_knowledge_base_file(
 async def delete_knowledge_base_entry(
     request: Request,
     entry_id: str,
-    db: AsyncSession = Depends(get_db_session),
 ) -> None:
-    deleted = await PostgresService.delete_kb_entry(db, entry_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge entry not found")
+    """
+    Deletes an entry from Elasticsearch and Pinecone.
+    """
+    es_service = getattr(request.app.state, "elasticsearch", None)
+    if es_service:
+        await es_service.delete_document(entry_id)
 
-    es_service = request.app.state.elasticsearch
-    await es_service.delete_document(entry_id)
-
-    pinecone_service = request.app.state.pinecone
-    if pinecone_service.is_configured():
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    if pinecone_service and pinecone_service.is_configured():
         await pinecone_service.delete_vector(entry_id)

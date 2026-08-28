@@ -15,22 +15,21 @@ This presented several architectural limitations:
 
 ## Decision
 
-We introduce **PostgreSQL** as the canonical relational datastore for all application data:
-1. **`kb_entries` table**: Stores canonical approved question-and-answer pairs, tenant IDs, categories, metadata, and timestamps.
-2. **`response_workspaces` table**: Stores imported questionnaire metadata, tenant ID, source mode (URL, upload, extension), and source URL.
-3. **`question_reviews` table**: Tracks each individual questionnaire question, suggested draft answer, final edited answer, review status (`Draft`, `SME review`, `Approved by SME`, `Legal review`, `Approved by Legal`, `Final approved`, `Rejected`, `Inserted`), assigned role, confidence score, and citations.
-4. **Data Sync Flow**:
-   - Write operations (Create/Update/Delete KB entries) write to PostgreSQL first.
-   - Upon successful database commit, the document is indexed into Elasticsearch and vector upserted into Pinecone.
+We define clear datastore responsibilities:
+1. **PostgreSQL**: Manages canonical operational relational data:
+   - **`response_workspaces` table**: Stores imported questionnaire metadata, tenant ID, source mode (URL, upload, extension), and source URL.
+   - **`question_reviews` table**: Tracks each individual questionnaire question, suggested draft answer, final edited answer, review status (`Draft`, `SME review`, `Approved by SME`, `Legal review`, `Approved by Legal`, `Final approved`, `Rejected`, `Inserted`), assigned role, confidence score, and citations.
+2. **Elasticsearch & Pinecone**: Manage knowledge base document chunks:
+   - High-volume document chunks (300–500 tokens) are indexed directly into **Elasticsearch** (BM25 keyword search and full text storage) and **Pinecone** (1536-dimensional semantic vector search).
+   - Search is performed across both engines and ranked with Reciprocal Rank Fusion (RRF).
 
 ## Consequences
 
 ### Positive
-- **ACID Guarantees & Integrity**: Knowledge records, tenant partitions, and review records have foreign key constraints and transactional consistency.
-- **Persistent Collaboration**: Reviewers and approvers can view, edit, and approve questionnaires across different sessions and devices.
-- **Search Re-indexing**: Search indexes in Elasticsearch and Pinecone can be regenerated or re-embedded at any time directly from canonical PostgreSQL records.
+- **Lean Database Footprint**: PostgreSQL is not burdened with high-volume, ephemeral, or chunked document text.
+- **Fast Dual-Retrieval**: Elasticsearch and Pinecone handle search and direct document hydration with zero extra relational round-trips.
+- **Persistent Collaboration**: Multi-user questionnaire review workflows, status transitions, and role assignments retain full ACID integrity in PostgreSQL.
 
 ### Negative / Trade-offs
-- Additional infrastructure component (PostgreSQL) required in deployment.
-- Requires database connection pooling and migration management (via async SQLAlchemy & asyncpg).
+- Re-indexing entire knowledge bases requires re-uploading source files or exporting directly from Elasticsearch.
 
