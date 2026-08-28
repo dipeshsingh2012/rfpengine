@@ -19,11 +19,9 @@ from app.services.gcp_secret_service import GCPSecretService
 
 REQUIRED_PROJECT_SECRETS = [
     ("DATABASE_URL", "PostgreSQL database connection string (Neon)"),
-    ("ELASTICSEARCH_URL", "Elasticsearch / Elastic Cloud cluster endpoint"),
     ("ELASTICSEARCH_API_KEY", "Elastic Cloud API key for BM25 indexing"),
-    ("OPENAI_API_KEY", "OpenAI API Key for embeddings and GPT-4o drafting"),
     ("PINECONE_API_KEY", "Pinecone API Key for dense vector similarity search"),
-    ("PINECONE_INDEX", "Pinecone Serverless index name"),
+    ("OPENAI_API_KEY", "OpenAI API Key for embeddings and GPT-4o drafting"),
 ]
 
 
@@ -44,7 +42,6 @@ async def audit_secrets(service: GCPSecretService):
     print(f"Found {len(remote_secrets)} remote secrets under prefix '{settings.gcp_secret_prefix}':")
     
     for key, desc in REQUIRED_PROJECT_SECRETS:
-        # Check normalized key match
         matched = None
         for r_k in remote_secrets.keys():
             norm_rk = r_k.upper().replace("-", "_")
@@ -53,7 +50,6 @@ async def audit_secrets(service: GCPSecretService):
                 break
         
         status_icon = "✅" if matched else "⚠️ [Missing]"
-        val_preview = "***" if matched else "N/A"
         print(f"  {status_icon} {key:<25} -> {desc}")
 
 
@@ -69,11 +65,9 @@ async def sync_secrets(service: GCPSecretService):
 
     secret_values = {
         "database-url": settings.database_url,
-        "elasticsearch-url": settings.elasticsearch_url,
         "elasticsearch-api-key": settings.elasticsearch_api_key,
-        "openai-api-key": settings.openai_api_key,
         "pinecone-api-key": settings.pinecone_api_key,
-        "pinecone-index": settings.pinecone_index,
+        "openai-api-key": settings.openai_api_key,
     }
 
     for secret_id, val in secret_values.items():

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Google Cloud Secret Manager Settings
     gcp_project_id: Optional[str] = None
     gcp_secret_manager_enabled: bool = False
-    gcp_secret_prefix: str = ""  # e.g. "rfpengine_" or ""
+    gcp_secret_prefix: str = "rfpengine-"  # Standard Terraform prefix: rfpengine-
     google_application_credentials: Optional[str] = None
 
     # OpenAI Settings
