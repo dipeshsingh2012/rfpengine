@@ -11,6 +11,7 @@ from app.api.responses import router as responses_router
 from app.api.search import router as search_router
 from app.core.config import get_settings
 from app.core.db import Base, close_db_connection, get_engine
+import app.models.db_models  # noqa: F401
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
@@ -81,7 +82,7 @@ def create_application() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.cors_origins_list,
         allow_origin_regex=settings.cors_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],

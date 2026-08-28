@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
+import json
 from functools import lru_cache
-from typing import List, Optional
+from typing import Any, List, Optional, Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,8 +37,21 @@ class Settings(BaseSettings):
     pinecone_metric: str = "cosine"
 
     # CORS Settings
-    cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000"
     cors_origin_regex: str = r"chrome-extension://.*"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        if isinstance(self.cors_origins, list):
+            return self.cors_origins
+        if isinstance(self.cors_origins, str):
+            if self.cors_origins.startswith("[") and self.cors_origins.endswith("]"):
+                try:
+                    return json.loads(self.cors_origins)
+                except Exception:
+                    pass
+            return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        return ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -49,4 +63,3 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
-

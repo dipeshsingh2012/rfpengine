@@ -11,6 +11,7 @@ sys.path.insert(0, str(backend_dir))
 
 from app.core.config import get_settings
 from app.core.db import Base, get_engine
+import app.models.db_models  # noqa: F401 - Register models with Base.metadata
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.pinecone_service import PineconeService
 
