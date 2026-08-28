@@ -241,27 +241,46 @@ All cloud infrastructure — including **Google Cloud Secret Manager secrets**, 
 
 ---
 
-### Managing Secrets with Terraform
+### Managing Secrets with Terraform & GCP Secret Manager
 
-All sensitive credentials (`DATABASE_URL`, `OPENAI_API_KEY`, `PINECONE_API_KEY`, etc.) are declared as sensitive variables in Terraform, provisioned in GCP Secret Manager, and injected directly into Cloud Run at container boot.
+All sensitive credentials (`DATABASE_URL`, `ELASTICSEARCH_API_KEY`, `OPENAI_API_KEY`, `PINECONE_API_KEY`) are declared as sensitive variables in Terraform, securely provisioned in **Google Cloud Secret Manager**, and automatically injected into Cloud Run at container boot via `version = "latest"`.
 
 #### 1. How to Update or Rotate an Existing Secret
 
-To update a database password, OpenAI key, or Pinecone API key:
+When you update credentials (e.g. rotating a Neon database password, Elastic Cloud API Key, or OpenAI token):
 
-1. Open `terraform/terraform.tfvars` (or pass `-var="variable_name=new_value"`).
-2. Update the variable value:
+1. Open your local `terraform/terraform.tfvars` file (which is gitignored):
    ```hcl
    # terraform/terraform.tfvars
-   database_url   = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
-   openai_api_key = "sk-proj-NEW_OPENAI_KEY..."
+   database_url          = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
+   elasticsearch_url     = "https://my-deployment.es.us-central1.gcp.elastic.cloud:443"
+   elasticsearch_api_key = "NEW_ELASTIC_API_KEY"
+   openai_api_key        = "sk-proj-NEW_OPENAI_KEY..."
+   pinecone_api_key      = "pcsk_NEW_PINECONE_KEY..."
    ```
-3. Apply the Terraform update:
+
+2. **Preview the Changes**:
+   ```bash
+   npm run tf:plan
+   ```
+   Terraform will show: `+ resource "google_secret_manager_secret_version" ... will be created`.
+
+3. **Apply the Update**:
    ```bash
    npm run tf:apply
-   # or: cd terraform && terraform apply
    ```
-4. **Zero Downtime**: Terraform creates a new secret version in GCP Secret Manager and automatically triggers a new Cloud Run revision using the latest secret value.
+
+4. **Zero-Downtime Secret Propagation**:
+   - Terraform automatically creates a **new immutable secret version** in GCP Secret Manager (e.g. Version 2).
+   - Because Cloud Run is configured with `version = "latest"`, it automatically re-deploys a new revision using the latest secret value without any downtime.
+
+> [!TIP]
+> **Single Secret Update via CLI**: You can also update a single secret without modifying `terraform.tfvars` by passing the `-var` flag:
+> ```bash
+> npm run tf:apply -- -var="openai_api_key=sk-proj-NEW_KEY_HERE"
+> ```
+
+👉 **View Active Secrets & Versions**: [Google Cloud Secret Manager Console](https://console.cloud.google.com/security/secret-manager?project=rfpengine)
 
 ---
 
