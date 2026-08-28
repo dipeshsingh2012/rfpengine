@@ -12,7 +12,12 @@ class Settings(BaseSettings):
     # App Settings
     app_name: str = "RFPEngine API"
     app_version: str = "0.2.0"
+    env: str = "dev"  # "dev", "staging", "prod"
     debug: bool = False
+
+    @property
+    def is_production(self) -> bool:
+        return self.env.lower() in ("prod", "production")
 
     # Google Cloud Secret Manager Settings
     gcp_project_id: Optional[str] = None

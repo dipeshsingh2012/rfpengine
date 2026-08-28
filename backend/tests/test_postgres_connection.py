@@ -1,7 +1,7 @@
 """
-Production PostgreSQL Connection & Architecture Validation Tests.
+PostgreSQL Connection & Architecture Validation Tests (Scoped to env="prod").
 Validates SSL security, connection pooling, Alembic migration integrity, ACID transactions,
-CRUD operations, and credential masking assuming a production PostgreSQL environment (e.g. Neon, AWS RDS, GCP Cloud SQL).
+CRUD operations, and credential masking when running in a production environment (ENV="prod").
 """
 
 from __future__ import annotations
@@ -13,35 +13,46 @@ import pytest
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
-from app.core.db import get_engine, normalize_database_url
+from app.core.config import get_settings, Settings
+from app.core.db import normalize_database_url
 from app.models.db_models import KBEntry, ResponseWorkspace, QuestionReview
 
 
-@pytest.mark.asyncio
-async def test_ssl_enforcement_and_url_normalization():
+def test_env_prod_configuration(monkeypatch):
     """
-    Validates that database URLs enforce SSL encryption parameters for production
+    Validates that setting ENV="prod" properly identifies the environment as production.
+    """
+    monkeypatch.setenv("ENV", "prod")
+    settings = Settings()
+    assert settings.env == "prod"
+    assert settings.is_production is True
+
+
+@pytest.mark.asyncio
+async def test_ssl_enforcement_and_url_normalization(settings: Settings, monkeypatch):
+    """
+    Validates that when env="prod", database URLs enforce SSL encryption parameters
     and properly sanitize libpq query parameters for asyncpg.
     """
-    settings = get_settings()
-    db_url = settings.effective_database_url
+    monkeypatch.setenv("ENV", "prod")
+    prod_settings = Settings()
+    db_url = prod_settings.effective_database_url
     normalized = normalize_database_url(db_url)
 
     assert normalized.startswith("postgresql+asyncpg://"), "Must use asyncpg driver"
     assert "channel_binding" not in normalized, "libpq channel_binding must be stripped for asyncpg"
 
-    # If Neon or remote cloud DB, ensure SSL parameter is present
-    if "neon.tech" in db_url or "aws" in db_url or "gcp" in db_url:
+    # Enforce SSL requirement in prod environments
+    if prod_settings.is_production or "neon.tech" in db_url or "aws" in db_url or "gcp" in db_url:
         assert "ssl=require" in normalized or "sslmode=require" in db_url, (
-            "Production cloud databases must require encrypted SSL connections."
+            "Production cloud databases (env='prod') must require encrypted SSL connections."
         )
 
 
 @pytest.mark.asyncio
-async def test_production_connectivity_and_version(db_session: AsyncSession):
+async def test_prod_connectivity_and_version(db_session: AsyncSession):
     """
-    Validates live connection to the production PostgreSQL server and asserts
+    Validates live connection to the PostgreSQL server when env="prod" and asserts
     PostgreSQL version is >= 14 with active transaction state.
     """
     # 1. Warm-up / initial handshake
@@ -55,19 +66,19 @@ async def test_production_connectivity_and_version(db_session: AsyncSession):
 
     assert version_str is not None, "PostgreSQL version string must be returned"
     assert "PostgreSQL" in version_str, f"Unexpected DB version string: {version_str}"
-    assert latency_ms < 2000, f"Production database steady-state latency ({latency_ms:.2f}ms) exceeded 2000ms SLA"
+    assert latency_ms < 2000, f"Database steady-state latency ({latency_ms:.2f}ms) exceeded 2000ms SLA in env='prod'"
 
 
 @pytest.mark.asyncio
-async def test_production_schema_and_alembic_head(db_session: AsyncSession):
+async def test_prod_schema_and_alembic_head(db_session: AsyncSession):
     """
-    Validates that all required RFPEngine production tables exist and that Alembic
+    Validates that all required RFPEngine tables exist in env="prod" and that Alembic
     has recorded the migration head revision.
     """
     # 1. Verify Alembic migration table and current head revision
     alembic_res = await db_session.execute(text("SELECT version_num FROM alembic_version;"))
     current_revision = alembic_res.scalar()
-    assert current_revision is not None, "Alembic migration version must be recorded in production"
+    assert current_revision is not None, "Alembic migration version must be recorded"
     assert len(current_revision) == 12, f"Expected 12-char Alembic revision hash, got '{current_revision}'"
 
     # 2. Verify all core tables exist in the current schema
@@ -82,14 +93,14 @@ async def test_production_schema_and_alembic_head(db_session: AsyncSession):
     existing_tables = {row[0] for row in tables_res.fetchall()}
     expected_tables = {"kb_entries", "response_workspaces", "question_reviews"}
     assert expected_tables.issubset(existing_tables), (
-        f"Missing required tables in production: {expected_tables - existing_tables}"
+        f"Missing required tables: {expected_tables - existing_tables}"
     )
 
 
 @pytest.mark.asyncio
 async def test_concurrent_connection_pooling():
     """
-    Validates that the asyncpg connection pool efficiently handles concurrent requests
+    Validates that the asyncpg connection pool efficiently handles concurrent requests in env="prod"
     without connection leaks, exhaustion, or pool deadlocks.
     """
     from sqlalchemy.ext.asyncio import create_async_engine
@@ -116,17 +127,18 @@ async def test_concurrent_connection_pooling():
 
 
 @pytest.mark.asyncio
-async def test_transaction_acid_rollback(db_session: AsyncSession):
+async def test_transaction_acid_rollback(db_session: AsyncSession, settings: Settings):
     """
-    Validates ACID transaction rollback behavior.
-    Ensures an uncommitted or failed transaction leaves zero orphaned data in production.
+    Validates ACID transaction rollback behavior in env="prod".
+    Ensures an uncommitted or failed transaction leaves zero orphaned data.
     """
     test_id = f"test-rollback-{uuid.uuid4().hex[:8]}"
+    tenant_id = f"{settings.env}-rollback-test"
 
     # Attempt an insert and explicitly roll back
     entry = KBEntry(
         id=test_id,
-        tenant_id="prod-rollback-test",
+        tenant_id=tenant_id,
         question="Rollback test question?",
         answer="This should never be persisted.",
         category="Testing",
@@ -144,23 +156,23 @@ async def test_transaction_acid_rollback(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_production_crud_lifecycle(db_session: AsyncSession):
+async def test_prod_crud_lifecycle(db_session: AsyncSession, settings: Settings):
     """
-    Validates complete Create, Read, Update, Delete (CRUD) lifecycle in production
+    Validates complete Create, Read, Update, Delete (CRUD) lifecycle in env="prod"
     for canonical records within an isolated tenant.
     """
-    test_id = f"test-prod-{uuid.uuid4().hex[:8]}"
-    test_tenant = "prod-validation-tenant"
+    test_id = f"test-{settings.env}-{uuid.uuid4().hex[:8]}"
+    test_tenant = f"{settings.env}-validation-tenant"
 
     try:
         # 1. CREATE
         new_entry = KBEntry(
             id=test_id,
             tenant_id=test_tenant,
-            question="What is the production database SLA?",
+            question="What is the database SLA in this environment?",
             answer="99.95% monthly uptime with automated multi-zone failover.",
             category="Infrastructure",
-            metadata_json={"tags": ["sla", "production", "uptime"]},
+            metadata_json={"tags": ["sla", settings.env, "uptime"]},
         )
         db_session.add(new_entry)
         await db_session.commit()
@@ -170,7 +182,7 @@ async def test_production_crud_lifecycle(db_session: AsyncSession):
         entry = read_res.scalar_one_or_none()
         assert entry is not None, "Created record must be readable"
         assert entry.tenant_id == test_tenant
-        assert entry.metadata_json == {"tags": ["sla", "production", "uptime"]}
+        assert entry.metadata_json == {"tags": ["sla", settings.env, "uptime"]}
 
         # 3. UPDATE
         entry.answer = "Updated 99.99% high-availability SLA."
@@ -196,12 +208,11 @@ async def test_production_crud_lifecycle(db_session: AsyncSession):
         await db_session.commit()
 
 
-def test_credential_masking_security():
+def test_credential_masking_security(settings: Settings):
     """
     Validates that credentials, passwords, and tokens are never exposed in plaintext
     via masked URLs, logging strings, or diagnostics.
     """
-    settings = get_settings()
     masked = settings.masked_database_url
 
     assert masked is not None
