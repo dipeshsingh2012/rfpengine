@@ -1174,66 +1174,137 @@ function App() {
                 </button>
               </div>
             </div>
-            <section className="question-panel panel">
-              <div className="panel-label">
-                <span className="step-number">01</span>
-                <div>
-                  <p className="eyebrow">Question to answer</p>
-                  <span className="label-hint">
-                    Ask a question or paste one from your RFP
-                  </span>
+            {detectedQuestions.length === 0 ? (
+              <section className="question-panel panel">
+                <div className="panel-label">
+                  <span className="step-number">01</span>
+                  <div>
+                    <p className="eyebrow">Question to answer</p>
+                    <span className="label-hint">
+                      Ask a question or paste one from your RFP
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <textarea
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                rows={3}
-              />
-              {detectedQuestions.length > 1 && (
-                <div className="detected-list">
-                  {detectedQuestions.map((detectedQuestion, index) => (
-                    <button
-                      key={`${detectedQuestion}-${index}`}
-                      className={
-                        detectedQuestion === question ? "detected-active" : ""
-                      }
-                      onClick={() => setQuestion(detectedQuestion)}
+                <textarea
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  rows={3}
+                />
+                <div className="question-footer">
+                  <div className="question-meta">
+                    <span className="status-dot" /> Knowledge base connected{" "}
+                    <span className="divider" /> Tenant:{" "}
+                    <select
+                      value={tenantId}
+                      onChange={(event) => setTenantId(event.target.value)}
                     >
-                      Q{String(index + 1).padStart(2, "0")} {detectedQuestion}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="question-footer">
-                <div className="question-meta">
-                  <span className="status-dot" /> Knowledge base connected{" "}
-                  <span className="divider" /> Tenant:{" "}
-                  <select
-                    value={tenantId}
-                    onChange={(event) => setTenantId(event.target.value)}
+                      <option value="acme-corp">acme-corp</option>
+                      <option value="demo-tenant">demo-tenant</option>
+                    </select>
+                  </div>
+                  <button
+                    className="primary-button"
+                    onClick={generateAnswer}
+                    disabled={isGenerating}
                   >
-                    <option value="acme-corp">acme-corp</option>
-                    <option value="demo-tenant">demo-tenant</option>
-                  </select>
+                    {isGenerating ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
+                    {isGenerating ? "Generating" : "Generate answer"} <ArrowUpRight size={15} />
+                  </button>
                 </div>
-                <button
-                  className="primary-button"
-                  onClick={detectedQuestions.length ? generateAllAnswers : generateAnswer}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <RefreshCw className="spin" size={16} />
-                  ) : (
-                    <Sparkles size={16} />
-                  )}
-                  {isGenerating ? "Generating" : detectedQuestions.length ? "Generate all answers" : "Generate answer"}{" "}
-                  <ArrowUpRight size={15} />
-                </button>
+              </section>
+            ) : (
+              <div
+                className="question-header-bar panel"
+                style={{
+                  padding: "16px 20px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px",
+                }}
+              >
+                <div>
+                  <span className="eyebrow">Questionnaire Response Workspace</span>
+                  <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--ink)" }}>
+                    {detectedQuestions.length} Questions in Questionnaire
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <div className="question-meta">
+                    <span className="status-dot" /> Tenant:{" "}
+                    <select
+                      value={tenantId}
+                      onChange={(event) => setTenantId(event.target.value)}
+                    >
+                      <option value="acme-corp">acme-corp</option>
+                      <option value="demo-tenant">demo-tenant</option>
+                    </select>
+                  </div>
+                  <button
+                    className="primary-button"
+                    onClick={generateAllAnswers}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
+                    {isGenerating ? "Generating All..." : "⚡ Generate All Answers"} <ArrowUpRight size={15} />
+                  </button>
+                </div>
               </div>
-            </section>
+            )}
 
             <div className="workspace-grid">
-              <section className="answer-column">
+              <section className={`answer-column ${detectedQuestions.length ? "has-question-list" : ""}`}>
+                {detectedQuestions.length > 0 && (
+                  <div className="question-review-list">
+                    {detectedQuestions.map((item, index) => (
+                      <article className="question-review-card panel" key={`${item}-${index}`}>
+                        <div className="question-review-header">
+                          <span className="source-rank">Q{String(index + 1).padStart(2, "0")}</span>
+                          <span className="review-status">
+                            {reviewStatusByQuestion[item] ||
+                              (answersByQuestion[item] ? "DRAFT READY" : "NOT GENERATED")}
+                          </span>
+                        </div>
+                        <h2>{item}</h2>
+                        <textarea
+                          className="question-review-answer"
+                          value={answersByQuestion[item] || ""}
+                          placeholder="Click 'Generate All Answers' to populate this response with AI..."
+                          onChange={(event) => {
+                            const nextAnswers = { ...answersByQuestion, [item]: event.target.value };
+                            setAnswersByQuestion(nextAnswers);
+                            saveAnswers(nextAnswers);
+                          }}
+                        />
+                        <div className="question-review-actions">
+                          <button
+                            className="reject-button"
+                            onClick={() => {
+                              const nextStatuses = { ...reviewStatusByQuestion, [item]: "Changes requested" };
+                              setReviewStatusByQuestion(nextStatuses);
+                              saveReviewStatuses(nextStatuses);
+                              showToast(`Q${index + 1} marked: Changes requested`);
+                            }}
+                          >
+                            <ThumbsDown size={14} /> Request changes
+                          </button>
+                          <button
+                            className="approve-button"
+                            onClick={() => {
+                              const nextStatuses = { ...reviewStatusByQuestion, [item]: "Approved" };
+                              setReviewStatusByQuestion(nextStatuses);
+                              saveReviewStatuses(nextStatuses);
+                              showToast(`Q${index + 1} Approved!`);
+                            }}
+                          >
+                            <Check size={14} /> Approve
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">02 / Draft response</p>
