@@ -112,5 +112,6 @@ async def health_check(
     return HealthResponse(
         status=overall_status,
         version=settings.app_version,
+        environment=settings.env,
         services=services,
     )

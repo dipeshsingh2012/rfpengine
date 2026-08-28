@@ -31,6 +31,11 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       env {
+        name  = "ENV"
+        value = var.environment
+      }
+
+      env {
         name  = "GCP_PROJECT_ID"
         value = var.project_id
       }

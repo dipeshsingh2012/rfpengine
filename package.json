@@ -15,7 +15,9 @@
     "db:revision": "cd backend && python3 -m alembic revision --autogenerate",
     "dev:backend": "cd backend && ./.venv/bin/uvicorn app.main:app --reload --port 8000",
     "dev:frontend": "cd frontend && npm run dev",
+    "dev:prod-api": "cd frontend && npm run dev -- --mode production",
     "build:frontend": "cd frontend && npm run build",
+    "deploy:prod": "cd terraform && terraform apply -auto-approve",
     "tf:init": "cd terraform && terraform init",
     "tf:plan": "cd terraform && terraform plan",
     "tf:apply": "cd terraform && terraform apply"

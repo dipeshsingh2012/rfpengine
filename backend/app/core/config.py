@@ -8,15 +8,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # App Settings
+    # App & Environment Settings
     app_name: str = "RFPEngine API"
     app_version: str = "0.2.0"
-    env: str = "dev"  # "dev", "staging", "prod"
+    env: str = "local"  # "local", "dev", "staging", "prod"
     debug: bool = False
 
     @property
     def is_production(self) -> bool:
         return self.env.lower() in ("prod", "production")
+
+    @property
+    def is_local(self) -> bool:
+        return self.env.lower() in ("local", "dev", "test")
 
     # Google Cloud & Vertex AI Settings
     gcp_project_id: Optional[str] = None
@@ -51,6 +55,16 @@ class Settings(BaseSettings):
     pinecone_region: str = "us-east-1"
     pinecone_dimension: int = 768
     pinecone_metric: str = "cosine"
+    pinecone_namespace: Optional[str] = None
+
+    @property
+    def effective_pinecone_namespace(self) -> str:
+        """
+        Returns environment-specific Pinecone namespace to isolate local vs prod vector embeddings.
+        """
+        if self.pinecone_namespace is not None:
+            return self.pinecone_namespace
+        return "prod" if self.is_production else "local"
 
     # CORS Settings
     cors_origins: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000"
@@ -113,7 +127,7 @@ class Settings(BaseSettings):
         return ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env", "../../.env"),
+        env_file=(".env.local", ".env", "../.env.local", "../.env", "../../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

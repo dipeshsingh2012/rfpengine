@@ -217,6 +217,31 @@ function App() {
     responseIdFromPath(window.location.pathname),
   );
 
+  // Environment & Health State
+  const [backendEnv, setBackendEnv] = useState<string>(() => import.meta.env.VITE_APP_ENV || "local");
+  const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
+  const [activeApiBase, setActiveApiBase] = useState<string>(() => {
+    return localStorage.getItem("rfpengine.custom_api_url") || apiBaseUrl;
+  });
+
+  useEffect(() => {
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${activeApiBase}/health`);
+        if (res.ok) {
+          const data = await res.json();
+          setBackendEnv(data.environment || (activeApiBase.includes("run.app") ? "prod" : "local"));
+          setBackendHealth(data.status || "ok");
+        } else {
+          setBackendHealth("degraded");
+        }
+      } catch {
+        setBackendHealth("degraded");
+      }
+    }
+    checkHealth();
+  }, [activeApiBase]);
+
   // Knowledge Base State
   const [showKBModal, setShowKBModal] = useState(false);
   const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
@@ -242,7 +267,7 @@ function App() {
     setPlaygroundLoading(true);
     setPlaygroundError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/search`, {
+      const res = await fetch(`${activeApiBase}/v1/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -252,8 +277,7 @@ function App() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Search request failed" }));
-        throw new Error(err.detail || "Search request failed");
+        throw new Error(`Search failed with status ${res.status}`);
       }
       const data: SearchResponse = await res.json();
       setPlaygroundResult(data);
@@ -267,7 +291,7 @@ function App() {
   async function fetchKBEntries() {
     setIsFetchingKB(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
+      const res = await fetch(`${activeApiBase}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
       if (res.ok) {
         const data = await res.json();
         setKbEntries(data);
@@ -283,13 +307,13 @@ function App() {
 
   useEffect(() => {
     fetchKBEntries();
-  }, [tenantId]);
+  }, [tenantId, activeApiBase]);
 
   useEffect(() => {
     if (showKBModal) {
       fetchKBEntries();
     }
-  }, [showKBModal]);
+  }, [showKBModal, activeApiBase]);
 
   async function handleKBUpload(file: File) {
     if (!file) return;
@@ -299,30 +323,35 @@ function App() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tenant_id", tenantId);
-      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/upload`, {
+      const res = await fetch(`${activeApiBase}/v1/knowledge-base/upload`, {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) {
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const countMsg = data.records_created ? ` (${data.records_created} passages indexed)` : "";
+        setKbUploadMsg({ text: `Successfully uploaded "${file.name}"${countMsg}.` });
+        fetchKBEntries();
+      } else {
         const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-        throw new Error(err.detail || "Upload failed");
+        setKbUploadMsg({ text: err.detail || "Failed to upload file", isError: true });
       }
-      const data = await res.json();
-      const primaryCat = data.categories?.[0] || "General";
-      setKbUploadMsg({
-        text: `Successfully ingested ${data.records_created} chunks from "${data.filename}" (Auto-categorized as "${primaryCat}").`,
-      });
-      fetchKBEntries();
-    } catch (err: any) {
-      setKbUploadMsg({ text: err.message || "Failed to upload file", isError: true });
+    } catch (e: any) {
+      setKbUploadMsg({ text: e.message || "Network error during upload", isError: true });
     } finally {
       setIsUploadingKB(false);
     }
   }
 
+  async function handleFileUpload(files: FileList | null) {
+    if (files && files.length > 0) {
+      handleKBUpload(files[0]);
+    }
+  }
+
   async function handleDeleteKBEntry(id: string) {
     try {
-      await fetch(`${apiBaseUrl}/v1/knowledge-base/${id}`, { method: "DELETE" });
+      await fetch(`${activeApiBase}/v1/knowledge-base/${id}`, { method: "DELETE" });
       setKbEntries((prev) => prev.filter((item) => item.id !== id));
     } catch (e) {
       console.warn("Failed to delete entry:", e);
@@ -545,7 +574,7 @@ function App() {
     setIsGenerating(true);
     setNotice("Searching approved knowledge...");
     try {
-      const result = await fetch(`${apiBaseUrl}/v1/search`, {
+      const result = await fetch(`${activeApiBase}/v1/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenant_id: tenantId, question, top_k: topK }),
@@ -588,7 +617,7 @@ function App() {
     const generated: Record<string, string> = { ...answersByQuestion };
     for (const item of detectedQuestions) {
       try {
-        const result = await fetch(`${apiBaseUrl}/v1/search`, {
+        const result = await fetch(`${activeApiBase}/v1/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
@@ -729,6 +758,41 @@ function App() {
         <div className="workspace-switcher">
           <span className="workspace-dot" /> Acme Corporation{" "}
           <ChevronDown size={15} />
+        </div>
+        <div
+          className="env-indicator"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "11px",
+            fontWeight: 600,
+            padding: "4px 10px",
+            borderRadius: "9999px",
+            backgroundColor: backendEnv === "prod" || backendEnv === "production" ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
+            color: backendEnv === "prod" || backendEnv === "production" ? "#10b981" : "#f59e0b",
+            border: `1px solid ${backendEnv === "prod" || backendEnv === "production" ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.25)"}`,
+            cursor: "pointer",
+            marginLeft: "8px",
+          }}
+          onClick={() => {
+            const nextUrl = activeApiBase.includes("localhost") || activeApiBase.startsWith("/api")
+              ? "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api"
+              : "/api";
+            localStorage.setItem("rfpengine.custom_api_url", nextUrl);
+            setActiveApiBase(nextUrl);
+          }}
+          title={`Active API: ${activeApiBase}\nStatus: ${backendHealth.toUpperCase()}\nClick to toggle Local / Cloud Prod target`}
+        >
+          <span
+            style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              backgroundColor: backendHealth === "ok" ? (backendEnv === "prod" || backendEnv === "production" ? "#10b981" : "#f59e0b") : "#ef4444",
+            }}
+          />
+          {backendEnv === "prod" || backendEnv === "production" ? "PROD CLOUD" : "LOCAL DEV"}
         </div>
         <div className="topbar-spacer" />
         <button className="icon-button" title="Open notifications">

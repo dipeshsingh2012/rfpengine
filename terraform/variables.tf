@@ -21,6 +21,12 @@ variable "app_name" {
   default     = "rfpengine"
 }
 
+variable "environment" {
+  type        = string
+  description = "Target deployment environment (e.g. prod, staging, dev)"
+  default     = "prod"
+}
+
 variable "container_image" {
   type        = string
   description = "Container image URL to deploy to Cloud Run"

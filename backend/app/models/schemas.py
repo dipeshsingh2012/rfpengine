@@ -172,4 +172,5 @@ class HealthServiceStatus(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     version: str
+    environment: str = "local"
     services: Dict[str, HealthServiceStatus]
