@@ -21,6 +21,10 @@ class DocumentParserService:
     CHUNK_SIZE_CHARS = 1600  # ~400 tokens
     CHUNK_OVERLAP_CHARS = 200  # ~50 tokens
 
+    ALLOWED_EXTENSIONS = {
+        ".csv", ".tsv", ".json", ".jsonl", ".pdf", ".docx", ".txt", ".md", ".markdown"
+    }
+
     @classmethod
     def infer_category(cls, filename: str, sample_text: str = "", override: Optional[str] = None) -> str:
         """
@@ -32,20 +36,36 @@ class DocumentParserService:
 
         combined = f"{filename} {sample_text[:1200]}".lower()
 
-        if any(k in combined for k in ["soc", "iso", "compliance", "audit", "certif", "whitepaper", "hipaa", "pci"]):
-            return "Compliance & Security"
-        if any(k in combined for k in ["secur", "encrypt", "cipher", "tls", "aes", "kms", "vulnerab", "pen test", "auth", "mfa", "sso", "fido2"]):
-            return "Security & Cryptography"
+        # Check Privacy & Legal first
         if any(k in combined for k in ["privacy", "gdpr", "ccpa", "dsar", "subprocessor", "dpa", "retention", "erasure", "legal"]):
             return "Privacy & Legal"
+
+        # Check SLA & Operations
         if any(k in combined for k in ["sla", "uptime", "disaster", "recovery", "rpo", "rto", "backup", "support tier", "incident", "failover", "sre", "operations"]):
             return "SLA & Operations"
+
+        # Check Product & Integrations
         if any(k in combined for k in ["api", "integration", "webhook", "connector", "sdk", "rest", "endpoint", "salesforce", "jira"]):
             return "Product & Integrations"
-        if any(k in combined for k in ["conduct", "employee", "hr", "human resource", "background check", "training", "policy"]):
+
+        # Check HR & Corporate Policies
+        if any(k in combined for k in ["conduct", "employee", "human resource", "background check", "training", "code_of_conduct", "hr_policies", "hr policy"]):
             return "HR & Corporate Policies"
+
+        # Check Cloud & Infrastructure
         if any(k in combined for k in ["architect", "cloud", "aws", "infrastructure", "vpc", "hosting", "kubernetes"]):
             return "Cloud & Architecture"
+
+        # Check Compliance
+        if any(k in combined for k in ["soc 2", "soc2", "soc-2", "iso 27001", "iso27001", "compliance", "audit", "certif", "whitepaper", "hipaa", "pci-dss"]):
+            return "Compliance & Security"
+
+        # Check Security & Cryptography
+        if any(k in combined for k in ["secur", "encrypt", "cipher", "tls", "aes", "kms", "vulnerab", "pen test", "auth", "mfa", "sso", "fido2"]):
+            return "Security & Cryptography"
+
+        if "policy" in combined or "hr" in combined:
+            return "HR & Corporate Policies"
 
         return "General"
 
@@ -59,6 +79,12 @@ class DocumentParserService:
     ) -> List[KBEntryCreate]:
         lower_name = filename.lower()
 
+        if not any(lower_name.endswith(ext) for ext in cls.ALLOWED_EXTENSIONS):
+            raise ValueError(
+                f"Unsupported file format for '{filename}'. Allowed formats: "
+                + ", ".join(sorted(cls.ALLOWED_EXTENSIONS))
+            )
+
         if lower_name.endswith(".csv") or lower_name.endswith(".tsv"):
             return cls._parse_tabular(content, filename, tenant_id, default_category)
         elif lower_name.endswith(".json") or lower_name.endswith(".jsonl"):
@@ -69,8 +95,9 @@ class DocumentParserService:
             return cls._parse_docx(content, filename, tenant_id, default_category)
         elif lower_name.endswith(".md") or lower_name.endswith(".markdown"):
             return cls._parse_markdown(content, filename, tenant_id, default_category)
+        elif lower_name.endswith(".txt"):
+            return cls._parse_text(content, filename, tenant_id, default_category)
         else:
-            # Fallback to plain text parser
             return cls._parse_text(content, filename, tenant_id, default_category)
 
     # --- 1. Tabular Parser (CSV / TSV) ---
