@@ -24,7 +24,7 @@ variable "app_name" {
 variable "container_image" {
   type        = string
   description = "Container image URL to deploy to Cloud Run"
-  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+  default     = "us-central1-docker.pkg.dev/rfpengine/rfpengine-repo/rfpengine-api:v0.2.0"
 }
 
 # --- Sensitive Secrets (stored in GCP Secret Manager) ---

@@ -31,6 +31,21 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       env {
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name  = "GCP_SECRET_MANAGER_ENABLED"
+        value = "true"
+      }
+
+      env {
+        name  = "GCP_SECRET_PREFIX"
+        value = "${var.app_name}-"
+      }
+
+      env {
         name  = "CORS_ORIGINS"
         value = var.cors_origins
       }
@@ -91,28 +106,22 @@ resource "google_cloud_run_v2_service" "backend" {
         }
       }
 
-      dynamic "env" {
-        for_each = var.elasticsearch_api_key != "" ? [1] : []
-        content {
-          name = "ELASTICSEARCH_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.elasticsearch_api_key.secret_id
-              version = "latest"
-            }
+      env {
+        name = "ELASTICSEARCH_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.elasticsearch_api_key.secret_id
+            version = "latest"
           }
         }
       }
 
-      dynamic "env" {
-        for_each = var.pinecone_api_key != "" ? [1] : []
-        content {
-          name = "PINECONE_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.pinecone_api_key.secret_id
-              version = "latest"
-            }
+      env {
+        name = "PINECONE_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.pinecone_api_key.secret_id
+            version = "latest"
           }
         }
       }

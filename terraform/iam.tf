@@ -29,3 +29,10 @@ resource "google_project_iam_member" "vertex_ai_user" {
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
+
+# Grant Secret Manager Viewer role for diagnostics and health auditing
+resource "google_project_iam_member" "secret_viewer" {
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
