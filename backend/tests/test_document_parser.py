@@ -18,9 +18,24 @@ import httpx
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import docx
-
 from app.main import app
 from app.services.document_parser_service import DocumentParserService
+from app.core.db import get_session_factory
+from app.models.db_models import KBEntry
+from sqlalchemy import delete
+
+
+@pytest.fixture
+async def cleanup_test_tenant():
+    """Ensure test tenant rows are cleaned up before and after test execution."""
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        await session.execute(delete(KBEntry).where(KBEntry.tenant_id == "test-upload-tenant"))
+        await session.commit()
+    yield
+    async with session_factory() as session:
+        await session.execute(delete(KBEntry).where(KBEntry.tenant_id == "test-upload-tenant"))
+        await session.commit()
 
 
 # ==============================================================================

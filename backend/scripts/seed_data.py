@@ -126,6 +126,15 @@ async def main() -> None:
     ]
     try:
         await es_service.ensure_index_exists()
+        try:
+            await es_service.client.delete_by_query(
+                index=settings.elasticsearch_index,
+                query={"term": {"tenant_id": tenant_id}},
+                refresh=True,
+            )
+        except Exception as del_err:
+            logger.debug("Elasticsearch tenant prune notice: %s", del_err)
+
         indexed_count = await es_service.bulk_index_documents(es_docs)
         if indexed_count > 0:
             logger.info("✓ Elasticsearch bulk indexing completed: %d documents indexed.", indexed_count)
@@ -142,11 +151,19 @@ async def main() -> None:
         try:
             await pinecone_service.ensure_index_exists()
             index = pinecone_service.client.Index(settings.pinecone_index)
-            # Clear existing vectors in the namespace to keep strictly 1:1 in sync
+            # Prune any stale vectors in the namespace not matching current doc_ids
             try:
-                await asyncio.to_thread(index.delete, delete_all=True, namespace="")
+                existing_ids = []
+                for ids_page in index.list(namespace=""):
+                    for item in ids_page:
+                        item_id = item.id if hasattr(item, "id") else str(item)
+                        existing_ids.append(item_id)
+                stale_ids = [vid for vid in existing_ids if vid not in doc_ids]
+                if stale_ids:
+                    await asyncio.to_thread(index.delete, ids=stale_ids, namespace="")
+                    logger.info("✓ Pruned %d stale vectors from Pinecone.", len(stale_ids))
             except Exception as del_exc:
-                logger.debug("Pinecone delete_all warning: %s", del_exc)
+                logger.debug("Pinecone pruning notice: %s", del_exc)
 
             embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
             pc_vectors = []
