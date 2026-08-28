@@ -46,12 +46,14 @@ type SearchResponse = {
 type KBItem = {
   id: string;
   tenant_id: string;
-  question: string;
-  answer: string;
+  title?: string;
+  content?: string;
+  question?: string;
+  answer?: string;
   category?: string;
   metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type SourceMode = "url" | "upload" | "extension";
@@ -207,6 +209,7 @@ function App() {
   const [showKBModal, setShowKBModal] = useState(false);
   const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
   const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
+  const [isFetchingKB, setIsFetchingKB] = useState(false);
   const [isUploadingKB, setIsUploadingKB] = useState(false);
   const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -250,16 +253,31 @@ function App() {
   }
 
   async function fetchKBEntries() {
+    setIsFetchingKB(true);
     try {
       const res = await fetch(`${apiBaseUrl}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
       if (res.ok) {
         const data = await res.json();
         setKbEntries(data);
+      } else {
+        console.warn("Could not fetch KB entries, HTTP status:", res.status);
       }
     } catch (e) {
       console.warn("Could not fetch KB entries:", e);
+    } finally {
+      setIsFetchingKB(false);
     }
   }
+
+  useEffect(() => {
+    fetchKBEntries();
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (showKBModal) {
+      fetchKBEntries();
+    }
+  }, [showKBModal]);
 
   async function handleKBUpload(file: File) {
     if (!file) return;
@@ -1269,50 +1287,87 @@ function App() {
                     </div>
                   )}
 
-                  {/* Records Section without filter */}
-                  <div className="kb-records-header">
+                  {/* Records Section */}
+                  <div className="kb-records-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
                       <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                        {kbEntries.length} record{kbEntries.length === 1 ? "" : "s"} stored in knowledge base
+                        {isFetchingKB
+                          ? "Fetching indexed passages from storage..."
+                          : `${kbEntries.length} record${kbEntries.length === 1 ? "" : "s"} stored in knowledge base`}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12px",
+                        padding: "6px 12px",
+                        cursor: "pointer",
+                        borderRadius: "6px",
+                        height: "auto",
+                      }}
+                      onClick={() => fetchKBEntries()}
+                      disabled={isFetchingKB}
+                      title="Refresh indexed records"
+                    >
+                      <RefreshCw size={13} className={isFetchingKB ? "spin" : ""} />
+                      {isFetchingKB ? "Refreshing..." : "Refresh"}
+                    </button>
                   </div>
 
                   <div className="kb-records-grid">
-                    {kbEntries.map((entry) => (
-                      <div key={entry.id} className="kb-record-card">
-                        <div className="kb-record-top">
-                          <div className="kb-record-title">{entry.question}</div>
-                          <button
-                            className="kb-delete-btn"
-                            title="Delete knowledge entry"
-                            onClick={() => handleDeleteKBEntry(entry.id)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                        <div className="kb-record-answer">{entry.answer}</div>
-                        <div className="kb-record-tags">
-                          {entry.category && (
-                            <span className="kb-tag">
-                              <Tag size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
-                              {entry.category}
-                            </span>
-                          )}
-                          {entry.metadata?.source_file && (
-                            <span className="kb-tag kb-tag-file">
-                              <FileText size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
-                              {entry.metadata.source_file}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                    {kbEntries.map((entry) => {
+                      const entryTitle = entry.title || entry.question || "Untitled Passage";
+                      const entryBody = entry.content || entry.answer || "";
+                      const sourceFile = entry.metadata?.source_file;
+                      const pageNum = entry.metadata?.page_number;
 
-                    {kbEntries.length === 0 && (
+                      return (
+                        <div key={entry.id} className="kb-record-card">
+                          <div className="kb-record-top">
+                            <div className="kb-record-title">{entryTitle}</div>
+                            <button
+                              className="kb-delete-btn"
+                              title="Delete knowledge entry"
+                              onClick={() => handleDeleteKBEntry(entry.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="kb-record-answer">{entryBody}</div>
+                          <div className="kb-record-tags">
+                            {entry.category && (
+                              <span className="kb-tag">
+                                <Tag size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
+                                {entry.category}
+                              </span>
+                            )}
+                            {sourceFile && (
+                              <span className="kb-tag kb-tag-file">
+                                <FileText size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
+                                {sourceFile}
+                                {pageNum ? ` (p.${pageNum})` : ""}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {kbEntries.length === 0 && !isFetchingKB && (
                       <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
                         No knowledge records found. Upload a file above or click a sample document to get started.
+                      </div>
+                    )}
+
+                    {isFetchingKB && kbEntries.length === 0 && (
+                      <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
+                        <RefreshCw size={16} className="spin" style={{ display: "inline-block", marginRight: "8px", verticalAlign: "middle" }} />
+                        Loading indexed knowledge records from cloud storage...
                       </div>
                     )}
                   </div>

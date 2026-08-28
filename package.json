@@ -13,6 +13,9 @@
     "secrets:sync": "cd backend && ./.venv/bin/python scripts/gcp_secrets_sync.py --sync",
     "db:migrate": "cd backend && python3 -m alembic upgrade head",
     "db:revision": "cd backend && python3 -m alembic revision --autogenerate",
+    "dev:backend": "cd backend && ./.venv/bin/uvicorn app.main:app --reload --port 8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
     "tf:init": "cd terraform && terraform init",
     "tf:plan": "cd terraform && terraform plan",
     "tf:apply": "cd terraform && terraform apply"

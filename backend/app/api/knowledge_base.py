@@ -32,25 +32,62 @@ router = APIRouter(prefix="/api/v1/knowledge-base", tags=["Knowledge Base"])
 async def list_knowledge_base_entries(
     request: Request,
     tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
-    limit: int = Query(default=50, ge=1, le=100),
+    limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> List[KBEntryResponse]:
     """
-    Lists indexed knowledge entries directly from Elasticsearch.
+    Lists indexed knowledge entries from Elasticsearch, with PostgreSQL fallback.
     """
     es_service = getattr(request.app.state, "elasticsearch", None)
-    if not es_service:
-        return []
+    docs = []
+    if es_service:
+        try:
+            docs = await es_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
+        except Exception as es_err:
+            logger.warning("Elasticsearch list_documents failed: %s", es_err)
 
-    docs = await es_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
+    if not docs:
+        try:
+            from app.core.db import get_session_factory
+            from app.models.db_models import KBEntry
+            from sqlalchemy import select
+
+            session_factory = get_session_factory()
+            async with session_factory() as session:
+                query = (
+                    select(KBEntry)
+                    .where(KBEntry.tenant_id == tenant_id)
+                    .offset(offset)
+                    .limit(limit)
+                )
+                result = await session.execute(query)
+                pg_entries = result.scalars().all()
+                docs = [
+                    {
+                        "id": e.id,
+                        "tenant_id": e.tenant_id,
+                        "title": e.title or e.question,
+                        "content": e.content or e.answer,
+                        "question": e.title or e.question,
+                        "answer": e.content or e.answer,
+                        "category": e.category or "",
+                        "metadata": e.metadata_json or {},
+                    }
+                    for e in pg_entries
+                ]
+        except Exception as pg_err:
+            logger.warning("PostgreSQL list fallback failed: %s", pg_err)
+
     return [
         KBEntryResponse(
             id=d["id"],
             tenant_id=d["tenant_id"],
-            question=d["question"],
-            answer=d["answer"],
-            category=d["category"],
-            metadata=d["metadata"],
+            title=d.get("title") or d.get("question", ""),
+            content=d.get("content") or d.get("answer", ""),
+            question=d.get("title") or d.get("question", ""),
+            answer=d.get("content") or d.get("answer", ""),
+            category=d.get("category", ""),
+            metadata=d.get("metadata", {}),
         )
         for d in docs
     ]
