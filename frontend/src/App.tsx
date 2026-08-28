@@ -529,6 +529,13 @@ function App() {
     setRoute(path);
   }
 
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
+
+  function showToast(text: string) {
+    setToastNotice(text);
+    setTimeout(() => setToastNotice(null), 3500);
+  }
+
   function openImport(id?: string) {
     navigate(
       `/review/${id || responseId || localStorage.getItem("rfpengine.latest") || "demo"}`,
@@ -539,14 +546,51 @@ function App() {
     navigate(`/response/workspace/${responseId || "demo"}`);
   }
 
+  function handleSendForReview() {
+    const currentQ = question;
+    const nextStatus = "SME review";
+    const updatedStatus = { ...reviewStatusByQuestion, [currentQ]: nextStatus };
+    setReviewStatusByQuestion(updatedStatus);
+    saveReviewStatuses(updatedStatus);
+
+    showToast(`Draft for question sent to SME Review queue!`);
+
+    // Advance to next question in list if available
+    const currentIndex = detectedQuestions.indexOf(currentQ);
+    if (currentIndex >= 0 && currentIndex < detectedQuestions.length - 1) {
+      setQuestion(detectedQuestions[currentIndex + 1]);
+    }
+  }
+
   function openOriginalForm() {
-    if (!formUrl) return;
-    const approvedQuestions = detectedQuestions.filter((item) => ["Approved", "Final approved"].includes(reviewStatusByQuestion[item]));
-    if (!approvedQuestions.length) { setNotice("Approve at least one answer before opening the original form"); return; }
-    const approvedAnswers = Object.fromEntries(approvedQuestions.map((item) => [item, answersByQuestion[item] || ""]));
-    const handoff = encodeURIComponent(JSON.stringify({ questions: approvedQuestions, answers: approvedAnswers }));
-    const target = `${formUrl.split("#")[0]}#rfpengine=${handoff}`;
+    const baseTargetUrl = formUrl || `${window.location.origin}/mock-questionnaire.html`;
+    
+    // Include approved questions, or if none approved yet, include all generated answers with drafts
+    let approvedQuestions = detectedQuestions.filter((item) =>
+      ["Approved", "Approved by SME", "Approved by Legal", "Final approved"].includes(reviewStatusByQuestion[item])
+    );
+    if (!approvedQuestions.length) {
+      approvedQuestions = detectedQuestions.filter((item) => (answersByQuestion[item] || "").trim().length > 0);
+    }
+    if (!approvedQuestions.length) {
+      approvedQuestions = detectedQuestions;
+    }
+    
+    const approvedAnswers = Object.fromEntries(
+      approvedQuestions.map((item) => [item, answersByQuestion[item] || ""])
+    );
+    
+    const handoff = encodeURIComponent(
+      JSON.stringify({
+        questions: approvedQuestions,
+        answers: approvedAnswers,
+        timestamp: Date.now(),
+      })
+    );
+    
+    const target = `${baseTargetUrl.split("#")[0]}#rfpengine=${handoff}`;
     window.open(target, "_blank", "noopener,noreferrer");
+    showToast(`Opened original form with ${Object.keys(approvedAnswers).length} response drafts!`);
   }
 
   function exportAnswers() {
@@ -1072,17 +1116,13 @@ function App() {
                     : "Live page"}{" "}
                 · {sourceLabel}
               </span>
-              <div>
-                {sourceMode === "url" && (
-                  <button className="outline-button" onClick={openOriginalForm}>
-                    <Link size={15} /> Open original form
-                  </button>
-                )}
-                {sourceMode === "upload" && (
-                  <button className="outline-button" onClick={exportAnswers}>
-                    <Download size={15} /> Export CSV
-                  </button>
-                )}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button className="outline-button" onClick={openOriginalForm} title="Launch buyer form with pre-approved answers">
+                  <Link size={15} /> Open original form
+                </button>
+                <button className="outline-button" onClick={exportAnswers} title="Download answers as CSV">
+                  <Download size={15} /> Export CSV
+                </button>
               </div>
             </div>
             <section className="question-panel panel">
@@ -1243,7 +1283,11 @@ function App() {
                 <span className="key">⌘</span>
                 <span className="key">↵</span> Generate answer
               </div>
-              <button className="send-button" title="Send for review">
+              <button
+                className="send-button"
+                title="Send current draft for SME review"
+                onClick={handleSendForReview}
+              >
                 <Send size={16} /> Send for review
               </button>
             </div>
@@ -1610,6 +1654,32 @@ function App() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toastNotice && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            background: "#18243b",
+            color: "#ffffff",
+            padding: "14px 20px",
+            borderRadius: "8px",
+            boxShadow: "0 12px 35px rgba(0,0,0,0.35)",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            zIndex: 999999,
+            borderLeft: "4px solid var(--lime)",
+            animation: "fadeIn 0.2s ease-out",
+          }}
+        >
+          <CheckCircle2 size={18} style={{ color: "var(--lime)" }} />
+          <span style={{ fontWeight: 500 }}>{toastNotice}</span>
         </div>
       )}
     </div>
