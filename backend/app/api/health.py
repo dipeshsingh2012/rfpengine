@@ -70,7 +70,29 @@ async def health_check(
             details="Pinecone service is not configured",
         )
 
-    # 4. OpenAI check
+    # 4. HashiCorp Vault check
+    vault_service = getattr(request.app.state, "vault", None)
+    if vault_service and vault_service.is_configured():
+        v_start = time.perf_counter()
+        v_status = await vault_service.health_check()
+        v_latency = (time.perf_counter() - v_start) * 1000
+        services["vault"] = HealthServiceStatus(
+            status=v_status.get("status", "unknown"),
+            latency_ms=round(v_latency, 2) if v_status.get("status") == "ok" else None,
+            details=str(v_status.get("details") or f"Vault at {v_status.get('vault_addr')} (v{v_status.get('version')})"),
+        )
+    elif settings.vault_enabled:
+        services["vault"] = HealthServiceStatus(
+            status="unconfigured",
+            details=f"Vault is enabled but missing token or URL: {settings.vault_addr}",
+        )
+    else:
+        services["vault"] = HealthServiceStatus(
+            status="disabled",
+            details="VAULT_ENABLED is false (using environment variables)",
+        )
+
+    # 5. OpenAI check
     if settings.openai_api_key:
         services["openai"] = HealthServiceStatus(
             status="configured",
@@ -91,4 +113,3 @@ async def health_check(
         version=settings.app_version,
         services=services,
     )
-

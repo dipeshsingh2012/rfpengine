@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from functools import lru_cache
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     app_name: str = "RFPEngine API"
     app_version: str = "0.2.0"
     debug: bool = False
+
+    # HashiCorp Vault Settings
+    vault_enabled: bool = False
+    vault_addr: str = "http://localhost:8200"
+    vault_token: Optional[str] = None
+    vault_secret_path: str = "secret/data/rfpengine"
+    vault_mount_point: str = "secret"
 
     # OpenAI Settings
     openai_api_key: Optional[str] = None
@@ -46,6 +53,33 @@ class Settings(BaseSettings):
     # CORS Settings
     cors_origins: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000"
     cors_origin_regex: str = r"chrome-extension://.*"
+
+    def apply_vault_secrets(self, secrets: Dict[str, Any]) -> None:
+        """
+        Dynamically applies secrets retrieved from HashiCorp Vault.
+        """
+        if not secrets:
+            return
+
+        if "OPENAI_API_KEY" in secrets:
+            self.openai_api_key = secrets["OPENAI_API_KEY"]
+        elif "openai_api_key" in secrets:
+            self.openai_api_key = secrets["openai_api_key"]
+
+        if "DATABASE_URL" in secrets:
+            self.database_url = secrets["DATABASE_URL"]
+        elif "database_url" in secrets:
+            self.database_url = secrets["database_url"]
+
+        if "PINECONE_API_KEY" in secrets:
+            self.pinecone_api_key = secrets["PINECONE_API_KEY"]
+        elif "pinecone_api_key" in secrets:
+            self.pinecone_api_key = secrets["pinecone_api_key"]
+
+        if "ELASTICSEARCH_PASSWORD" in secrets:
+            self.elasticsearch_password = secrets["ELASTICSEARCH_PASSWORD"]
+        elif "elasticsearch_password" in secrets:
+            self.elasticsearch_password = secrets["elasticsearch_password"]
 
     @property
     def effective_database_url(self) -> str:

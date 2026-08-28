@@ -15,6 +15,7 @@ import app.models.db_models  # noqa: F401
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
+from app.services.vault_service import VaultService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +29,19 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info("Initializing RFPEngine backend services...")
 
-    # 1. Initialize PostgreSQL tables
+    # 1. Initialize Vault Service & load dynamic secrets if enabled
+    vault_service = VaultService(settings)
+    app.state.vault = vault_service
+    if settings.vault_enabled:
+        try:
+            secrets = await vault_service.read_secrets()
+            if secrets:
+                settings.apply_vault_secrets(secrets)
+                logger.info("Applied secrets dynamically from HashiCorp Vault.")
+        except Exception as exc:
+            logger.warning("Could not fetch secrets from Vault: %s", exc)
+
+    # 2. Initialize PostgreSQL tables
     try:
         engine = get_engine()
         async with engine.begin() as conn:
@@ -37,7 +50,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Could not automatically create PostgreSQL tables (DB may be offline): %s", exc)
 
-    # 2. Initialize Elasticsearch client & index
+    # 3. Initialize Elasticsearch client & index
     es_service = ElasticsearchService(settings)
     app.state.elasticsearch = es_service
     try:
@@ -45,7 +58,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Elasticsearch index initialization deferred: %s", exc)
 
-    # 3. Initialize Pinecone client & index
+    # 4. Initialize Pinecone client & index
     pinecone_service = PineconeService(settings)
     app.state.pinecone = pinecone_service
     if pinecone_service.is_configured():
@@ -54,7 +67,7 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Pinecone index initialization deferred: %s", exc)
 
-    # 4. Initialize Hybrid Search Service (orchestrator)
+    # 5. Initialize Hybrid Search Service (orchestrator)
     hybrid_search = HybridSearchService(
         settings=settings,
         es_service=es_service,

@@ -59,6 +59,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0003: Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety](docs/adr/0003-human-in-the-loop-governance-and-extension-safety.md)
 - [ADR 0004: Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture](docs/adr/0004-decoupled-seller-workspace-and-browser-extension.md)
 - [ADR 0005: Database Migrations with Alembic](docs/adr/0005-database-migrations-with-alembic.md)
+- [ADR 0006: Centralized Secrets Management with HashiCorp Vault](docs/adr/0006-centralized-secrets-management-with-hashicorp-vault.md)
 
 ---
 
