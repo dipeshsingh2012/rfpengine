@@ -1,155 +1,99 @@
 from __future__ import annotations
 
-import os
+import logging
 from contextlib import asynccontextmanager
-from typing import Any
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from openai import AsyncOpenAI
-from opensearchpy._async.client import AsyncOpenSearch
-from pydantic import BaseModel, Field
 
+from app.api.health import router as health_router
+from app.api.knowledge_base import router as kb_router
+from app.api.responses import router as responses_router
+from app.api.search import router as search_router
+from app.core.config import get_settings
+from app.core.db import Base, close_db_connection, get_engine
+from app.services.elasticsearch_service import ElasticsearchService
+from app.services.hybrid_search_service import HybridSearchService
+from app.services.pinecone_service import PineconeService
 
-INDEX_NAME = "rfq_knowledge_base"
-
-
-class SearchRequest(BaseModel):
-    tenant_id: str = Field(min_length=1)
-    question: str = Field(min_length=1)
-    top_k: int = Field(default=5, ge=1, le=50)
-
-
-class Source(BaseModel):
-    id: str
-    question: str
-    answer: str
-    score: float
-
-
-class SearchResponse(BaseModel):
-    suggested_answer: str
-    confidence_score: float = Field(ge=0, le=1)
-    sources: list[Source]
-
-
-def create_opensearch_client() -> AsyncOpenSearch:
-    return AsyncOpenSearch(
-        hosts=[os.getenv("OPENSEARCH_URL", "http://localhost:9200")],
-        http_auth=(
-            os.getenv("OPENSEARCH_USERNAME", "admin"),
-            os.getenv("OPENSEARCH_PASSWORD", "admin"),
-        ),
-        use_ssl=os.getenv("OPENSEARCH_USE_SSL", "false").lower() == "true",
-        verify_certs=os.getenv("OPENSEARCH_VERIFY_CERTS", "false").lower() == "true",
-    )
-
-
-def create_openai_client() -> AsyncOpenAI:
-    return AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("rfpengine")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.opensearch = create_opensearch_client()
-    app.state.openai = create_openai_client() if os.getenv("OPENAI_API_KEY") else None
+    settings = get_settings()
+    logger.info("Initializing RFPEngine backend services...")
+
+    # 1. Initialize PostgreSQL tables
+    try:
+        engine = get_engine()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("PostgreSQL database tables verified/created.")
+    except Exception as exc:
+        logger.warning("Could not automatically create PostgreSQL tables (DB may be offline): %s", exc)
+
+    # 2. Initialize Elasticsearch client & index
+    es_service = ElasticsearchService(settings)
+    app.state.elasticsearch = es_service
+    try:
+        await es_service.ensure_index_exists()
+    except Exception as exc:
+        logger.warning("Elasticsearch index initialization deferred: %s", exc)
+
+    # 3. Initialize Pinecone client & index
+    pinecone_service = PineconeService(settings)
+    app.state.pinecone = pinecone_service
+    if pinecone_service.is_configured():
+        try:
+            await pinecone_service.ensure_index_exists()
+        except Exception as exc:
+            logger.warning("Pinecone index initialization deferred: %s", exc)
+
+    # 4. Initialize Hybrid Search Service (orchestrator)
+    hybrid_search = HybridSearchService(
+        settings=settings,
+        es_service=es_service,
+        pinecone_service=pinecone_service,
+    )
+    app.state.hybrid_search = hybrid_search
+
+    logger.info("RFPEngine API initialized successfully.")
     yield
-    await app.state.opensearch.close()
+
+    # Shutdown / Cleanup
+    logger.info("Shutting down services...")
+    await es_service.close()
+    await close_db_connection()
+    logger.info("Services shut down.")
 
 
-app = FastAPI(title="RFPEngine API", version="0.1.0", lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
-    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"chrome-extension://.*"),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-def reciprocal_rank_fusion(result_sets: list[list[dict[str, Any]]], limit: int) -> list[dict[str, Any]]:
-    fused: dict[str, dict[str, Any]] = {}
-    for results in result_sets:
-        for rank, hit in enumerate(results, start=1):
-            document_id = hit["_id"]
-            entry = fused.setdefault(document_id, {"hit": hit, "score": 0.0})
-            entry["score"] += 1 / (60 + rank)
-    return sorted(fused.values(), key=lambda item: item["score"], reverse=True)[:limit]
-
-
-async def retrieve_sources(client: AsyncOpenSearch, request: SearchRequest, embedding: list[float]) -> list[dict[str, Any]]:
-    tenant_filter = {"term": {"tenant_id": request.tenant_id}}
-    sparse = await client.search(
-        index=INDEX_NAME,
-        body={
-            "size": request.top_k,
-            "query": {"bool": {"filter": [tenant_filter], "must": {"match": {"question": request.question}}}},
-        },
-    )
-    dense = await client.search(
-        index=INDEX_NAME,
-        body={
-            "size": request.top_k,
-            "query": {"knn": {"question_vector": {"vector": embedding, "k": request.top_k, "filter": tenant_filter}}},
-        },
-    )
-    return reciprocal_rank_fusion(
-        [sparse["hits"]["hits"], dense["hits"]["hits"]], request.top_k
+def create_application() -> FastAPI:
+    settings = get_settings()
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        lifespan=lifespan,
     )
 
-
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.post("/api/v1/search", response_model=SearchResponse)
-async def search(request: SearchRequest) -> SearchResponse:
-    if app.state.openai is None:
-        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
-
-    try:
-        embedding_response = await app.state.openai.embeddings.create(
-            model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
-            input=request.question,
-        )
-        fused_results = await retrieve_sources(
-            app.state.opensearch, request, embedding_response.data[0].embedding
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="Search backend unavailable") from exc
-
-    sources = [
-        Source(
-            id=item["hit"]["_id"],
-            question=item["hit"]["_source"].get("question", ""),
-            answer=item["hit"]["_source"].get("answer", ""),
-            score=round(item["score"], 6),
-        )
-        for item in fused_results
-    ]
-    context = "\n\n".join(f"Source {source.id}: Q: {source.question}\nA: {source.answer}" for source in sources)
-    prompt = (
-        "Draft a concise answer to the user's question using only the supplied sources. "
-        "If the sources do not support an answer, say that clearly. Do not invent facts.\n\n"
-        f"User question: {request.question}\n\nSources:\n{context or 'No sources found.'}"
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_origin_regex=settings.cors_origin_regex,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
-    try:
-        completion = await app.state.openai.chat.completions.create(
-            model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o"),
-            temperature=0,
-            messages=[
-                {"role": "system", "content": "You are an exacting RFP response assistant. Return only the drafted answer."},
-                {"role": "user", "content": prompt},
-            ],
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="Answer generation unavailable") from exc
 
-    confidence = min(1.0, max((source.score for source in sources), default=0.0) * 60)
-    return SearchResponse(
-        suggested_answer=completion.choices[0].message.content or "",
-        confidence_score=round(confidence, 4),
-        sources=sources,
-    )
+    app.include_router(health_router)
+    app.include_router(search_router)
+    app.include_router(kb_router)
+    app.include_router(responses_router)
+
+    return app
+
+
+app = create_application()
