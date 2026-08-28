@@ -462,6 +462,7 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
 │   │   └── test_postgres_connection.py # Production PostgreSQL validation suite
 │   ├── scripts/
 │   │   ├── gcp_secrets_sync.py     # CLI sync to GCP Secret Manager
+│   │   ├── verify_cloud_connections.py # Live Cloud diagnostics CLI
 │   │   ├── init_services.py        # DB schema and index setup script
 │   │   └── seed_data.py            # Sample RFP data seed script
 │   ├── pytest.ini

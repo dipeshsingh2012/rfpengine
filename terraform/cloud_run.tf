@@ -4,8 +4,6 @@ resource "google_artifact_registry_repository" "docker_repo" {
   repository_id = "${var.app_name}-repo"
   description   = "Docker repository for RFPEngine backend images"
   format        = "DOCKER"
-
-  depends_on = [google_project_service.enabled_apis]
 }
 
 # 2. Cloud Run Service (v2)
@@ -30,11 +28,6 @@ resource "google_cloud_run_v2_service" "backend" {
           cpu    = "1"
           memory = "512Mi"
         }
-      }
-
-      env {
-        name  = "PORT"
-        value = "8000"
       }
 
       env {
@@ -83,6 +76,19 @@ resource "google_cloud_run_v2_service" "backend" {
           }
         }
       }
+
+      dynamic "env" {
+        for_each = var.elasticsearch_api_key != "" ? [1] : []
+        content {
+          name = "ELASTICSEARCH_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.elasticsearch_api_key.secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
     }
   }
 
@@ -90,6 +96,7 @@ resource "google_cloud_run_v2_service" "backend" {
     google_secret_manager_secret_iam_member.db_url_access,
     google_secret_manager_secret_iam_member.openai_key_access,
     google_secret_manager_secret_iam_member.pinecone_key_access,
+    google_secret_manager_secret_iam_member.elasticsearch_key_access,
   ]
 }
 

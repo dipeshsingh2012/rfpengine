@@ -10,4 +10,6 @@ database_url     = "postgresql://neondb_owner:your_password@ep-rapid-truth-...ne
 openai_api_key   = ""
 pinecone_api_key = ""
 
-cors_origins     = "http://localhost:5173,https://your-domain.com"
+cors_origins          = "http://localhost:5173,https://your-domain.com"
+elasticsearch_url     = "https://my-deployment.es.us-central1.gcp.elastic.cloud:443"
+elasticsearch_api_key = ""

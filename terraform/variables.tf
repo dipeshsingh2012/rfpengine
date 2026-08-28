@@ -55,6 +55,13 @@ variable "elasticsearch_url" {
   default     = "http://localhost:9200"
 }
 
+variable "elasticsearch_api_key" {
+  type        = string
+  description = "Elasticsearch API Key for Elastic Cloud"
+  sensitive   = true
+  default     = ""
+}
+
 variable "cors_origins" {
   type        = string
   description = "Allowed CORS origins for the frontend and extension"
