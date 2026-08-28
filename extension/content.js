@@ -149,14 +149,47 @@ async function generateAnswerForQuestion(question) {
   }
 }
 
+function isRFPEngineWebApp() {
+  const host = window.location.hostname || '';
+  const pathname = window.location.pathname || '';
+
+  // Explicit test buyer form
+  if (pathname.includes('mock-questionnaire.html')) {
+    return false;
+  }
+
+  // RFPEngine web application (dashboard, workspace drafting, review queue, knowledge base)
+  if (host.includes('rfpengine.net') || host.includes('run.app')) {
+    return true;
+  }
+
+  if (
+    (host === 'localhost' || host === '127.0.0.1') &&
+    (window.location.port === '5173' || window.location.port === '3000')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 // --- In-Page Injection Floating Overlay ---
 function createInPageOverlay() {
+  // Never show floater overlay inside the RFPEngine web app itself
+  if (isRFPEngineWebApp()) return;
+
   const handoff = formHandoff();
   const fields = getScanFields();
   if (fields.length === 0) return;
 
   const hasHandoffAnswers = handoff && handoff.answers && Object.keys(handoff.answers).length > 0;
   const answerableFields = fields.filter((f) => f.handoffAnswer);
+
+  // Only show the floating overlay when handoff answers are present (user came from Open Original Form)
+  // or on explicit mock questionnaire pages
+  if (!hasHandoffAnswers && !window.location.pathname.includes('mock-questionnaire.html')) {
+    return;
+  }
 
   if (document.getElementById('rfpengine-floating-overlay')) return;
 
