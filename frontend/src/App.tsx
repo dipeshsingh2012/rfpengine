@@ -28,6 +28,9 @@ import {
   X,
   Zap,
   Play,
+  Clock,
+  MessageSquare,
+  CheckCircle,
 } from "lucide-react";
 
 type Source = {
@@ -229,6 +232,14 @@ function App() {
   const [responseId, setResponseId] = useState(() =>
     responseIdFromPath(window.location.pathname),
   );
+
+  // Send for Review & Governance State
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewModalScope, setReviewModalScope] = useState<"all" | "current">("all");
+  const [reviewTargetRole, setReviewTargetRole] = useState<"Security SME" | "Legal reviewer" | "Final approver">("Security SME");
+  const [reviewInstructions, setReviewInstructions] = useState("");
+  const [reviewSelectedQuestion, setReviewSelectedQuestion] = useState<string | null>(null);
+  const [reviewCommentsByQuestion, setReviewCommentsByQuestion] = useState<Record<string, string>>({});
 
   // Environment & Health State
   const [backendEnv, setBackendEnv] = useState<string>(() => import.meta.env.VITE_APP_ENV || "local");
@@ -552,20 +563,94 @@ function App() {
     navigate(`/response/workspace/${responseId || "demo"}`);
   }
 
-  function handleSendForReview() {
-    const currentQ = question;
-    const nextStatus = "SME review";
-    const updatedStatus = { ...reviewStatusByQuestion, [currentQ]: nextStatus };
-    setReviewStatusByQuestion(updatedStatus);
-    saveReviewStatuses(updatedStatus);
+  function openSendForReviewModal(scope: "all" | "current" = "all", targetQuestion?: string) {
+    setReviewModalScope(scope);
+    setReviewSelectedQuestion(targetQuestion || (scope === "current" ? question : null));
+    setReviewInstructions("");
+    setShowReviewModal(true);
+  }
 
-    showToast(`Draft for question sent to SME Review queue!`);
+  function submitSendForReview() {
+    const targetQuestions = reviewSelectedQuestion 
+      ? [reviewSelectedQuestion] 
+      : reviewModalScope === "current" 
+        ? [question] 
+        : (detectedQuestions.length > 0 ? detectedQuestions : [question]);
 
-    // Advance to next question in list if available
-    const currentIndex = detectedQuestions.indexOf(currentQ);
-    if (currentIndex >= 0 && currentIndex < detectedQuestions.length - 1) {
-      setQuestion(detectedQuestions[currentIndex + 1]);
+    let targetStatus = "SME review";
+    if (reviewTargetRole === "Legal reviewer") targetStatus = "Legal review";
+    if (reviewTargetRole === "Final approver") targetStatus = "Ready for Final Approval";
+
+    const nextStatuses = { ...reviewStatusByQuestion };
+    const nextComments = { ...reviewCommentsByQuestion };
+
+    targetQuestions.forEach((q) => {
+      nextStatuses[q] = targetStatus;
+      if (reviewInstructions.trim()) {
+        nextComments[q] = `[${reviewTargetRole} Note]: ${reviewInstructions.trim()}`;
+      }
+    });
+
+    setReviewStatusByQuestion(nextStatuses);
+    saveReviewStatuses(nextStatuses);
+    setReviewCommentsByQuestion(nextComments);
+
+    showToast(`Dispatched ${targetQuestions.length} draft${targetQuestions.length === 1 ? "" : "s"} to ${reviewTargetRole}!`);
+    setShowReviewModal(false);
+  }
+
+  function handleApproveQuestion(item: string) {
+    let nextStatus = "Approved";
+    if (role === "Security SME") nextStatus = "Approved by SME";
+    if (role === "Legal reviewer") nextStatus = "Approved by Legal";
+    if (role === "Final approver") nextStatus = "Final approved";
+
+    const nextStatuses = { ...reviewStatusByQuestion, [item]: nextStatus };
+    setReviewStatusByQuestion(nextStatuses);
+    saveReviewStatuses(nextStatuses);
+    showToast(`Question marked: ${nextStatus}`);
+  }
+
+  function handleRequestChanges(item: string) {
+    const note = window.prompt(`Enter revision feedback / changes requested:`, reviewCommentsByQuestion[item] || "");
+    if (note === null) return;
+
+    const nextStatuses = { ...reviewStatusByQuestion, [item]: "Changes requested" };
+    setReviewStatusByQuestion(nextStatuses);
+    saveReviewStatuses(nextStatuses);
+
+    if (note.trim()) {
+      const nextComments = { ...reviewCommentsByQuestion, [item]: `[Changes Requested by ${role}]: ${note.trim()}` };
+      setReviewCommentsByQuestion(nextComments);
     }
+
+    showToast(`Marked "Changes requested" with review note`);
+  }
+
+  function handleBatchApproveAll() {
+    let nextStatus = "Approved";
+    if (role === "Security SME") nextStatus = "Approved by SME";
+    if (role === "Legal reviewer") nextStatus = "Approved by Legal";
+    if (role === "Final approver") nextStatus = "Final approved";
+
+    const allQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
+    const nextStatuses = { ...reviewStatusByQuestion };
+    allQuestions.forEach((q) => {
+      nextStatuses[q] = nextStatus;
+    });
+
+    setReviewStatusByQuestion(nextStatuses);
+    saveReviewStatuses(nextStatuses);
+    showToast(`All ${allQuestions.length} questions marked: ${nextStatus}!`);
+  }
+
+  function getStatusBadgeClass(status?: string) {
+    if (!status || status === "NOT GENERATED" || status === "DRAFT READY") return "status-draft";
+    if (status.includes("SME review") || status.includes("Ready")) return "status-review";
+    if (status.includes("Legal review")) return "status-legal";
+    if (status.includes("Approved") || status.includes("Final")) return "status-approved";
+    if (status.includes("Changes")) return "status-changes";
+    return "status-draft";
   }
 
   async function openOriginalForm() {
@@ -742,6 +827,18 @@ function App() {
     showToast(`Generated answers for all ${detectedQuestions.length} questions!`);
     setIsGenerating(false);
   }
+
+  const allCurrentQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
+  const approvedCount = allCurrentQuestions.filter((q) =>
+    ["Approved", "Approved by SME", "Approved by Legal", "Final approved"].includes(reviewStatusByQuestion[q])
+  ).length;
+  const inReviewCount = allCurrentQuestions.filter((q) =>
+    ["SME review", "Legal review", "Ready for Final Approval"].includes(reviewStatusByQuestion[q])
+  ).length;
+  const changesRequestedCount = allCurrentQuestions.filter((q) =>
+    reviewStatusByQuestion[q] === "Changes requested"
+  ).length;
+  const isAllApproved = allCurrentQuestions.length > 0 && approvedCount === allCurrentQuestions.length;
 
   if (route.startsWith("/review/")) {
     return (
@@ -1174,7 +1271,7 @@ function App() {
                 </button>
               </div>
             </div>
-            {detectedQuestions.length === 0 ? (
+            {detectedQuestions.length === 0 && (
               <section className="question-panel panel">
                 <div className="panel-label">
                   <span className="step-number">01</span>
@@ -1212,11 +1309,100 @@ function App() {
                   </button>
                 </div>
               </section>
-            ) : (
+            )}
+
+            {/* Governance & Reviewer Role Bar */}
+            <div className="governance-bar panel">
+              <div className="governance-role-select">
+                <span className="eyebrow">Acting Role:</span>
+                <div className="role-pills">
+                  <button
+                    className={`role-pill ${role === "Proposal manager" ? "active" : ""}`}
+                    onClick={() => {
+                      setRole("Proposal manager");
+                      showToast("Active Role: Proposal Drafter");
+                    }}
+                  >
+                    🧑‍💻 Proposal Drafter
+                  </button>
+                  <button
+                    className={`role-pill ${role === "Security SME" ? "active" : ""}`}
+                    onClick={() => {
+                      setRole("Security SME");
+                      showToast("Active Role: Security SME");
+                    }}
+                  >
+                    🛡️ Security SME
+                  </button>
+                  <button
+                    className={`role-pill ${role === "Legal reviewer" ? "active" : ""}`}
+                    onClick={() => {
+                      setRole("Legal reviewer");
+                      showToast("Active Role: Legal Reviewer");
+                    }}
+                  >
+                    ⚖️ Legal Reviewer
+                  </button>
+                  <button
+                    className={`role-pill ${role === "Final approver" ? "active" : ""}`}
+                    onClick={() => {
+                      setRole("Final approver");
+                      showToast("Active Role: Final Approver");
+                    }}
+                  >
+                    👑 Final Approver
+                  </button>
+                </div>
+              </div>
+              <div className="governance-stats">
+                <span className="stat-badge approved">
+                  <Check size={12} /> {approvedCount} / {allCurrentQuestions.length} Approved
+                </span>
+                {inReviewCount > 0 && (
+                  <span className="stat-badge review">
+                    <Clock size={12} /> {inReviewCount} In Review
+                  </span>
+                )}
+                {changesRequestedCount > 0 && (
+                  <span className="stat-badge changes">
+                    <MessageSquare size={12} /> {changesRequestedCount} Changes Requested
+                  </span>
+                )}
+                <button
+                  className="outline-button"
+                  style={{ padding: "5px 10px", fontSize: "11px" }}
+                  onClick={handleBatchApproveAll}
+                  title={`Batch approve all questions as ${role}`}
+                >
+                  <Check size={12} /> Approve All as {role === "Proposal manager" ? "Drafter" : role}
+                </button>
+              </div>
+            </div>
+
+            {/* All-Approved Governance Celebration Banner */}
+            {isAllApproved && (
+              <div className="celebration-banner">
+                <div>
+                  <strong>
+                    <CheckCircle size={18} /> Governance Complete: All {allCurrentQuestions.length} Responses Approved!
+                  </strong>
+                  <p>All answers have passed SME & Legal reviews. Ready for 1-click buyer form injection.</p>
+                </div>
+                <button
+                  className="primary-button"
+                  onClick={openOriginalForm}
+                  style={{ padding: "8px 16px" }}
+                >
+                  <Sparkles size={14} /> ⚡ Inject Answers into Buyer Form
+                </button>
+              </div>
+            )}
+
+            {detectedQuestions.length > 0 && (
               <div
                 className="question-header-bar panel"
                 style={{
-                  padding: "16px 20px",
+                  padding: "14px 20px",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
@@ -1260,12 +1446,20 @@ function App() {
                       <article className="question-review-card panel" key={`${item}-${index}`}>
                         <div className="question-review-header">
                           <span className="source-rank">Q{String(index + 1).padStart(2, "0")}</span>
-                          <span className="review-status">
+                          <span className={`review-status ${getStatusBadgeClass(reviewStatusByQuestion[item])}`}>
                             {reviewStatusByQuestion[item] ||
                               (answersByQuestion[item] ? "DRAFT READY" : "NOT GENERATED")}
                           </span>
                         </div>
                         <h2>{item}</h2>
+
+                        {reviewCommentsByQuestion[item] && (
+                          <div className="review-note-callout">
+                            <MessageSquare size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
+                            <div>{reviewCommentsByQuestion[item]}</div>
+                          </div>
+                        )}
+
                         <textarea
                           className="question-review-answer"
                           value={answersByQuestion[item] || ""}
@@ -1279,25 +1473,24 @@ function App() {
                         <div className="question-review-actions">
                           <button
                             className="reject-button"
-                            onClick={() => {
-                              const nextStatuses = { ...reviewStatusByQuestion, [item]: "Changes requested" };
-                              setReviewStatusByQuestion(nextStatuses);
-                              saveReviewStatuses(nextStatuses);
-                              showToast(`Q${index + 1} marked: Changes requested`);
-                            }}
+                            onClick={() => handleRequestChanges(item)}
+                            title="Leave feedback / request edits"
                           >
                             <ThumbsDown size={14} /> Request changes
                           </button>
                           <button
-                            className="approve-button"
-                            onClick={() => {
-                              const nextStatuses = { ...reviewStatusByQuestion, [item]: "Approved" };
-                              setReviewStatusByQuestion(nextStatuses);
-                              saveReviewStatuses(nextStatuses);
-                              showToast(`Q${index + 1} Approved!`);
-                            }}
+                            className="outline-button"
+                            onClick={() => openSendForReviewModal("current", item)}
+                            title="Route to Security SME, Legal, or Final Approver"
                           >
-                            <Check size={14} /> Approve
+                            <Send size={14} /> Send for review
+                          </button>
+                          <button
+                            className="approve-button"
+                            onClick={() => handleApproveQuestion(item)}
+                            title={`Approve answer as ${role}`}
+                          >
+                            <Check size={14} /> Approve as {role === "Proposal manager" ? "Drafter" : role}
                           </button>
                         </div>
                       </article>
@@ -1331,10 +1524,16 @@ function App() {
                   <div className="answer-footer">
                     <span>{answer.length} characters</span>
                     <div className="answer-actions">
-                      <button className="reject-button">
-                        <ThumbsDown size={15} /> Reject
+                      <button
+                        className="reject-button"
+                        onClick={() => handleRequestChanges(question)}
+                      >
+                        <ThumbsDown size={15} /> Request changes
                       </button>
-                      <button className="approve-button">
+                      <button
+                        className="approve-button"
+                        onClick={() => handleApproveQuestion(question)}
+                      >
                         <Check size={15} /> Approve answer
                       </button>
                     </div>
@@ -1404,8 +1603,8 @@ function App() {
               </div>
               <button
                 className="send-button"
-                title="Send current draft for SME review"
-                onClick={handleSendForReview}
+                title="Send drafts for Governance Review"
+                onClick={() => openSendForReviewModal("all")}
               >
                 <Send size={16} /> Send for review
               </button>
@@ -1413,6 +1612,87 @@ function App() {
           </>
         )}
       </main>
+
+      {/* Send for Review Governance Modal */}
+      {showReviewModal && (
+        <div className="kb-modal-backdrop" onClick={() => setShowReviewModal(false)}>
+          <div className="kb-modal-container review-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="kb-modal-header">
+              <h2 style={{ fontSize: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Send size={18} color="var(--blue)" /> Send Answers for Governance Review
+              </h2>
+              <button className="icon-button" onClick={() => setShowReviewModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="kb-modal-body" style={{ padding: "20px 24px" }}>
+              <p style={{ margin: "0 0 14px", fontSize: "12px", color: "var(--muted)" }}>
+                Route RFP drafts to the appropriate Subject Matter Expert (SME), Legal counsel, or Final Approver.
+              </p>
+              <form
+                className="review-modal-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitSendForReview();
+                }}
+              >
+                <label>
+                  Target Reviewer Role:
+                  <select
+                    value={reviewTargetRole}
+                    onChange={(e) => setReviewTargetRole(e.target.value as any)}
+                  >
+                    <option value="Security SME">🛡️ Security SME (Technical Architecture, Encryption, SLAs)</option>
+                    <option value="Legal reviewer">⚖️ Legal Reviewer (Compliance, Terms, GDPR, Liability)</option>
+                    <option value="Final approver">👑 Final Executive Approver (Sign-off & Lock)</option>
+                  </select>
+                </label>
+
+                <label>
+                  Review Scope:
+                  <select
+                    value={reviewSelectedQuestion ? "current" : reviewModalScope}
+                    onChange={(e) => setReviewModalScope(e.target.value as "all" | "current")}
+                    disabled={!!reviewSelectedQuestion}
+                  >
+                    <option value="all">
+                      Entire Questionnaire ({allCurrentQuestions.length} Questions)
+                    </option>
+                    <option value="current">
+                      {reviewSelectedQuestion
+                        ? `Selected: "${reviewSelectedQuestion.slice(0, 40)}..."`
+                        : `Current: "${question.slice(0, 40)}..."`}
+                    </option>
+                  </select>
+                </label>
+
+                <label>
+                  Review Instructions & Notes (Optional):
+                  <textarea
+                    placeholder="e.g. Please verify that our 35-day backup rotation window matches our current SOC 2 Type II audit report."
+                    value={reviewInstructions}
+                    onChange={(e) => setReviewInstructions(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+
+                <div className="review-modal-actions">
+                  <button
+                    type="button"
+                    className="outline-button"
+                    onClick={() => setShowReviewModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary-button">
+                    <Send size={14} /> Dispatch to {reviewTargetRole}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Knowledge Base Modal */}
       {showKBModal && (
