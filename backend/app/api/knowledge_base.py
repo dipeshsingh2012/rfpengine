@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import (
     APIRouter,
@@ -225,48 +226,30 @@ async def upload_knowledge_base_file(
             detail="Could not extract any valid knowledge records or chunks from the uploaded file.",
         )
 
-    # 2. Index into Elasticsearch & Pinecone
+    # 2. Index into Elasticsearch & Pinecone using batched operations
     es_service = getattr(request.app.state, "elasticsearch", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
     created_responses: List[KBEntryResponse] = []
+    es_docs: List[Dict[str, Any]] = []
+    embed_prompts: List[str] = []
+    doc_ids: List[str] = []
 
-    for entry in parsed_entries:
+    for i, entry in enumerate(parsed_entries):
         doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+        doc_ids.append(doc_id)
+        embed_prompts.append(f"Topic: {entry.question}\n{entry.answer}")
 
-        if es_service:
-            try:
-                await es_service.index_document(
-                    doc_id=doc_id,
-                    tenant_id=entry.tenant_id,
-                    question=entry.question,
-                    answer=entry.answer,
-                    category=entry.category,
-                    metadata=entry.metadata,
-                )
-            except Exception as es_err:
-                logger.warning("ES indexing deferred for doc %s: %s", doc_id, es_err)
-
-        if pinecone_service and pinecone_service.is_configured() and hybrid_search:
-            try:
-                embed_text = f"Topic: {entry.question}\n{entry.answer}"
-                embedding = await hybrid_search.generate_embedding(embed_text)
-                if embedding:
-                    await pinecone_service.upsert_vector(
-                        doc_id=doc_id,
-                        vector=embedding,
-                        metadata={
-                            "tenant_id": entry.tenant_id,
-                            "doc_id": doc_id,
-                            "question": entry.question,
-                            "answer": entry.answer[:1000],
-                            "category": entry.category or "",
-                            "source_file": file.filename or "uploaded_file",
-                        },
-                    )
-            except Exception as pc_err:
-                logger.warning("Pinecone indexing deferred for doc %s: %s", doc_id, pc_err)
+        es_docs.append({
+            "id": doc_id,
+            "tenant_id": entry.tenant_id,
+            "question": entry.question,
+            "answer": entry.answer,
+            "category": entry.category or "",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "metadata": entry.metadata or {},
+        })
 
         created_responses.append(
             KBEntryResponse(
@@ -278,6 +261,39 @@ async def upload_knowledge_base_file(
                 metadata=entry.metadata,
             )
         )
+
+    # 2a. Bulk Index into Elastic Cloud / Elasticsearch
+    if es_service:
+        try:
+            await es_service.bulk_index_documents(es_docs)
+        except Exception as es_err:
+            logger.warning("Elasticsearch bulk indexing error: %s", es_err)
+
+    # 2b. Batch Embed & Bulk Upsert into Pinecone Serverless
+    if pinecone_service and pinecone_service.is_configured() and hybrid_search:
+        try:
+            embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
+            pc_vectors: List[Dict[str, Any]] = []
+            for i, entry in enumerate(parsed_entries):
+                emb = embeddings[i] if i < len(embeddings) else None
+                if emb:
+                    pc_vectors.append({
+                        "id": doc_ids[i],
+                        "values": emb,
+                        "metadata": {
+                            "tenant_id": entry.tenant_id,
+                            "doc_id": doc_ids[i],
+                            "question": entry.question,
+                            "answer": entry.answer[:1000],
+                            "category": entry.category or "",
+                            "source_file": file.filename or "uploaded_file",
+                            "page_number": entry.metadata.get("page_number", 1) if entry.metadata else 1,
+                        },
+                    })
+            if pc_vectors:
+                await pinecone_service.bulk_upsert_vectors(pc_vectors)
+        except Exception as pc_err:
+            logger.warning("Pinecone bulk vector upsert error: %s", pc_err)
 
     categories_found = sorted({e.category for e in created_responses if e.category})
 

@@ -33,7 +33,10 @@ class PineconeService:
             return None
         if self._index is None:
             try:
-                self._index = self.client.Index(self.index_name)
+                if self.settings.pinecone_host:
+                    self._index = self.client.Index(name=self.index_name, host=self.settings.pinecone_host)
+                else:
+                    self._index = self.client.Index(self.index_name)
             except Exception as exc:
                 logger.error("Failed to connect to Pinecone index %s: %s", self.index_name, exc)
                 return None
@@ -63,7 +66,10 @@ class PineconeService:
             indexes = await asyncio.to_thread(self.client.list_indexes)
             index_names = [idx.name for idx in indexes]
             if self.index_name not in index_names:
-                spec = ServerlessSpec(cloud="aws", region="us-east-1")
+                spec = ServerlessSpec(
+                    cloud=self.settings.pinecone_cloud or "aws",
+                    region=self.settings.pinecone_region or "us-east-1",
+                )
                 await asyncio.to_thread(
                     self.client.create_index,
                     name=self.index_name,
@@ -71,11 +77,31 @@ class PineconeService:
                     metric=self.metric,
                     spec=spec,
                 )
-                logger.info("Created Pinecone serverless index: %s", self.index_name)
+                logger.info(
+                    "Created Pinecone serverless index: %s (%s/%s)",
+                    self.index_name,
+                    self.settings.pinecone_cloud,
+                    self.settings.pinecone_region,
+                )
             return True
         except Exception as exc:
             logger.error("Failed to ensure Pinecone index %s: %s", self.index_name, exc)
             return False
+
+    async def bulk_upsert_vectors(self, vectors: List[Dict[str, Any]]) -> int:
+        """
+        Batched upsert of vector objects to Pinecone in a single API call.
+        Each vector item format: {"id": str, "values": List[float], "metadata": Dict[str, Any]}
+        """
+        index = self._get_index()
+        if not index or not vectors:
+            return 0
+        try:
+            await asyncio.to_thread(index.upsert, vectors=vectors)
+            return len(vectors)
+        except Exception as exc:
+            logger.error("Pinecone bulk upsert failed for %d vectors: %s", len(vectors), exc)
+            return 0
 
     async def upsert_vector(
         self,

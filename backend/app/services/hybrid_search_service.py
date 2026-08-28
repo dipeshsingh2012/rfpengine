@@ -72,6 +72,24 @@ class HybridSearchService:
             logger.error("OpenAI embedding generation failed: %s", exc)
             return None
 
+    async def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
+        """
+        Generates vector embeddings for a batch of text chunks in a single API request.
+        """
+        if not self.openai_client or not texts:
+            return [None] * len(texts)
+        try:
+            resp = await self.openai_client.embeddings.create(
+                model=self.settings.openai_embedding_model,
+                input=texts,
+            )
+            # Match embeddings by index order
+            embeddings_by_index = {item.index: item.embedding for item in resp.data}
+            return [embeddings_by_index.get(i) for i in range(len(texts))]
+        except Exception as exc:
+            logger.error("OpenAI batched embedding generation failed for %d texts: %s", len(texts), exc)
+            return [None] * len(texts)
+
     async def search(self, request: SearchRequest) -> SearchResponse:
         sparse_task = self.es_service.search_sparse(
             tenant_id=request.tenant_id,

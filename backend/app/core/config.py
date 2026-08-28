@@ -39,18 +39,22 @@ class Settings(BaseSettings):
     postgres_db: Optional[str] = None
     postgres_ssl: bool = True
 
-    # Elasticsearch Settings
+    # Elasticsearch / Elastic Cloud Settings
     elasticsearch_url: str = "http://localhost:9200"
+    elasticsearch_api_key: Optional[str] = None
+    elastic_cloud_id: Optional[str] = None
     elasticsearch_username: Optional[str] = None
     elasticsearch_password: Optional[str] = None
     elasticsearch_index: str = "rfq_knowledge_base"
     elasticsearch_verify_certs: bool = False
 
-    # Pinecone Settings
+    # Pinecone Serverless Settings
     pinecone_api_key: Optional[str] = None
     pinecone_index: str = "rfq-knowledge-base"
     pinecone_environment: Optional[str] = None
     pinecone_host: Optional[str] = None
+    pinecone_cloud: str = "aws"
+    pinecone_region: str = "us-east-1"
     pinecone_dimension: int = 1536
     pinecone_metric: str = "cosine"
 
@@ -73,6 +77,14 @@ class Settings(BaseSettings):
                 self.database_url = v
             elif normalized_key.endswith("PINECONE_API_KEY") or normalized_key == "PINECONE_API_KEY":
                 self.pinecone_api_key = v
+            elif normalized_key.endswith("PINECONE_INDEX") or normalized_key == "PINECONE_INDEX":
+                self.pinecone_index = v
+            elif normalized_key.endswith("ELASTICSEARCH_API_KEY") or normalized_key == "ELASTICSEARCH_API_KEY":
+                self.elasticsearch_api_key = v
+            elif normalized_key.endswith("ELASTIC_CLOUD_ID") or normalized_key == "ELASTIC_CLOUD_ID":
+                self.elastic_cloud_id = v
+            elif normalized_key.endswith("ELASTICSEARCH_URL") or normalized_key == "ELASTICSEARCH_URL":
+                self.elasticsearch_url = v
             elif normalized_key.endswith("ELASTICSEARCH_PASSWORD") or normalized_key == "ELASTICSEARCH_PASSWORD":
                 self.elasticsearch_password = v
 

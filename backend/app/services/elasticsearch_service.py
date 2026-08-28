@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from elasticsearch import AsyncElasticsearch
 from elasticsearch.exceptions import NotFoundError
+from elasticsearch.helpers import async_bulk
 
 from app.core.config import Settings
 
@@ -14,16 +15,27 @@ class ElasticsearchService:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.index_name = settings.elasticsearch_index
-        auth = None
-        if settings.elasticsearch_username and settings.elasticsearch_password:
-            auth = (settings.elasticsearch_username, settings.elasticsearch_password)
 
-        self.client = AsyncElasticsearch(
-            hosts=[settings.elasticsearch_url],
-            basic_auth=auth,
-            verify_certs=settings.elasticsearch_verify_certs,
-            request_timeout=10,
-        )
+        client_kwargs: Dict[str, Any] = {
+            "request_timeout": 15,
+        }
+
+        # 1. Host / Cloud ID configuration
+        if settings.elastic_cloud_id:
+            client_kwargs["cloud_id"] = settings.elastic_cloud_id
+            client_kwargs["verify_certs"] = True
+        else:
+            client_kwargs["hosts"] = [settings.elasticsearch_url]
+            is_https = settings.elasticsearch_url.startswith("https://")
+            client_kwargs["verify_certs"] = True if is_https else settings.elasticsearch_verify_certs
+
+        # 2. Authentication (API Key takes precedence over basic auth)
+        if settings.elasticsearch_api_key:
+            client_kwargs["api_key"] = settings.elasticsearch_api_key
+        elif settings.elasticsearch_username and settings.elasticsearch_password:
+            client_kwargs["basic_auth"] = (settings.elasticsearch_username, settings.elasticsearch_password)
+
+        self.client = AsyncElasticsearch(**client_kwargs)
 
     async def close(self) -> None:
         await self.client.close()
@@ -31,7 +43,11 @@ class ElasticsearchService:
     async def health_check(self) -> Dict[str, Any]:
         try:
             info = await self.client.info()
-            return {"status": "ok", "version": info.get("version", {}).get("number", "unknown")}
+            return {
+                "status": "ok",
+                "version": info.get("version", {}).get("number", "unknown"),
+                "cluster_name": info.get("cluster_name", "unknown"),
+            }
         except Exception as exc:
             return {"status": "error", "details": str(exc)}
 
@@ -51,6 +67,14 @@ class ElasticsearchService:
                             "answer": {"type": "text", "analyzer": "standard"},
                             "category": {"type": "keyword"},
                             "created_at": {"type": "date"},
+                            "metadata": {
+                                "properties": {
+                                    "source_file": {"type": "keyword"},
+                                    "format": {"type": "keyword"},
+                                    "page_number": {"type": "integer"},
+                                    "chunk_index": {"type": "integer"},
+                                }
+                            },
                         }
                     },
                 }
@@ -60,6 +84,36 @@ class ElasticsearchService:
         except Exception as exc:
             logger.error("Failed to ensure Elasticsearch index: %s", exc)
             return False
+
+    async def bulk_index_documents(self, documents: List[Dict[str, Any]]) -> int:
+        """
+        Bulk indexes multiple document chunks in a single high-performance request.
+        """
+        if not documents:
+            return 0
+        try:
+            actions = [
+                {
+                    "_index": self.index_name,
+                    "_id": doc["id"],
+                    "_source": {
+                        "tenant_id": doc.get("tenant_id", "acme-corp"),
+                        "question": doc.get("question", ""),
+                        "answer": doc.get("answer", ""),
+                        "category": doc.get("category", ""),
+                        "created_at": doc.get("created_at"),
+                        "metadata": doc.get("metadata", {}),
+                    },
+                }
+                for doc in documents
+            ]
+            success_count, errors = await async_bulk(self.client, actions, refresh=True)
+            if errors:
+                logger.warning("Elasticsearch bulk indexing had errors: %s", errors)
+            return success_count
+        except Exception as exc:
+            logger.error("Elasticsearch bulk indexing failed: %s", exc)
+            return 0
 
     async def index_document(
         self,
