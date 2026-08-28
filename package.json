@@ -5,6 +5,8 @@
   "description": "Seller-side RFP and questionnaire response assistant",
   "scripts": {
     "prepare": "husky",
+    "test": "cd backend && pytest tests -v",
+    "test:db": "cd backend && pytest tests/test_production_postgres.py -v",
     "db:migrate": "cd backend && python3 -m alembic upgrade head",
     "db:revision": "cd backend && python3 -m alembic revision --autogenerate",
     "tf:init": "cd terraform && terraform init",
