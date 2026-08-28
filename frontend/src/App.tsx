@@ -777,7 +777,7 @@ function App() {
           }}
           onClick={() => {
             const nextUrl = activeApiBase.includes("localhost") || activeApiBase.startsWith("/api")
-              ? "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api"
+              ? "https://rfpengine-api-714049712844.us-central1.run.app/api"
               : "/api";
             localStorage.setItem("rfpengine.custom_api_url", nextUrl);
             setActiveApiBase(nextUrl);
