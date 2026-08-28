@@ -562,35 +562,50 @@ function App() {
     }
   }
 
-  function openOriginalForm() {
+  async function openOriginalForm() {
     const baseTargetUrl = formUrl || `${window.location.origin}/mock-questionnaire.html`;
     
-    // Include approved questions, or if none approved yet, include all generated answers with drafts
-    let approvedQuestions = detectedQuestions.filter((item) =>
-      ["Approved", "Approved by SME", "Approved by Legal", "Final approved"].includes(reviewStatusByQuestion[item])
-    );
-    if (!approvedQuestions.length) {
-      approvedQuestions = detectedQuestions.filter((item) => (answersByQuestion[item] || "").trim().length > 0);
+    const currentAnswers = { ...answersByQuestion };
+    const missing = detectedQuestions.filter((q) => !currentAnswers[q] || !currentAnswers[q].trim());
+
+    if (missing.length > 0) {
+      showToast(`Generating answers for ${missing.length} questions...`);
+      await Promise.all(
+        missing.map(async (item) => {
+          try {
+            const result = await fetch(`${activeApiBase}/v1/search`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
+            });
+            if (result.ok) {
+              const data = (await result.json()) as SearchResponse;
+              currentAnswers[item] = data.suggested_answer;
+            }
+          } catch {
+            currentAnswers[item] = demoAnswerFor(item).suggested_answer;
+          }
+        })
+      );
+      setAnswersByQuestion(currentAnswers);
+      saveAnswers(currentAnswers);
     }
-    if (!approvedQuestions.length) {
-      approvedQuestions = detectedQuestions;
-    }
-    
-    const approvedAnswers = Object.fromEntries(
-      approvedQuestions.map((item) => [item, answersByQuestion[item] || ""])
+
+    const payloadAnswers = Object.fromEntries(
+      detectedQuestions.map((item) => [item, currentAnswers[item] || ""])
     );
-    
+
     const handoff = encodeURIComponent(
       JSON.stringify({
-        questions: approvedQuestions,
-        answers: approvedAnswers,
+        questions: detectedQuestions,
+        answers: payloadAnswers,
         timestamp: Date.now(),
       })
     );
-    
+
     const target = `${baseTargetUrl.split("#")[0]}#rfpengine=${handoff}`;
     window.open(target, "_blank", "noopener,noreferrer");
-    showToast(`Opened original form with ${Object.keys(approvedAnswers).length} response drafts!`);
+    showToast(`Opened original form with all ${detectedQuestions.length} answers!`);
   }
 
   function exportAnswers() {
@@ -672,25 +687,32 @@ function App() {
   async function generateAllAnswers() {
     if (!detectedQuestions.length || isGenerating) return;
     setIsGenerating(true);
-    setNotice("Generating answers for the full questionnaire...");
+    setNotice("Generating answers in parallel for all questions...");
+    showToast("Generating AI answers for all questions...");
     const generated: Record<string, string> = { ...answersByQuestion };
-    for (const item of detectedQuestions) {
-      try {
-        const result = await fetch(`${activeApiBase}/v1/search`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
-        });
-        if (!result.ok) throw new Error("API unavailable");
-        generated[item] = ((await result.json()) as SearchResponse).suggested_answer;
-      } catch {
-        generated[item] = demoAnswerFor(item).suggested_answer;
-      }
-    }
+    
+    await Promise.all(
+      detectedQuestions.map(async (item) => {
+        try {
+          const result = await fetch(`${activeApiBase}/v1/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
+          });
+          if (!result.ok) throw new Error("API unavailable");
+          const data = (await result.json()) as SearchResponse;
+          generated[item] = data.suggested_answer;
+        } catch {
+          generated[item] = demoAnswerFor(item).suggested_answer;
+        }
+      })
+    );
+
     setAnswersByQuestion(generated);
     saveAnswers(generated);
     setAnswer(generated[question] || generated[detectedQuestions[0]] || "");
     setNotice("All answers ready for human review");
+    showToast(`Generated answers for all ${detectedQuestions.length} questions!`);
     setIsGenerating(false);
   }
 
