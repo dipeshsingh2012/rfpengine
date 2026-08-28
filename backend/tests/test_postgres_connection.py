@@ -225,3 +225,115 @@ def test_credential_masking_security(settings: Settings):
         password_part = settings.database_url.split(":")[2].split("@")[0]
         if len(password_part) > 4:
             assert password_part not in masked, "Raw password leaked in masked database URL!"
+
+
+@pytest.mark.asyncio
+async def test_workspace_and_question_review_postgres_insertion(db_session: AsyncSession, settings: Settings):
+    """
+    Validates transactional insertion of ResponseWorkspace and QuestionReview records
+    into PostgreSQL, verifying foreign keys, JSON columns, status updates, and cascading deletion.
+    """
+    workspace_id = f"ws-{uuid.uuid4().hex[:8]}"
+    test_tenant = f"{settings.env}-workspace-tenant"
+
+    try:
+        # 1. INSERT ResponseWorkspace
+        workspace = ResponseWorkspace(
+            id=workspace_id,
+            tenant_id=test_tenant,
+            title="Enterprise Security & Privacy RFP 2026",
+            source_mode="upload",
+            source_url=None,
+        )
+        db_session.add(workspace)
+        await db_session.flush()
+
+        # 2. INSERT QuestionReview items linked by foreign key
+        q1 = QuestionReview(
+            id=f"qr-{uuid.uuid4().hex[:8]}",
+            workspace_id=workspace_id,
+            question_index=0,
+            question_text="What encryption standards are enforced for databases at rest?",
+            suggested_answer="Databases and EBS volumes are encrypted using AES-256 via AWS KMS.",
+            final_answer="Databases and EBS volumes are encrypted using AES-256 via AWS KMS with annual CMK key rotation.",
+            review_status="Approved by SME",
+            assigned_role="Security SME",
+            confidence_score=0.96,
+            sources_json=[
+                {"source_id": "kb-sec-1", "score": 0.98, "title": "Security Whitepaper", "section": "Encryption"}
+            ],
+        )
+
+        q2 = QuestionReview(
+            id=f"qr-{uuid.uuid4().hex[:8]}",
+            workspace_id=workspace_id,
+            question_index=1,
+            question_text="What are your disaster recovery RPO and RTO SLAs?",
+            suggested_answer="RPO is 15 minutes and RTO is 1 hour across multi-region standby clusters.",
+            final_answer=None,
+            review_status="Draft",
+            assigned_role="Proposal manager",
+            confidence_score=0.92,
+            sources_json=[
+                {"source_id": "kb-ops-1", "score": 0.94, "title": "SLA & DR Policy", "section": "RPO/RTO"}
+            ],
+        )
+
+        db_session.add_all([q1, q2])
+        await db_session.commit()
+
+        # 3. SELECT & VERIFY from PostgreSQL
+        stmt = (
+            select(ResponseWorkspace)
+            .where(ResponseWorkspace.id == workspace_id)
+        )
+        res = await db_session.execute(stmt)
+        persisted_ws = res.scalar_one_or_none()
+
+        assert persisted_ws is not None, "Workspace must be persisted in PostgreSQL"
+        assert persisted_ws.title == "Enterprise Security & Privacy RFP 2026"
+        assert persisted_ws.tenant_id == test_tenant
+
+        # Verify reviews in database
+        review_stmt = (
+            select(QuestionReview)
+            .where(QuestionReview.workspace_id == workspace_id)
+            .order_by(QuestionReview.question_index)
+        )
+        review_res = await db_session.execute(review_stmt)
+        reviews = review_res.scalars().all()
+
+        assert len(reviews) == 2
+        assert reviews[0].question_index == 0
+        assert reviews[0].review_status == "Approved by SME"
+        assert reviews[0].confidence_score == 0.96
+        assert isinstance(reviews[0].sources_json, list)
+        assert reviews[0].sources_json[0]["source_id"] == "kb-sec-1"
+        assert reviews[1].question_index == 1
+        assert reviews[1].review_status == "Draft"
+
+        # 4. UPDATE status in PostgreSQL
+        reviews[1].review_status = "Final approved"
+        reviews[1].final_answer = "RPO is 15 minutes and RTO is 1 hour across multi-region standby clusters."
+        await db_session.commit()
+
+        updated_q2 = (await db_session.execute(select(QuestionReview).where(QuestionReview.id == reviews[1].id))).scalar_one()
+        assert updated_q2.review_status == "Final approved"
+        assert updated_q2.final_answer is not None
+
+        # 5. CASCADE DELETE
+        await db_session.delete(persisted_ws)
+        await db_session.commit()
+
+        # Confirm reviews were cascaded and deleted
+        remaining_reviews = (await db_session.execute(review_stmt)).scalars().all()
+        assert len(remaining_reviews) == 0, "Question reviews must cascade delete with workspace"
+
+    finally:
+        # Cleanup safety net
+        await db_session.execute(
+            text("DELETE FROM response_workspaces WHERE id = :id"),
+            {"id": workspace_id},
+        )
+        await db_session.commit()
+
