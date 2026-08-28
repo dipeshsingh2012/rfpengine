@@ -23,6 +23,7 @@ from app.services.elasticsearch_service import ElasticsearchService
 from app.services.pinecone_service import PineconeService
 from app.services.hybrid_search_service import HybridSearchService
 from app.models.schemas import SearchRequest
+from app.services.gcp_secret_service import GCPSecretService
 from sqlalchemy.ext.asyncio import create_async_engine
 from app.core.db import normalize_database_url
 from sqlalchemy import text
@@ -33,6 +34,17 @@ async def main():
     print("=" * 70)
     print(f"🚀 RFPEngine Cloud Connection Diagnostics (Env: {settings.env})")
     print("=" * 70)
+
+    # 0. Load GCP Secret Manager secrets if enabled
+    gcp_service = GCPSecretService(settings)
+    if settings.gcp_secret_manager_enabled and gcp_service.is_configured():
+        try:
+            secrets = await gcp_service.get_all_app_secrets()
+            if secrets:
+                settings.apply_gcp_secrets(secrets)
+                print(f"  🔒 Loaded {len(secrets)} secrets from GCP Secret Manager (project: {settings.gcp_project_id})")
+        except Exception as exc:
+            print(f"  ⚠️ Could not fetch secrets from GCP Secret Manager: {exc}")
 
     # --------------------------------------------------------------------------
     # 1. PostgreSQL (Neon) Check

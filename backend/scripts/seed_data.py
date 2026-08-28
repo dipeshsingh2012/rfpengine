@@ -16,6 +16,8 @@ from app.services.elasticsearch_service import ElasticsearchService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
 
+from app.services.gcp_secret_service import GCPSecretService
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("seed_data")
 
@@ -25,6 +27,17 @@ async def main() -> None:
     tenant_id = "acme-corp"
     project_root = backend_dir.parent
     sample_docs_dir = project_root / "sample_docs"
+
+    # 0. Load GCP Secret Manager secrets if enabled
+    gcp_service = GCPSecretService(settings)
+    if settings.gcp_secret_manager_enabled and gcp_service.is_configured():
+        try:
+            secrets = await gcp_service.get_all_app_secrets()
+            if secrets:
+                settings.apply_gcp_secrets(secrets)
+                logger.info("Loaded %d secrets from GCP Secret Manager (project: %s).", len(secrets), settings.gcp_project_id)
+        except Exception as exc:
+            logger.warning("Could not fetch secrets from GCP Secret Manager: %s", exc)
 
     logger.info("Starting knowledge base ingestion from '%s' for tenant '%s'...", sample_docs_dir, tenant_id)
 
