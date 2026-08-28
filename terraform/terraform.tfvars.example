@@ -12,4 +12,9 @@ pinecone_api_key = ""
 
 cors_origins          = "http://localhost:5173,https://your-domain.com"
 elasticsearch_url     = "https://my-deployment.es.us-central1.gcp.elastic.cloud:443"
+elasticsearch_index   = "rfq_knowledge_base"
 elasticsearch_api_key = ""
+
+pinecone_index        = "rfq-knowledge-base"
+pinecone_cloud        = "aws"
+pinecone_region       = "us-east-1"

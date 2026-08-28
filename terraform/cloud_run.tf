@@ -40,6 +40,26 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.elasticsearch_url
       }
 
+      env {
+        name  = "ELASTICSEARCH_INDEX"
+        value = var.elasticsearch_index
+      }
+
+      env {
+        name  = "PINECONE_INDEX"
+        value = var.pinecone_index
+      }
+
+      env {
+        name  = "PINECONE_CLOUD"
+        value = var.pinecone_cloud
+      }
+
+      env {
+        name  = "PINECONE_REGION"
+        value = var.pinecone_region
+      }
+
       # Direct Secret Manager Injection at Container Boot
       env {
         name = "DATABASE_URL"

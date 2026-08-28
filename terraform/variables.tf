@@ -55,6 +55,12 @@ variable "elasticsearch_url" {
   default     = "http://localhost:9200"
 }
 
+variable "elasticsearch_index" {
+  type        = string
+  description = "Elasticsearch index name"
+  default     = "rfq_knowledge_base"
+}
+
 variable "elasticsearch_api_key" {
   type        = string
   description = "Elasticsearch API Key for Elastic Cloud"
@@ -62,9 +68,28 @@ variable "elasticsearch_api_key" {
   default     = ""
 }
 
+variable "pinecone_index" {
+  type        = string
+  description = "Pinecone vector index name"
+  default     = "rfq-knowledge-base"
+}
+
+variable "pinecone_cloud" {
+  type        = string
+  description = "Pinecone serverless cloud provider (e.g. aws, gcp)"
+  default     = "aws"
+}
+
+variable "pinecone_region" {
+  type        = string
+  description = "Pinecone serverless cloud region"
+  default     = "us-east-1"
+}
+
 variable "cors_origins" {
   type        = string
   description = "Allowed CORS origins for the frontend and extension"
   default     = "http://localhost:5173,https://your-domain.com"
 }
+
 
