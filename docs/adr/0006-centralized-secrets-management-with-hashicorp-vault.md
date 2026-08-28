@@ -39,3 +39,4 @@ We integrate **HashiCorp Vault** (KV v2 Secrets Engine) for secure, centralized 
 
 ### Negative / Trade-offs
 - Additional infrastructure service when running with Vault in staging/production environments.
+
