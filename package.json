@@ -7,6 +7,7 @@
     "prepare": "husky",
     "test": "cd backend && ./.venv/bin/pytest tests -v",
     "test:db": "cd backend && ./.venv/bin/pytest tests/test_postgres_connection.py -v",
+    "test:cloud": "cd backend && ./.venv/bin/python scripts/verify_cloud_connections.py",
     "db:migrate": "cd backend && python3 -m alembic upgrade head",
     "db:revision": "cd backend && python3 -m alembic revision --autogenerate",
     "tf:init": "cd terraform && terraform init",

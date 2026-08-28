@@ -15,26 +15,33 @@ Relying solely on dense vector embeddings often loses precision on exact keyword
 ## Decision
 
 We adopt a **Hybrid Retrieval Architecture** combining:
-1. **Elasticsearch (Sparse / BM25)**:
-   - Indexes `tenant_id`, `question`, `answer`, `category`.
+1. **Elasticsearch / Elastic Cloud (Sparse / BM25)**:
+   - Supports self-hosted Elasticsearch and managed **Elastic Cloud** deployments (via `ELASTICSEARCH_API_KEY`, `ELASTIC_CLOUD_ID`, or HTTPS `ELASTICSEARCH_URL` with SSL verification).
+   - Uses `elasticsearch.helpers.async_bulk` for high-throughput multi-document ingestion.
+   - Indexes `tenant_id`, `question`, `answer`, `category`, and nested citation `metadata`.
    - Performs BM25 keyword matching with query boosting on question fields and tenant filtering.
 2. **Pinecone (Dense / Vector k-NN)**:
-   - Indexes 1536-dimensional embeddings generated with OpenAI (`text-embedding-3-small`).
+   - Uses modern Pinecone SDK v5 with **Serverless** index auto-provisioning (`ServerlessSpec(cloud="aws", region="us-east-1")`).
+   - Indexes 1,536-dimensional embeddings generated with OpenAI (`text-embedding-3-small`) in single-request batch calls.
    - Performs cosine similarity search with tenant metadata filtering (`{"tenant_id": {"$eq": tenant_id}}`).
 3. **Reciprocal Rank Fusion (RRF)**:
    - Merges ranked lists from both retrievers using the formula:
      $$RRF(d) = \sum_{m \in M} \frac{1}{k + r_m(d)} \quad (k=60)$$
    - Grounded context from top-ranked fused documents is passed to OpenAI (`gpt-4o`) for strict, hallucination-free response drafting.
+4. **Diagnostics & Cloud Health Tooling**:
+   - Automated CLI diagnostics script (`backend/scripts/verify_cloud_connections.py`) and FastAPI `/health` endpoint validating live health, version, latency, and index readiness across PostgreSQL (Neon), Elastic Cloud, Pinecone Serverless, and OpenAI.
 
 ## Consequences
 
 ### Positive
 - **High precision and recall**: Captures both exact regulatory/technical keywords and semantic concepts.
-- **Resilience**: If either retriever is experiencing high latency, degraded results can still be served from the available retriever.
+- **Enterprise Cloud Ready**: Zero-code friction switching between local Docker containers and production Elastic Cloud & Pinecone Serverless clusters.
+- **High-Performance Ingestion**: Batched OpenAI embeddings (`generate_embeddings_batch`) combined with Elasticsearch `async_bulk` and Pinecone bulk upserts reduce document upload latency from $O(N)$ HTTP roundtrips to $O(1)$.
+- **Resilience**: If either retriever experiences high latency or degraded state, results can still be served from the available retriever.
 - **Tenant isolation**: Enforces tenant-level isolation across both Elasticsearch queries and Pinecone metadata filters.
-- **Grounded LLM context**: Provides citations with source IDs and retriever origin tags (`elasticsearch`, `pinecone`, or `elasticsearch+pinecone`).
+- **Grounded LLM context**: Provides citations with source IDs, source file names, page numbers, and retriever origin tags.
 
 ### Negative / Trade-offs
-- Requires maintaining and synchronizing two search systems alongside the primary database.
+- Requires maintaining and synchronizing credentials for two search systems alongside the primary database.
 - Batch upserts and deletes must update both Elasticsearch and Pinecone.
 

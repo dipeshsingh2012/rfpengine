@@ -146,24 +146,30 @@ ENV=dev
 DATABASE_URL=postgresql://neondb_owner:your_password@ep-rapid-truth-aqw82ysi-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require
 
 # OpenAI Configuration
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-proj-...
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_CHAT_MODEL=gpt-4o
 
-# Elasticsearch Configuration
+# Elasticsearch / Elastic Cloud Configuration
+# For local Docker:
 ELASTICSEARCH_URL=http://localhost:9200
+# For Elastic Cloud (uncomment and supply credentials):
+# ELASTICSEARCH_URL=https://my-deployment.es.us-east-1.aws.elastic.cloud:443
+# ELASTICSEARCH_API_KEY=V2V...==
 ELASTICSEARCH_INDEX=rfq_knowledge_base
 
-# Pinecone Configuration
+# Pinecone Serverless Configuration
 PINECONE_API_KEY=pcsk_...
 PINECONE_INDEX=rfq-knowledge-base
+PINECONE_CLOUD=aws
+PINECONE_REGION=us-east-1
 
 # CORS & Server
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 PORT=8000
 ```
 
-### 2. Start Local Elasticsearch
+### 2. Start Local Elasticsearch (Optional if using Elastic Cloud)
 
 ```bash
 docker-compose up -d
@@ -182,14 +188,17 @@ python3 -m alembic upgrade head
 cd ..
 ```
 
-### 4. Database & Test Commands
+### 4. Database, Cloud Diagnostics & Test Commands
 
 ```bash
-# Run all backend tests (Document Parser, PostgreSQL connection, Uploads)
+# Run all backend tests (Document Parser, PostgreSQL, Uploads)
 npm test
 
-# Run PostgreSQL connection test suite specifically
+# Run PostgreSQL connection and CRUD test suite specifically
 npm run test:db
+
+# Run live Cloud Diagnostics across Neon, Elastic Cloud, Pinecone, and OpenAI
+npm run test:cloud
 
 # Apply pending Alembic migrations
 npm run db:migrate
