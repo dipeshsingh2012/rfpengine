@@ -58,7 +58,19 @@ type KBItem = {
 
 type SourceMode = "url" | "upload" | "extension";
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+function getApiBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+  if (!envUrl) {
+    return "/api";
+  }
+  // If user provided a host without /api suffix (e.g. http://localhost:8000 or https://cloudrun.app)
+  if (!envUrl.startsWith("/") && !envUrl.endsWith("/api")) {
+    return `${envUrl}/api`;
+  }
+  return envUrl;
+}
+
+const apiBaseUrl = getApiBaseUrl();
 
 const sampleDemoFiles = [
   { name: "Security Whitepaper", file: "01_Security_and_Compliance_Whitepaper.md", format: "MD" },
