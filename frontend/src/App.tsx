@@ -244,6 +244,13 @@ function App() {
     }
   }
 
+  function closeKBModal() {
+    setShowKBModal(false);
+    if (route === "/knowledge-base") {
+      navigate("/");
+    }
+  }
+
   useEffect(() => {
     const handlePopState = () => setRoute(window.location.pathname || "/");
     window.addEventListener("popstate", handlePopState);
@@ -279,6 +286,12 @@ function App() {
   }, [route, answerStatus, role]);
 
   useEffect(() => {
+    if (route === "/knowledge-base") {
+      setShowKBModal(true);
+      fetchKBEntries();
+      return;
+    }
+
     const id = responseIdFromPath(route) || reviewIdFromPath(route);
     if (!id) return;
     const saved = localStorage.getItem(`rfpengine.response.${id}`);
@@ -647,10 +660,9 @@ function App() {
               <span className="nav-count">12</span>
             </button>
             <button
-              className="nav-item"
+              className={`nav-item ${route === "/knowledge-base" || showKBModal ? "active" : ""}`}
               onClick={() => {
-                setShowKBModal(true);
-                fetchKBEntries();
+                navigate("/knowledge-base");
               }}
             >
               <FolderOpen size={17} /> Knowledge base
@@ -1061,7 +1073,7 @@ function App() {
 
       {/* Knowledge Base Modal */}
       {showKBModal && (
-        <div className="kb-modal-backdrop" onClick={() => setShowKBModal(false)}>
+        <div className="kb-modal-backdrop" onClick={closeKBModal}>
           <div className="kb-modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="kb-modal-header">
               <h2>
@@ -1069,7 +1081,7 @@ function App() {
               </h2>
               <button
                 className="icon-button"
-                onClick={() => setShowKBModal(false)}
+                onClick={closeKBModal}
                 aria-label="Close Knowledge Base modal"
               >
                 <X size={20} />
