@@ -146,3 +146,4 @@ npm run package:extension
 ```
 
 Output file: `dist/rfpengine-extension-v0.1.0.zip`
+

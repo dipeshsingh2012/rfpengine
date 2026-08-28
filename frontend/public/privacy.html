@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — RFPEngine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f6f1;
+      --card-bg: #ffffff;
+      --ink: #1e2422;
+      --muted: #66706c;
+      --line: #e3dfd6;
+      --blue: #2346b8;
+      --navy: #18243b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 48px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    }
+    .badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--blue);
+      background: #eef2ff;
+      padding: 4px 10px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 32px;
+      margin: 0 0 8px;
+      color: var(--navy);
+      letter-spacing: -0.5px;
+    }
+    .date {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 32px;
+      display: block;
+    }
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px;
+      color: var(--navy);
+      margin: 32px 0 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+    p, li {
+      font-size: 14px;
+      color: #374151;
+    }
+    ul {
+      padding-left: 20px;
+      margin: 12px 0;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    strong {
+      color: var(--ink);
+    }
+    .highlight-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--blue);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .highlight-box p {
+      margin: 0;
+      font-size: 13px;
+      color: #334155;
+    }
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">Legal & Compliance</span>
+    <h1>Privacy Policy</h1>
+    <span class="date">Last Updated: August 28, 2026</span>
+
+    <div class="highlight-box">
+      <p><strong>Summary:</strong> RFPEngine and the RFPEngine Chrome Extension process questionnaire content solely to generate answers from your enterprise knowledge base. We never sell your data, use your confidential data to train public foundation models, or track your browsing activity.</p>
+    </div>
+
+    <h2>1. Introduction</h2>
+    <p>This Privacy Policy applies to <strong>RFPEngine</strong> (the "Service"), including the web platform hosted at <a href="https://www.rfpengine.net">https://www.rfpengine.net</a> and the <strong>RFPEngine Response Assistant</strong> browser extension. We respect your privacy and are committed to protecting sensitive enterprise data.</p>
+
+    <h2>2. Data We Collect and Process</h2>
+    <p>We only collect and process data necessary to provide and operate the RFP automation services:</p>
+    <ul>
+      <li><strong>Questionnaire Content:</strong> When you click "Scan Form" in the browser extension or upload questionnaire files to the web application, question text is parsed to generate relevant answers from your knowledge base.</li>
+      <li><strong>Knowledge Base Documents:</strong> Files and passages you upload (e.g. security whitepapers, SOC 2 reports, compliance documents) are indexed in your tenant's isolated vector and relational databases.</li>
+      <li><strong>Account & Preferences:</strong> User settings, assigned reviewer roles, tenant IDs, and approval statuses saved during questionnaire drafting workflows.</li>
+    </ul>
+
+    <h2>3. What We DO NOT Collect</h2>
+    <ul>
+      <li>We <strong>do not</strong> track your general web browsing history or website activity outside of the questionnaires you explicitly scan.</li>
+      <li>We <strong>do not</strong> access passwords, cookies, financial information, payment data, or personal communications.</li>
+      <li>We <strong>do not</strong> run continuous background scraping scripts; form scanning is executed only upon manual user initiation.</li>
+    </ul>
+
+    <h2>4. How Your Data Is Used</h2>
+    <p>Your data is strictly utilized for the following functions:</p>
+    <ul>
+      <li>Executing hybrid search (BM25 keyword search + dense vector retrieval) against your uploaded documents.</li>
+      <li>Synthesizing grounded answers using enterprise LLM inference (Google Cloud Vertex AI).</li>
+      <li>Populating approved answers back into your active web forms upon your explicit review and confirmation.</li>
+    </ul>
+
+    <h2>5. Data Storage and Security</h2>
+    <p>All data in transit is encrypted using <strong>TLS 1.3</strong>. Data at rest is encrypted using industry-standard <strong>AES-256</strong>. Infrastructure is hosted on Google Cloud Platform (Cloud Run, Vertex AI) and secure SOC 2 certified managed database providers (Neon PostgreSQL, Elastic Cloud, Pinecone Serverless).</p>
+
+    <h2>6. Chrome Web Store Compliance Certification</h2>
+    <p>In adherence to the Google Chrome Web Store Developer Program Policies:</p>
+    <ul>
+      <li>User data is <strong>never sold</strong> to data brokers or third parties.</li>
+      <li>User data is <strong>not used or transferred</strong> for purposes unrelated to the extension's single purpose (RFP questionnaire assistance).</li>
+      <li>User data is <strong>not used or transferred</strong> to determine creditworthiness or for lending purposes.</li>
+    </ul>
+
+    <h2>7. Data Retention and Deletion</h2>
+    <p>You maintain complete ownership and control of your knowledge base. You can delete indexed documents, passages, and questionnaire workspaces at any time through the RFPEngine Knowledge Base dashboard, which purges them synchronously across PostgreSQL, Elasticsearch, and Pinecone.</p>
+
+    <h2>8. Contact Us</h2>
+    <p>If you have any questions, concerns, or requests regarding this Privacy Policy, please contact our security and compliance team at:</p>
+    <p>
+      <strong>RFPEngine Support & Privacy Team</strong><br>
+      Email: <a href="mailto:support@rfpengine.net">support@rfpengine.net</a><br>
+      Website: <a href="https://www.rfpengine.net">https://www.rfpengine.net</a>
+    </p>
+
+    <div class="footer">
+      <span>&copy; 2026 RFPEngine. All rights reserved.</span>
+      <a href="https://www.rfpengine.net">Return to RFPEngine</a>
+    </div>
+  </div>
+</body>
+</html>
