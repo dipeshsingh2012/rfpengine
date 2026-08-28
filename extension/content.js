@@ -2,6 +2,34 @@
 
 const PROD_API_ENDPOINT = 'https://rfpengine-api-714049712844.us-central1.run.app/api/v1/search';
 
+let cachedHandoff = formHandoff();
+
+// Query chrome.storage.local for active_handoff stored by the Service Worker
+if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+  chrome.storage.local.get(['active_handoff'], (res) => {
+    if (res?.active_handoff) {
+      cachedHandoff = res.active_handoff;
+      setTimeout(createInPageOverlay, 300);
+    }
+  });
+}
+
+// Listen for window.postMessage directly from RFPEngine web application
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'RFPENGINE_SYNC_ANSWERS') {
+    const payload = {
+      questions: event.data.questions || [],
+      answers: event.data.answers || {},
+      sourceUrl: event.data.sourceUrl || '',
+      timestamp: event.data.timestamp || Date.now(),
+    };
+    cachedHandoff = payload;
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'SYNC_WORKSPACE_ANSWERS', ...payload });
+    }
+  }
+});
+
 function normalizeText(text) {
   return (text || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -61,7 +89,7 @@ function formHandoff() {
 }
 
 function getScanFields() {
-  const handoff = formHandoff();
+  const handoff = cachedHandoff || formHandoff();
   const handoffAnswers = handoff?.answers || {};
   const handoffQuestions = handoff?.questions || Object.keys(handoffAnswers);
 
@@ -185,7 +213,7 @@ function createInPageOverlay() {
   // Never show floater overlay inside the RFPEngine web app itself
   if (isRFPEngineWebApp()) return;
 
-  const handoff = formHandoff();
+  const handoff = cachedHandoff || formHandoff();
   const fields = getScanFields();
   if (fields.length === 0) return;
 

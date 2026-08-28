@@ -609,17 +609,30 @@ function App() {
       allQuestions.map((item) => [item, currentAnswers[item] || ""])
     );
 
+    // 1. Sync directly to Chrome Extension Service Worker via DOM postMessage
+    window.postMessage(
+      {
+        type: "RFPENGINE_SYNC_ANSWERS",
+        questions: allQuestions,
+        answers: payloadAnswers,
+        sourceUrl: baseTargetUrl,
+        timestamp: Date.now(),
+      },
+      "*",
+    );
+
+    // 2. Also keep URL fragment as universal fallback
     const handoff = encodeURIComponent(
       JSON.stringify({
         questions: allQuestions,
         answers: payloadAnswers,
         timestamp: Date.now(),
-      })
+      }),
     );
 
     const target = `${baseTargetUrl.split("#")[0]}#rfpengine=${handoff}`;
     window.open(target, "_blank", "noopener,noreferrer");
-    showToast(`Opened original form with all ${allQuestions.length} answers!`);
+    showToast(`Synced ${allQuestions.length} answers to extension and opened form!`);
   }
 
   function exportAnswers() {

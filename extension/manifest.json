@@ -21,6 +21,14 @@
     "https://*/*",
     "http://*/*"
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://www.rfpengine.net/*",
+      "https://rfpengine.net/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1:*/*"
+    ]
+  },
   "action": {
     "default_title": "Open RFPEngine",
     "default_icon": {
