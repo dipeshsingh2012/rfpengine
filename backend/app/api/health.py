@@ -13,6 +13,7 @@ router = APIRouter(tags=["Health"])
 
 
 @router.get("/health", response_model=HealthResponse)
+@router.get("/api/health", response_model=HealthResponse)
 async def health_check(
     request: Request,
     db: AsyncSession = Depends(get_db_session),
