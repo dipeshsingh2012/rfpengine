@@ -38,6 +38,22 @@ class KBEntry(Base):
         Index("ix_kb_tenant_category", "tenant_id", "category"),
     )
 
+    @property
+    def title(self) -> str:
+        return self.question
+
+    @title.setter
+    def title(self, val: str) -> None:
+        self.question = val
+
+    @property
+    def content(self) -> str:
+        return self.answer
+
+    @content.setter
+    def content(self, val: str) -> None:
+        self.answer = val
+
 
 class ResponseWorkspace(Base):
     __tablename__ = "response_workspaces"

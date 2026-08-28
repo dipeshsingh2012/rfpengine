@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class DocumentParserService:
     """
-    Parses various document formats (CSV, TSV, JSON, JSONL, PDF, DOCX, Markdown, TXT)
-    into structured KBEntryCreate objects with optimal 300-500 token chunking for vector search.
+    Parses arbitrary enterprise document formats (CSV, TSV, JSON, JSONL, PDF, DOCX, Markdown, TXT)
+    into structured passage chunks (title, content, category, metadata) with optimal 300-500 token chunking.
     """
 
     CHUNK_SIZE_CHARS = 1600  # ~400 tokens
@@ -29,7 +29,6 @@ class DocumentParserService:
     def infer_category(cls, filename: str, sample_text: str = "", override: Optional[str] = None) -> str:
         """
         Infers the enterprise taxonomy category from filename and content signals.
-        Supports seamless extension to LLM-based zero-shot classification later.
         """
         if override and override.strip():
             return override.strip()
@@ -121,44 +120,42 @@ class DocumentParserService:
             if not row:
                 continue
 
-            # Normalize keys to lowercase for flexible column mapping
             norm_row = {k.strip().lower(): v.strip() for k, v in row.items() if k and v}
 
-            # Find Question
-            question = (
-                norm_row.get("question")
+            title = (
+                norm_row.get("title")
+                or norm_row.get("topic")
+                or norm_row.get("question")
                 or norm_row.get("prompt")
                 or norm_row.get("q")
                 or norm_row.get("inquiry")
-                or norm_row.get("topic")
                 or norm_row.get("requirement")
+                or f"{filename} - Row {row_idx}"
             )
 
-            # Find Answer
-            answer = (
-                norm_row.get("answer")
-                or norm_row.get("response")
-                or norm_row.get("a")
-                or norm_row.get("content")
+            body_content = (
+                norm_row.get("content")
                 or norm_row.get("text")
+                or norm_row.get("answer")
+                or norm_row.get("response")
                 or norm_row.get("details")
+                or norm_row.get("a")
             )
 
-            # Find Category
             category = (
                 norm_row.get("category")
                 or norm_row.get("section")
                 or norm_row.get("domain")
                 or norm_row.get("tag")
-                or cls.infer_category(filename, answer or "", default_category)
+                or cls.infer_category(filename, body_content or "", default_category)
             )
 
-            if question and answer:
+            if body_content:
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
-                        question=question,
-                        answer=answer,
+                        title=title,
+                        content=body_content,
                         category=category,
                         metadata={
                             "source_file": filename,
@@ -184,11 +181,9 @@ class DocumentParserService:
         entries: List[KBEntryCreate] = []
 
         try:
-            # Try standard JSON parse first
             data = json.loads(text_content)
             items = data if isinstance(data, list) else data.get("items", data.get("records", [data]))
         except json.JSONDecodeError:
-            # Try JSONL line by line
             items = []
             for line in text_content.splitlines():
                 line = line.strip()
@@ -201,19 +196,37 @@ class DocumentParserService:
         for idx, item in enumerate(items, start=1):
             if not isinstance(item, dict):
                 continue
-            question = item.get("question") or item.get("prompt") or item.get("topic") or item.get("q")
-            answer = item.get("answer") or item.get("response") or item.get("content") or item.get("text") or item.get("a")
-            category = item.get("category") or item.get("section") or cls.infer_category(filename, str(answer or ""), default_category)
+            title = (
+                item.get("title")
+                or item.get("topic")
+                or item.get("question")
+                or item.get("prompt")
+                or item.get("name")
+                or f"{filename} - Item {idx}"
+            )
+            body_content = (
+                item.get("content")
+                or item.get("text")
+                or item.get("answer")
+                or item.get("response")
+                or item.get("details")
+                or item.get("description")
+            )
+            category = (
+                item.get("category")
+                or item.get("section")
+                or cls.infer_category(filename, str(body_content or ""), default_category)
+            )
 
-            if question and answer:
+            if body_content:
                 meta = item.get("metadata", {})
                 meta["source_file"] = filename
                 meta["item_index"] = idx
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
-                        question=str(question).strip(),
-                        answer=str(answer).strip(),
+                        title=str(title).strip(),
+                        content=str(body_content).strip(),
                         category=str(category).strip(),
                         metadata=meta,
                     )
@@ -232,12 +245,11 @@ class DocumentParserService:
         default_category: Optional[str],
     ) -> List[KBEntryCreate]:
         text_content = content.decode("utf-8", errors="replace")
-        # Split by markdown headers (# Header 1, ## Header 2, ### Header 3)
         heading_pattern = re.compile(r"^(#{1,4}\s+.+)$", re.MULTILINE)
         splits = heading_pattern.split(text_content)
 
         entries: List[KBEntryCreate] = []
-        current_heading = default_category or "Overview"
+        current_heading = filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
 
         for i in range(len(splits)):
             part = splits[i].strip()
@@ -251,13 +263,13 @@ class DocumentParserService:
                 for chunk_idx, chunk in enumerate(chunks, start=1):
                     if len(chunk) < 30:
                         continue
-                    question_title = f"{current_heading} (Part {chunk_idx})" if len(chunks) > 1 else current_heading
+                    section_title = f"{current_heading} (Part {chunk_idx})" if len(chunks) > 1 else current_heading
                     inferred_cat = cls.infer_category(filename, f"{current_heading} {chunk}", default_category)
                     entries.append(
                         KBEntryCreate(
                             tenant_id=tenant_id,
-                            question=question_title,
-                            answer=chunk,
+                            title=section_title,
+                            content=chunk,
                             category=inferred_cat,
                             metadata={
                                 "source_file": filename,
@@ -296,17 +308,16 @@ class DocumentParserService:
                 if len(chunk) < 40:
                     continue
 
-                # Extract first sentence or phrase as topical prompt
                 first_period = chunk.find(". ")
-                topic_snippet = chunk[:first_period].strip() if 10 < first_period < 120 else chunk[:80].strip()
-                question = f"{base_name} - Page {page_num}: {topic_snippet}..."
+                topic_snippet = chunk[:first_period].strip() if 10 < first_period < 100 else chunk[:60].strip()
+                passage_title = f"{base_name} - Page {page_num}: {topic_snippet}..." if topic_snippet else f"{base_name} - Page {page_num}"
                 inferred_cat = cls.infer_category(filename, chunk, default_category)
 
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
-                        question=question,
-                        answer=chunk,
+                        title=passage_title,
+                        content=chunk,
                         category=inferred_cat,
                         metadata={
                             "source_file": filename,
@@ -333,7 +344,7 @@ class DocumentParserService:
 
         doc = docx.Document(io.BytesIO(content))
         entries: List[KBEntryCreate] = []
-        current_heading = default_category or filename.rsplit(".", 1)[0]
+        current_heading = filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
         current_buffer = []
 
         for p in doc.paragraphs:
@@ -342,7 +353,6 @@ class DocumentParserService:
                 continue
 
             if p.style.name.startswith("Heading"):
-                # Flush previous buffer if populated
                 if current_buffer:
                     full_text = " ".join(current_buffer)
                     chunks = cls._chunk_text(full_text, cls.CHUNK_SIZE_CHARS, cls.CHUNK_OVERLAP_CHARS)
@@ -351,8 +361,8 @@ class DocumentParserService:
                         entries.append(
                             KBEntryCreate(
                                 tenant_id=tenant_id,
-                                question=f"{current_heading} (Part {c_idx})" if len(chunks) > 1 else current_heading,
-                                answer=chunk,
+                                title=f"{current_heading} (Part {c_idx})" if len(chunks) > 1 else current_heading,
+                                content=chunk,
                                 category=inferred_cat,
                                 metadata={"source_file": filename, "section": current_heading},
                             )
@@ -370,8 +380,8 @@ class DocumentParserService:
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
-                        question=f"{current_heading} (Part {c_idx})" if len(chunks) > 1 else current_heading,
-                        answer=chunk,
+                        title=f"{current_heading} (Part {c_idx})" if len(chunks) > 1 else current_heading,
+                        content=chunk,
                         category=inferred_cat,
                         metadata={"source_file": filename, "section": current_heading},
                     )
@@ -399,12 +409,13 @@ class DocumentParserService:
                 continue
             first_period = chunk.find(". ")
             snippet = chunk[:first_period].strip() if 10 < first_period < 100 else chunk[:60].strip()
+            passage_title = f"{base_name} ({snippet})" if snippet else base_name
             inferred_cat = cls.infer_category(filename, chunk, default_category)
             entries.append(
                 KBEntryCreate(
                     tenant_id=tenant_id,
-                    question=f"{base_name} ({snippet})",
-                    answer=chunk,
+                    title=passage_title,
+                    content=chunk,
                     category=inferred_cat,
                     metadata={"source_file": filename, "chunk_index": idx},
                 )
@@ -426,7 +437,6 @@ class DocumentParserService:
         while start < text_len:
             end = min(start + max_size, text_len)
 
-            # Try to break on paragraph or sentence boundary
             if end < text_len:
                 last_newline = text.rfind("\n", start + max_size // 2, end)
                 if last_newline != -1:
@@ -446,4 +456,3 @@ class DocumentParserService:
             start = max(start + 1, end - overlap)
 
         return chunks
-

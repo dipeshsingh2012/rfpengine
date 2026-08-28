@@ -2,23 +2,41 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # --- Search Schemas ---
 
 class SearchRequest(BaseModel):
     tenant_id: str = Field(min_length=1, default="acme-corp", description="Tenant identifier")
-    question: str = Field(min_length=1, description="Question text to answer")
-    top_k: int = Field(default=5, ge=1, le=50, description="Max number of sources to retrieve")
+    question: str = Field(min_length=1, description="Question or RFP requirement to answer")
+    top_k: int = Field(default=5, ge=1, le=50, description="Max number of source passages to retrieve")
 
 
 class Source(BaseModel):
     id: str
-    question: str
-    answer: str
-    score: float
+    title: Optional[str] = ""
+    content: str = ""
+    score: float = 0.0
     source_type: Optional[str] = "hybrid"  # "elasticsearch", "pinecone", "hybrid"
+    source_file: Optional[str] = None
+    page_number: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
+    # Optional legacy alias fields
+    question: Optional[str] = None
+    answer: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_legacy_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            title = data.get("title") or data.get("question") or ""
+            content = data.get("content") or data.get("answer") or ""
+            data["title"] = title
+            data["content"] = content
+            data["question"] = title
+            data["answer"] = content
+        return data
 
 
 class SearchResponse(BaseModel):
@@ -27,13 +45,28 @@ class SearchResponse(BaseModel):
     sources: List[Source]
 
 
-# --- Knowledge Base Schemas ---
+# --- Knowledge Base Passage Schemas ---
 
 class KBEntryBase(BaseModel):
-    question: str = Field(min_length=1)
-    answer: str = Field(min_length=1)
+    title: str = Field(default="", description="Section header, topic, or document title")
+    content: str = Field(default="", description="Passage text, policy clause, or documentation excerpt")
     category: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    # Backward compatibility aliases
+    question: Optional[str] = None
+    answer: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_passage_and_qa(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            title = data.get("title") or data.get("question") or "Overview"
+            content = data.get("content") or data.get("answer") or ""
+            data["title"] = title
+            data["content"] = content
+            data["question"] = title
+            data["answer"] = content
+        return data
 
 
 class KBEntryCreate(KBEntryBase):
@@ -42,10 +75,26 @@ class KBEntryCreate(KBEntryBase):
 
 
 class KBEntryUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
     question: Optional[str] = None
     answer: Optional[str] = None
     category: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_update_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "question" in data and "title" not in data:
+                data["title"] = data["question"]
+            elif "title" in data and "question" not in data:
+                data["question"] = data["title"]
+            if "answer" in data and "content" not in data:
+                data["content"] = data["answer"]
+            elif "content" in data and "answer" not in data:
+                data["answer"] = data["content"]
+        return data
 
 
 class KBEntryResponse(KBEntryBase):
@@ -124,4 +173,3 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     services: Dict[str, HealthServiceStatus]
-

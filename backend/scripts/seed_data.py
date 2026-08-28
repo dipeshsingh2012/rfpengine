@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import sys
-import uuid
 from pathlib import Path
 
 # Add backend directory to sys.path
@@ -15,7 +15,6 @@ from app.services.document_parser_service import DocumentParserService
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
-
 from app.services.gcp_secret_service import GCPSecretService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -50,7 +49,7 @@ async def main() -> None:
         pinecone_service=pinecone_service,
     )
 
-    # 2. Parse all sample documents
+    # 2. Parse all sample documents into coherent passage chunks
     doc_files = sorted(list(sample_docs_dir.glob("*.*")))
     if not doc_files:
         logger.warning("No sample documents found in '%s'", sample_docs_dir)
@@ -67,31 +66,29 @@ async def main() -> None:
                 filename=file_path.name,
                 tenant_id=tenant_id,
             )
-            logger.info("📄 Parsed %d chunks from %s", len(chunks), file_path.name)
+            logger.info("📄 Parsed %d passage chunks from %s", len(chunks), file_path.name)
             all_chunks.extend(chunks)
         except Exception as exc:
             logger.error("Failed to parse %s: %s", file_path.name, exc)
 
-    logger.info("Total chunks extracted across all sample documents: %d", len(all_chunks))
+    logger.info("Total passage chunks extracted across all sample documents: %d", len(all_chunks))
 
-    import hashlib
-
-    # Generate deterministic IDs and embedding prompts for chunks
+    # Generate deterministic IDs and embedding prompts for passage chunks
     doc_ids = []
     embed_prompts = []
     for chunk in all_chunks:
-        raw_key = f"{chunk.tenant_id}::{chunk.question}::{chunk.answer}"
+        raw_key = f"{chunk.tenant_id}::{chunk.title}::{chunk.content}"
         doc_id = f"kb-{hashlib.sha256(raw_key.encode('utf-8')).hexdigest()[:12]}"
         doc_ids.append(doc_id)
-        embed_prompts.append(f"Topic: {chunk.question}\n{chunk.answer}")
+        embed_prompts.append(f"Title: {chunk.title}\n\nContent: {chunk.content}")
 
     # 3. PostgreSQL Database Sync (kb_entries)
     try:
         from app.core.db import get_session_factory
         from app.models.db_models import KBEntry
         from sqlalchemy import delete
-        
-        logger.info("Syncing %d chunks into PostgreSQL 'kb_entries' for tenant '%s'...", len(all_chunks), tenant_id)
+
+        logger.info("Syncing %d passage chunks into PostgreSQL 'kb_entries' for tenant '%s'...", len(all_chunks), tenant_id)
         session_factory = get_session_factory()
         async with session_factory() as session:
             # Clear existing seed chunks for this tenant to keep in sync
@@ -100,8 +97,8 @@ async def main() -> None:
                 db_entry = KBEntry(
                     id=doc_ids[i],
                     tenant_id=chunk.tenant_id,
-                    question=chunk.question,
-                    answer=chunk.answer,
+                    question=chunk.title or chunk.question or "General",
+                    answer=chunk.content or chunk.answer or "",
                     category=chunk.category or "General",
                     metadata_json=chunk.metadata or {},
                 )
@@ -112,13 +109,15 @@ async def main() -> None:
         logger.warning("PostgreSQL sync skipped or encountered error: %s", exc)
 
     # 4. Batch Index into Elasticsearch / Elastic Cloud
-    logger.info("Indexing %d chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
+    logger.info("Indexing %d passage chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
     es_docs = [
         {
             "id": doc_ids[i],
             "tenant_id": chunk.tenant_id,
-            "question": chunk.question,
-            "answer": chunk.answer,
+            "title": chunk.title,
+            "content": chunk.content,
+            "question": chunk.title,
+            "answer": chunk.content,
             "category": chunk.category or "",
             "metadata": chunk.metadata or {},
         }
@@ -147,7 +146,7 @@ async def main() -> None:
 
     # 5. Batch Embed & Bulk Upsert into Pinecone Serverless
     if pinecone_service.is_configured():
-        logger.info("Vectorizing and bulk-upserting %d chunks into Pinecone (index: %s)...", len(all_chunks), settings.pinecone_index)
+        logger.info("Vectorizing and bulk-upserting %d passages into Pinecone (index: %s)...", len(all_chunks), settings.pinecone_index)
         try:
             await pinecone_service.ensure_index_exists()
             index = pinecone_service.client.Index(settings.pinecone_index)
@@ -176,8 +175,10 @@ async def main() -> None:
                         "metadata": {
                             "tenant_id": chunk.tenant_id,
                             "doc_id": doc_ids[i],
-                            "question": chunk.question,
-                            "answer": chunk.answer[:1000],
+                            "title": chunk.title,
+                            "content": chunk.content[:1000],
+                            "question": chunk.title,
+                            "answer": chunk.content[:1000],
                             "category": chunk.category or "",
                             "source_file": chunk.metadata.get("source_file", "sample_doc") if chunk.metadata else "sample_doc",
                             "page_number": chunk.metadata.get("page_number", 1) if chunk.metadata else 1,

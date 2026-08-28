@@ -63,6 +63,8 @@ class ElasticsearchService:
                     "mappings": {
                         "properties": {
                             "tenant_id": {"type": "keyword"},
+                            "title": {"type": "text", "analyzer": "standard"},
+                            "content": {"type": "text", "analyzer": "standard"},
                             "question": {"type": "text", "analyzer": "standard"},
                             "answer": {"type": "text", "analyzer": "standard"},
                             "category": {"type": "keyword"},
@@ -73,6 +75,7 @@ class ElasticsearchService:
                                     "format": {"type": "keyword"},
                                     "page_number": {"type": "integer"},
                                     "chunk_index": {"type": "integer"},
+                                    "section": {"type": "keyword"},
                                 }
                             },
                         }
@@ -87,26 +90,29 @@ class ElasticsearchService:
 
     async def bulk_index_documents(self, documents: List[Dict[str, Any]]) -> int:
         """
-        Bulk indexes multiple document chunks in a single high-performance request.
+        Bulk indexes multiple document chunks / passages in a single high-performance request.
         """
         if not documents:
             return 0
         try:
-            actions = [
-                {
+            actions = []
+            for doc in documents:
+                title = doc.get("title") or doc.get("question", "")
+                content = doc.get("content") or doc.get("answer", "")
+                actions.append({
                     "_index": self.index_name,
                     "_id": doc["id"],
                     "_source": {
                         "tenant_id": doc.get("tenant_id", "acme-corp"),
-                        "question": doc.get("question", ""),
-                        "answer": doc.get("answer", ""),
+                        "title": title,
+                        "content": content,
+                        "question": title,
+                        "answer": content,
                         "category": doc.get("category", ""),
                         "created_at": doc.get("created_at"),
                         "metadata": doc.get("metadata", {}),
                     },
-                }
-                for doc in documents
-            ]
+                })
             success_count, errors = await async_bulk(self.client, actions, refresh=True)
             if errors:
                 logger.warning("Elasticsearch bulk indexing had errors: %s", errors)
@@ -119,16 +125,22 @@ class ElasticsearchService:
         self,
         doc_id: str,
         tenant_id: str,
-        question: str,
-        answer: str,
+        question: str = "",
+        answer: str = "",
+        title: Optional[str] = None,
+        content: Optional[str] = None,
         category: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         try:
+            eff_title = title or question
+            eff_content = content or answer
             doc = {
                 "tenant_id": tenant_id,
-                "question": question,
-                "answer": answer,
+                "title": eff_title,
+                "content": eff_content,
+                "question": eff_title,
+                "answer": eff_content,
                 "category": category or "",
                 "metadata": metadata or {},
             }
@@ -164,7 +176,7 @@ class ElasticsearchService:
                             {
                                 "multi_match": {
                                     "query": query,
-                                    "fields": ["question^2", "answer"],
+                                    "fields": ["title^2", "content", "question^2", "answer"],
                                     "fuzziness": "AUTO",
                                 }
                             }
@@ -177,12 +189,21 @@ class ElasticsearchService:
             results = []
             for hit in hits:
                 source = hit.get("_source", {})
+                title = source.get("title") or source.get("question", "")
+                content = source.get("content") or source.get("answer", "")
+                meta = source.get("metadata", {})
                 results.append({
                     "id": hit["_id"],
-                    "question": source.get("question", ""),
-                    "answer": source.get("answer", ""),
+                    "title": title,
+                    "content": content,
+                    "question": title,
+                    "answer": content,
+                    "category": source.get("category", ""),
                     "score": float(hit.get("_score", 0.0)),
                     "source_type": "elasticsearch",
+                    "source_file": meta.get("source_file"),
+                    "page_number": meta.get("page_number"),
+                    "metadata": meta,
                 })
             return results
         except Exception as exc:
@@ -209,17 +230,22 @@ class ElasticsearchService:
             }
             response = await self.client.search(index=self.index_name, body=body)
             hits = response.get("hits", {}).get("hits", [])
-            return [
-                {
+            results = []
+            for hit in hits:
+                src = hit["_source"]
+                title = src.get("title") or src.get("question", "")
+                content = src.get("content") or src.get("answer", "")
+                results.append({
                     "id": hit["_id"],
-                    "tenant_id": hit["_source"].get("tenant_id", tenant_id),
-                    "question": hit["_source"].get("question", ""),
-                    "answer": hit["_source"].get("answer", ""),
-                    "category": hit["_source"].get("category", ""),
-                    "metadata": hit["_source"].get("metadata", {}),
-                }
-                for hit in hits
-            ]
+                    "tenant_id": src.get("tenant_id", tenant_id),
+                    "title": title,
+                    "content": content,
+                    "question": title,
+                    "answer": content,
+                    "category": src.get("category", ""),
+                    "metadata": src.get("metadata", {}),
+                })
+            return results
         except Exception as exc:
             logger.warning("Elasticsearch list_documents failed: %s", exc)
             return []
@@ -229,11 +255,15 @@ class ElasticsearchService:
             res = await self.client.get(index=self.index_name, id=doc_id)
             if res and res.get("found"):
                 source = res.get("_source", {})
+                title = source.get("title") or source.get("question", "")
+                content = source.get("content") or source.get("answer", "")
                 return {
                     "id": doc_id,
                     "tenant_id": source.get("tenant_id", ""),
-                    "question": source.get("question", ""),
-                    "answer": source.get("answer", ""),
+                    "title": title,
+                    "content": content,
+                    "question": title,
+                    "answer": content,
                     "category": source.get("category", ""),
                     "metadata": source.get("metadata", {}),
                 }
@@ -241,4 +271,3 @@ class ElasticsearchService:
         except Exception as exc:
             logger.warning("Elasticsearch get_document failed for %s: %s", doc_id, exc)
             return None
-

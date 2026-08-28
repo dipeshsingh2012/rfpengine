@@ -157,12 +157,19 @@ class PineconeService:
             results = []
             for match in matches:
                 meta = match.get("metadata", {}) or {}
+                title = meta.get("title") or meta.get("question", "")
+                content = meta.get("content") or meta.get("answer", "")
                 results.append({
                     "id": match["id"],
-                    "question": meta.get("question", ""),
-                    "answer": meta.get("answer", ""),
+                    "title": title,
+                    "content": content,
+                    "question": title,
+                    "answer": content,
                     "score": float(match.get("score", 0.0)),
                     "source_type": "pinecone",
+                    "source_file": meta.get("source_file"),
+                    "page_number": meta.get("page_number"),
+                    "metadata": meta,
                 })
             return results
         except Exception as exc:

@@ -32,17 +32,25 @@ def reciprocal_rank_fusion(
     k_constant: int = 60,
 ) -> List[Dict[str, Any]]:
     """
-    Combines ranked results from sparse and dense retrievers using Reciprocal Rank Fusion.
+    Combines ranked results from sparse (Elasticsearch BM25) and dense (Pinecone vector) retrievers using Reciprocal Rank Fusion.
     """
     fused: Dict[str, Dict[str, Any]] = {}
     for result_list in result_sets:
         for rank, item in enumerate(result_list, start=1):
             doc_id = item["id"]
             if doc_id not in fused:
+                title = item.get("title") or item.get("question", "")
+                content = item.get("content") or item.get("answer", "")
                 fused[doc_id] = {
                     "id": doc_id,
-                    "question": item.get("question", ""),
-                    "answer": item.get("answer", ""),
+                    "title": title,
+                    "content": content,
+                    "question": title,
+                    "answer": content,
+                    "category": item.get("category", ""),
+                    "source_file": item.get("source_file"),
+                    "page_number": item.get("page_number"),
+                    "metadata": item.get("metadata", {}),
                     "score": 0.0,
                     "matched_retrievers": [],
                 }
@@ -146,7 +154,7 @@ class HybridSearchService:
 
     async def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
         """
-        Generates vector embeddings for a batch of text chunks.
+        Generates vector embeddings for a batch of text chunks / passages.
         """
         if not texts:
             return []
@@ -154,7 +162,6 @@ class HybridSearchService:
         # A. Try Vertex AI
         if self.genai_client and self.settings.llm_provider != "openai":
             try:
-                # Vertex AI handles batches up to 250 texts
                 resp = await asyncio.to_thread(
                     self.genai_client.models.embed_content,
                     model=self.settings.vertex_embedding_model,
@@ -210,17 +217,24 @@ class HybridSearchService:
         for hit in fused_hits:
             source_types = hit.get("matched_retrievers", [])
             retriever_label = "+".join(source_types) if source_types else "hybrid"
+            title = hit.get("title") or hit.get("question", "")
+            content = hit.get("content") or hit.get("answer", "")
             sources.append(
                 Source(
                     id=hit["id"],
-                    question=hit.get("question", ""),
-                    answer=hit.get("answer", ""),
+                    title=title,
+                    content=content,
+                    question=title,
+                    answer=content,
                     score=round(hit["score"], 6),
                     source_type=retriever_label,
+                    source_file=hit.get("source_file"),
+                    page_number=hit.get("page_number"),
+                    metadata=hit.get("metadata"),
                 )
             )
 
-        # Draft answer with Gemini or OpenAI
+        # Synthesize grounded answer with Gemini or OpenAI
         suggested_answer = await self._generate_answer(request.question, sources)
         confidence = min(1.0, max((s.score for s in sources), default=0.0) * 60)
         if not sources and self.genai_client is None and self.openai_client is None:
@@ -233,19 +247,28 @@ class HybridSearchService:
         )
 
     async def _generate_answer(self, question: str, sources: List[Source]) -> str:
-        context_lines = [
-            f"Source [{s.id} ({s.source_type})]:\nQ: {s.question}\nA: {s.answer}"
-            for s in sources
-        ]
-        context = "\n\n".join(context_lines) if context_lines else "No relevant sources found in knowledge base."
+        context_blocks = []
+        for s in sources:
+            source_info = s.source_file or s.metadata.get("source_file") if s.metadata else "Knowledge Base"
+            page_info = f", Page {s.page_number}" if s.page_number else ""
+            topic_info = f"Topic: {s.title}" if s.title else ""
+            header = f"--- Source Document Passage [{s.id}] ({source_info}{page_info} | {topic_info}) ---"
+            context_blocks.append(f"{header}\n{s.content}")
+
+        context = "\n\n".join(context_blocks) if context_blocks else "No relevant documentation passages found in the knowledge base."
 
         prompt = (
-            "You are an exacting RFP response assistant for technical and compliance questionnaires.\n"
-            "Draft a concise, accurate, and professional response to the user's question using ONLY the supplied sources.\n"
-            "If the sources do not provide enough information to answer the question, clearly state that information is not available in the approved knowledge base.\n"
-            "Do NOT invent or extrapolate facts not in the sources.\n\n"
-            f"User Question: {question}\n\n"
-            f"Approved Knowledge Base Sources:\n{context}"
+            "You are an enterprise RFP response assistant for technical, security, and compliance questionnaires.\n\n"
+            "Your task is to synthesize a direct, authoritative, and professional answer to the buyer's questionnaire requirement "
+            "based SOLELY on the approved documentation passages provided below.\n\n"
+            "Guidelines:\n"
+            "1. Address the requirement directly and clearly (e.g. state 'Yes' or confirm capabilities when supported by documentation).\n"
+            "2. Extract and incorporate specific standards, protocols, SLAs, and technical details mentioned in the passages.\n"
+            "3. If the documentation passages do not provide sufficient information to answer the question, state clearly that the information is not specified in current approved documentation.\n"
+            "4. Do NOT hallucinate, invent unmentioned capabilities, or extrapolate beyond the provided text passages.\n\n"
+            f"Questionnaire Requirement / Buyer Question:\n{question}\n\n"
+            f"Approved Documentation Passages:\n{context}\n\n"
+            "Synthesized RFP Answer:"
         )
 
         # A. Try Google Cloud Vertex AI Gemini
@@ -270,7 +293,7 @@ class HybridSearchService:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a seller RFP response assistant. Return only the drafted answer.",
+                            "content": "You are an enterprise RFP response assistant. Return only the drafted answer.",
                         },
                         {"role": "user", "content": prompt},
                     ],
@@ -281,7 +304,7 @@ class HybridSearchService:
 
         # C. Source Fallback
         if sources:
-            return sources[0].answer
+            return sources[0].content or sources[0].answer
         return (
             "Customer data is retained for the duration of the active subscription and for up to "
             "30 days after termination. Backups are rotated on a 35-day schedule."
