@@ -217,10 +217,10 @@ function createInPageOverlay() {
 
   const headerTitle = hasHandoffAnswers ? '🟢 RFPEngine Handoff' : '⚡ RFPEngine Assistant';
   const countText = hasHandoffAnswers
-    ? `${answerableFields.length} Approved Answers from Workspace (Zero LLM calls)`
+    ? `${answerableFields.length} ${answerableFields.length === 1 ? 'Answer' : 'Answers'} from Workspace (Zero LLM calls)`
     : `${fields.length} Questionnaire Fields Detected`;
   const buttonLabel = hasHandoffAnswers
-    ? '⚡ Inject Approved Answers'
+    ? '⚡ Inject Answers'
     : '⚡ Auto-Fill with AI (LLM)';
 
   overlay.innerHTML = `

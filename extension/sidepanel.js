@@ -56,12 +56,12 @@ async function scan() {
     const isHandoffMode = handoffCount > 0;
 
     if (isHandoffMode) {
-      pageState.innerHTML = `🟢 <strong>Workspace Handoff Active:</strong> ${handoffCount} approved answer${
+      pageState.innerHTML = `🟢 <strong>Workspace Handoff Active:</strong> ${handoffCount} answer${
         handoffCount === 1 ? '' : 's'
-      } loaded (No LLM calls required)`;
-      generateAllButton.hidden = true; // No need to generate, answers are already approved
+      } loaded from workspace (No LLM calls required)`;
+      generateAllButton.hidden = true; // No need to generate, answers are already loaded
       insertAllButton.hidden = false;
-      insertAllButton.textContent = '⚡ Insert All Approved Answers';
+      insertAllButton.textContent = '⚡ Insert Workspace Answers';
     } else {
       pageState.textContent = `${result.title || 'Current page'} · ${scannedFields.length} question${
         scannedFields.length === 1 ? '' : 's'
@@ -82,9 +82,9 @@ async function generateAnswer(field, controls) {
   // Flow A: User came from Web App -> Zero LLM call, use handoff draft directly
   if (field.handoffAnswer) {
     controls.answer.value = field.handoffAnswer;
-    controls.confidence.textContent = 'Approved workspace draft';
+    controls.confidence.textContent = 'Workspace draft';
     controls.sourceBox.innerHTML =
-      '<div class="source-line"><strong>rfpengine</strong> Pre-approved draft from seller workspace (Zero LLM call)</div>';
+      '<div class="source-line"><strong>rfpengine</strong> Draft from seller workspace (Zero LLM call)</div>';
     controls.sourceBox.hidden = false;
     controls.approve.hidden = false;
     controls.reject.hidden = false;
@@ -140,11 +140,11 @@ function renderQuestion(field, index, isHandoffMode) {
   // If handoff answer exists from web app, populate immediately!
   if (field.handoffAnswer) {
     answer.value = field.handoffAnswer;
-    confidence.textContent = 'Approved workspace draft';
+    confidence.textContent = 'Workspace draft';
     sourceBox.innerHTML =
-      '<div class="source-line"><strong>rfpengine</strong> Approved in seller workspace (No LLM call needed)</div>';
+      '<div class="source-line"><strong>rfpengine</strong> Draft from seller workspace (No LLM call needed)</div>';
     sourceBox.hidden = false;
-    approve.textContent = 'Approved';
+    approve.textContent = 'Ready';
     approve.disabled = true;
     approve.hidden = false;
     reject.hidden = true;
