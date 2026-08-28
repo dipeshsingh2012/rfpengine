@@ -1233,8 +1233,7 @@ function App() {
             </section>
 
             <div className="workspace-grid">
-              <section className={`answer-column ${detectedQuestions.length ? "has-question-list" : ""}`}>
-                {detectedQuestions.length > 0 && <div className="question-review-list">{detectedQuestions.map((item, index) => <article className="question-review-card panel" key={`${item}-${index}`}><div className="question-review-header"><span className="source-rank">Q{String(index + 1).padStart(2, "0")}</span><span className="review-status">{reviewStatusByQuestion[item] || (answersByQuestion[item] ? "DRAFT READY" : "NOT GENERATED")}</span></div><h2>{item}</h2><textarea className="question-review-answer" value={answersByQuestion[item] || ""} placeholder="Generate all answers to populate this response." onChange={(event) => { const nextAnswers = { ...answersByQuestion, [item]: event.target.value }; setAnswersByQuestion(nextAnswers); saveAnswers(nextAnswers); }} /><div className="question-review-actions"><button className="reject-button" onClick={() => { const nextStatuses = { ...reviewStatusByQuestion, [item]: "Changes requested" }; setReviewStatusByQuestion(nextStatuses); saveReviewStatuses(nextStatuses); }}><ThumbsDown size={14} /> Request changes</button><button className="approve-button" onClick={() => { const nextStatuses = { ...reviewStatusByQuestion, [item]: "Approved" }; setReviewStatusByQuestion(nextStatuses); saveReviewStatuses(nextStatuses); }}><Check size={14} /> Approve</button></div></article>)}</div>}
+              <section className="answer-column">
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">02 / Draft response</p>
