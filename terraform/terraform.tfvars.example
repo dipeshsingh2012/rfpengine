@@ -1,21 +1,27 @@
 project_id       = "rfpengine"
 region           = "us-central1"
 app_name         = "rfpengine"
-credentials_file = "../gcp-key.json" # Optional: service account key file
+credentials_file = "../gcp-key.json"
 
 # Neon PostgreSQL Connection URL
 database_url     = "postgresql://neondb_owner:your_password@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
 
-# API Keys (Optional)
-openai_api_key   = ""
-pinecone_api_key = ""
-
-cors_origins          = "http://localhost:5173,https://your-domain.com"
-elasticsearch_url     = "https://my-deployment.es.us-central1.gcp.elastic.cloud:443"
+# Elastic Cloud Settings
+elasticsearch_url     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
 elasticsearch_index   = "rfq_knowledge_base"
 elasticsearch_api_key = ""
 
+# Pinecone Serverless Settings
 pinecone_index        = "rfq-knowledge-base"
 pinecone_cloud        = "aws"
 pinecone_region       = "us-east-1"
-pinecone_api_key = "pcsk_2pJmKx_DNaj9RWhSqpwYtB9eutCbvR8pmxqoaFUEhvrvcbYr8V3AjnF2WMf9iUVTUg1xbC"
+pinecone_api_key      = ""
+
+# Vertex AI Settings
+llm_provider           = "vertexai"
+gemini_model           = "gemini-2.5-flash"
+vertex_embedding_model = "text-embedding-004"
+embedding_dimension    = 768
+
+# CORS Settings
+cors_origins = "http://localhost:5173,http://localhost:3000"

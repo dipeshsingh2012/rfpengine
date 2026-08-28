@@ -1,11 +1,10 @@
-# 1. DATABASE_URL Secret
+# 1. DATABASE_URL Secret (Neon PostgreSQL 17)
 resource "google_secret_manager_secret" "database_url" {
   secret_id = "${var.app_name}-database-url"
 
   replication {
     auto {}
   }
-
 }
 
 resource "google_secret_manager_secret_version" "database_url_val" {
@@ -13,46 +12,13 @@ resource "google_secret_manager_secret_version" "database_url_val" {
   secret_data = var.database_url
 }
 
-# 2. OPENAI_API_KEY Secret
-resource "google_secret_manager_secret" "openai_api_key" {
-  secret_id = "${var.app_name}-openai-api-key"
-
-  replication {
-    auto {}
-  }
-
-}
-
-resource "google_secret_manager_secret_version" "openai_api_key_val" {
-  count       = var.openai_api_key != "" ? 1 : 0
-  secret      = google_secret_manager_secret.openai_api_key.id
-  secret_data = var.openai_api_key
-}
-
-# 3. PINECONE_API_KEY Secret
-resource "google_secret_manager_secret" "pinecone_api_key" {
-  secret_id = "${var.app_name}-pinecone-api-key"
-
-  replication {
-    auto {}
-  }
-
-}
-
-resource "google_secret_manager_secret_version" "pinecone_api_key_val" {
-  count       = var.pinecone_api_key != "" ? 1 : 0
-  secret      = google_secret_manager_secret.pinecone_api_key.id
-  secret_data = var.pinecone_api_key
-}
-
-# 4. ELASTICSEARCH_API_KEY Secret
+# 2. ELASTICSEARCH_API_KEY Secret (Elastic Cloud)
 resource "google_secret_manager_secret" "elasticsearch_api_key" {
   secret_id = "${var.app_name}-elasticsearch-api-key"
 
   replication {
     auto {}
   }
-
 }
 
 resource "google_secret_manager_secret_version" "elasticsearch_api_key_val" {
@@ -61,4 +27,17 @@ resource "google_secret_manager_secret_version" "elasticsearch_api_key_val" {
   secret_data = var.elasticsearch_api_key
 }
 
+# 3. PINECONE_API_KEY Secret (Pinecone Serverless)
+resource "google_secret_manager_secret" "pinecone_api_key" {
+  secret_id = "${var.app_name}-pinecone-api-key"
 
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "pinecone_api_key_val" {
+  count       = var.pinecone_api_key != "" ? 1 : 0
+  secret      = google_secret_manager_secret.pinecone_api_key.id
+  secret_data = var.pinecone_api_key
+}

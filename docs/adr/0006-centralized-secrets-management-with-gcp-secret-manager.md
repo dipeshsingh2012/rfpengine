@@ -9,8 +9,9 @@
 RFPEngine requires multiple sensitive credentials across its hybrid data architecture:
 - **PostgreSQL Database URL / Credentials** (Neon database connection).
 - **Elasticsearch API Key / URL** (Managed Elastic Cloud deployment).
-- **OpenAI API Key** (Embeddings and LLM answer generation).
 - **Pinecone API Key** (Dense vector index).
+
+Google Cloud Vertex AI (Gemini 2.5 Flash and `text-embedding-004`) authenticates natively using the Cloud Run Service Account (`roles/aiplatform.user`) and local Application Default Credentials (`gcp-key.json`), requiring no 3rd-party API tokens.
 
 While third-party solutions like HashiCorp Cloud Platform Vault impose significant monthly costs (\$300–\$500+/mo), Google Cloud Secret Manager provides:
 1. Generous **permanent free tier** (6 active secret versions and 10,000 access operations/month free).
@@ -26,9 +27,10 @@ We adopt **GCP Secret Manager** as the primary cloud secrets store:
    - **Standalone / Local / VM**: [`GCPSecretService`](file:///home/dipes/projects/RFQEngine/backend/app/services/gcp_secret_service.py) uses the `google-cloud-secret-manager` Python SDK to retrieve or sync secrets when running outside Cloud Run.
 2. **Terraform Provisioning**:
    - Complete Terraform module in [`terraform/`](file:///home/dipes/projects/RFQEngine/terraform/) managing:
-     - Secret Manager secrets (`rfpengine-database-url`, `rfpengine-elasticsearch-api-key`, `rfpengine-openai-api-key`, `rfpengine-pinecone-api-key`).
+     - Canonical Secret Manager secrets (`rfpengine-database-url`, `rfpengine-elasticsearch-api-key`, `rfpengine-pinecone-api-key`).
      - Dedicated least-privilege IAM service account (`rfpengine-backend-sa@rfpengine.iam.gserviceaccount.com`).
      - Secret accessor IAM role bindings (`roles/secretmanager.secretAccessor`).
+     - Vertex AI User role bindings (`roles/aiplatform.user`).
      - Private Docker repository (`us-central1-docker.pkg.dev/rfpengine/rfpengine-repo`).
      - Cloud Run v2 API service (`https://rfpengine-api-fwwnzie4dq-uc.a.run.app`).
 3. **Local Dev Fallback**:

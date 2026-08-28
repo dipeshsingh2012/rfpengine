@@ -92,12 +92,12 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       dynamic "env" {
-        for_each = var.openai_api_key != "" ? [1] : []
+        for_each = var.elasticsearch_api_key != "" ? [1] : []
         content {
-          name = "OPENAI_API_KEY"
+          name = "ELASTICSEARCH_API_KEY"
           value_source {
             secret_key_ref {
-              secret  = google_secret_manager_secret.openai_api_key.secret_id
+              secret  = google_secret_manager_secret.elasticsearch_api_key.secret_id
               version = "latest"
             }
           }
@@ -116,36 +116,20 @@ resource "google_cloud_run_v2_service" "backend" {
           }
         }
       }
-
-      dynamic "env" {
-        for_each = var.elasticsearch_api_key != "" ? [1] : []
-        content {
-          name = "ELASTICSEARCH_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.elasticsearch_api_key.secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
     }
   }
 
   depends_on = [
     google_secret_manager_secret_iam_member.db_url_access,
-    google_secret_manager_secret_iam_member.openai_key_access,
-    google_secret_manager_secret_iam_member.pinecone_key_access,
     google_secret_manager_secret_iam_member.elasticsearch_key_access,
+    google_secret_manager_secret_iam_member.pinecone_key_access,
   ]
 }
 
-# 3. Allow Public Unauthenticated Invocations for the API
+# 3. Allow Public Unauthenticated Ingress to Cloud Run
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
-  project  = var.project_id
-  location = var.region
   name     = google_cloud_run_v2_service.backend.name
+  location = google_cloud_run_v2_service.backend.location
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
-

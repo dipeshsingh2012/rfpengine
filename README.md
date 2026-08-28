@@ -263,20 +263,19 @@ All cloud infrastructure — including **Google Cloud Secret Manager secrets**, 
 
 ### Managing Secrets with Terraform & GCP Secret Manager
 
-All sensitive credentials (`DATABASE_URL`, `ELASTICSEARCH_API_KEY`, `OPENAI_API_KEY`, `PINECONE_API_KEY`) are declared as sensitive variables in Terraform, securely provisioned in **Google Cloud Secret Manager**, and automatically injected into Cloud Run at container boot via `version = "latest"`.
+All sensitive credentials (`DATABASE_URL`, `ELASTICSEARCH_API_KEY`, `PINECONE_API_KEY`) are declared as sensitive variables in Terraform, securely provisioned in **Google Cloud Secret Manager**, and automatically injected into Cloud Run at container boot via `version = "latest"`. Google Cloud Vertex AI (Gemini 2.5 Flash and `text-embedding-004`) authenticates natively using the Cloud Run Service Account (`roles/aiplatform.user`).
 
 #### 1. How to Update or Rotate an Existing Secret
 
-When you update credentials (e.g. rotating a Neon database password, Elastic Cloud API Key, or OpenAI token):
+When you update credentials (e.g. rotating a Neon database password, Elastic Cloud API Key, or Pinecone API key):
 
 1. Open your local `terraform/terraform.tfvars` file (which is gitignored):
    ```hcl
    # terraform/terraform.tfvars
    database_url          = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
-   elasticsearch_url     = "https://my-deployment.es.us-central1.gcp.elastic.cloud:443"
+   elasticsearch_url     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
    elasticsearch_api_key = "NEW_ELASTIC_API_KEY"
-   openai_api_key        = "sk-proj-NEW_OPENAI_KEY..."
-   pinecone_api_key      = "pcsk_NEW_PINECONE_KEY..."
+   pinecone_api_key      = "NEW_PINECONE_KEY..."
    ```
 
 2. **Preview the Changes**:
@@ -297,7 +296,7 @@ When you update credentials (e.g. rotating a Neon database password, Elastic Clo
 > [!TIP]
 > **Single Secret Update via CLI**: You can also update a single secret without modifying `terraform.tfvars` by passing the `-var` flag:
 > ```bash
-> npm run tf:apply -- -var="openai_api_key=sk-proj-NEW_KEY_HERE"
+> npm run tf:apply -- -var="pinecone_api_key=pcsk_NEW_KEY_HERE"
 > ```
 
 👉 **View Active Secrets & Versions**: [Google Cloud Secret Manager Console](https://console.cloud.google.com/security/secret-manager?project=rfpengine)

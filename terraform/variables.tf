@@ -24,20 +24,20 @@ variable "app_name" {
 variable "container_image" {
   type        = string
   description = "Container image URL to deploy to Cloud Run"
-  default     = "us-docker.pkg.dev/cloudrun/container/hello" # Placeholder until first build is pushed
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 # --- Sensitive Secrets (stored in GCP Secret Manager) ---
 
 variable "database_url" {
   type        = string
-  description = "PostgreSQL connection string (e.g. Neon connection URL)"
+  description = "PostgreSQL connection string (Neon Cloud)"
   sensitive   = true
 }
 
-variable "openai_api_key" {
+variable "elasticsearch_api_key" {
   type        = string
-  description = "OpenAI API Key for embeddings and answer drafting"
+  description = "Elasticsearch API Key for Elastic Cloud"
   sensitive   = true
   default     = ""
 }
@@ -49,23 +49,18 @@ variable "pinecone_api_key" {
   default     = ""
 }
 
+# --- Search & Infrastructure Settings ---
+
 variable "elasticsearch_url" {
   type        = string
-  description = "Elasticsearch endpoint URL"
-  default     = "http://localhost:9200"
+  description = "Elasticsearch endpoint URL (Elastic Cloud)"
+  default     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
 }
 
 variable "elasticsearch_index" {
   type        = string
   description = "Elasticsearch index name"
   default     = "rfq_knowledge_base"
-}
-
-variable "elasticsearch_api_key" {
-  type        = string
-  description = "Elasticsearch API Key for Elastic Cloud"
-  sensitive   = true
-  default     = ""
 }
 
 variable "pinecone_index" {
@@ -89,19 +84,19 @@ variable "pinecone_region" {
 variable "cors_origins" {
   type        = string
   description = "Allowed CORS origins for the frontend and extension"
-  default     = "http://localhost:5173,https://your-domain.com"
+  default     = "http://localhost:5173,http://localhost:3000"
 }
 
 variable "llm_provider" {
   type        = string
-  description = "Primary LLM and Embedding provider (vertexai or openai)"
+  description = "Primary LLM and Embedding provider (vertexai)"
   default     = "vertexai"
 }
 
 variable "gemini_model" {
   type        = string
   description = "Google Cloud Vertex AI Gemini model name"
-  default     = "gemini-2.0-flash"
+  default     = "gemini-2.5-flash"
 }
 
 variable "vertex_embedding_model" {
@@ -112,9 +107,6 @@ variable "vertex_embedding_model" {
 
 variable "embedding_dimension" {
   type        = number
-  description = "Vector embedding dimensionality (768 for Vertex AI text-embedding-004, 1536 for OpenAI)"
+  description = "Vector embedding dimensionality (768 for Vertex AI text-embedding-004)"
   default     = 768
 }
-
-
-
