@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# Service Account Keys & Credentials
+*credentials*.json
+*service_account*.json
+gcp-*.json
+*.key.json
+
 # Python
 .venv/
 __pycache__/
@@ -14,6 +20,7 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+*:Zone.Identifier
 
 # Terraform
 **/.terraform/

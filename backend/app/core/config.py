@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     gcp_project_id: Optional[str] = None
     gcp_secret_manager_enabled: bool = False
     gcp_secret_prefix: str = ""  # e.g. "rfpengine_" or ""
+    google_application_credentials: Optional[str] = None
 
     # OpenAI Settings
     openai_api_key: Optional[str] = None

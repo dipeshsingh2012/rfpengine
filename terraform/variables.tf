@@ -3,6 +3,12 @@ variable "project_id" {
   description = "The Google Cloud Platform project ID"
 }
 
+variable "credentials_file" {
+  type        = string
+  description = "Path to GCP service account key JSON file (optional, defaults to Application Default Credentials)"
+  default     = ""
+}
+
 variable "region" {
   type        = string
   description = "GCP Region to deploy resources (e.g. us-central1, us-east1)"
