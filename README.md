@@ -344,6 +344,19 @@ gcloud run deploy rfpengine-api \
 
 ---
 
+## Frontend Routes & Pages
+
+The React single-page application (`frontend/`) provides dedicated routes for questionnaire ingestion, AI-assisted drafting, multi-stakeholder governance, and knowledge base file uploads:
+
+| Route Path | Page / View Name | Primary Features & User Workflows |
+| :--- | :--- | :--- |
+| **`GET /`** | **Overview & Importer** | • Import buyer questionnaires via URL or file upload (`.csv`, `.json`, `.pdf`, `.docx`)<br>• Quick-start with pre-configured starter questions<br>• Summary dashboard of recent RFP projects |
+| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gpt-4o`)<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
+| **`GET /review/:id`** | **Question Review & Governance** | • Multi-question review queue with role switcher (`Proposal manager`, `Security SME`, `Legal reviewer`, `Final approver`)<br>• Approval state machine badges (`Draft`, `SME review`, `Approved by SME`, `Legal review`, `Approved by Legal`, `Final approved`, `Rejected`)<br>• Question search and filtering<br>• Export approved answers to CSV or automated handoff to buyer form |
+| **`GET /knowledge-base`** | **Knowledge Base Library** | • Drag-and-drop multi-format file uploader (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`)<br>• 300–500 token chunking with category tagging<br>• Searchable table of indexed knowledge chunks<br>• Single-click chunk deletion synchronized across Elasticsearch and Pinecone |
+
+---
+
 ## API Reference
 
 ### 1. Hybrid Search & Answer Generation
