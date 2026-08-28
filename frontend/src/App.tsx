@@ -127,9 +127,15 @@ const demoResponse: SearchResponse = {
 };
 
 const starterQuestions = [
-  "Describe your data retention policy.",
-  "How do you approach information security?",
-  "What support is included with the platform?",
+  "Describe your data retention and automated backup rotation policy.",
+  "Explain how customer data is encrypted at rest and in transit.",
+  "List your security certifications and compliance audit standards.",
+  "What uptime SLA guarantee do you provide and what are your support hours?",
+  "What is your typical implementation timeline and customer onboarding process?",
+  "What authentication and Single Sign-On (SSO) integrations are supported?",
+  "Describe your drone battery safety, thermal runaway mitigation, and charging protocols.",
+  "What FAA waivers and Beyond Visual Line of Sight (BVLOS) authorizations are held?",
+  "What is the guaranteed latency SLA and failover mechanism for remote pilot teleoperation?",
 ];
 
 function demoAnswerFor(question: string): SearchResponse {
