@@ -1202,7 +1202,7 @@ function App() {
                         Upload Knowledge Base Files
                       </strong>
                       <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                        Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code> (300-500 token chunking & auto-categorization)
+                        Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code>
                       </p>
                     </div>
 
@@ -1274,7 +1274,7 @@ function App() {
                     <div>
                       <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
                       <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                        {kbEntries.length} record{kbEntries.length === 1 ? "" : "s"} indexed in Elasticsearch & Pinecone
+                        {kbEntries.length} record{kbEntries.length === 1 ? "" : "s"} stored in knowledge base
                       </p>
                     </div>
                   </div>
@@ -1323,22 +1323,22 @@ function App() {
                   <div className="kb-playground-input-card">
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <strong style={{ fontSize: "14px" }}>Hybrid Search & Generation Playground</strong>
+                        <strong style={{ fontSize: "14px" }}>Knowledge Retrieval & AI Answering Playground</strong>
                         <p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                          Test queries across Elasticsearch (BM25 sparse) and Pinecone (dense vector) with live RRF fusion
+                          Test questions against your knowledge base with real-time AI answer generation and source retrieval
                         </p>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--muted)" }}>
-                        <span>Top K:</span>
+                        <span>Depth:</span>
                         <select
                           value={playgroundTopK}
                           onChange={(e) => setPlaygroundTopK(Number(e.target.value))}
                           style={{ padding: "4px 8px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px" }}
                         >
-                          <option value={3}>3</option>
-                          <option value={5}>5</option>
-                          <option value={8}>8</option>
-                          <option value={10}>10</option>
+                          <option value={3}>Top 3</option>
+                          <option value={5}>Top 5</option>
+                          <option value={8}>Top 8</option>
+                          <option value={10}>Top 10</option>
                         </select>
                       </div>
                     </div>
@@ -1431,10 +1431,10 @@ function App() {
                                 </span>
                                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                                   <span className="kb-source-method">
-                                    {(src as any).source_type || "hybrid"}
+                                    Source #{idx + 1}
                                   </span>
                                   <span className="kb-source-score">
-                                    RRF: {(src.score || 0).toFixed(4)}
+                                    Match Score: {(src.score || 0).toFixed(4)}
                                   </span>
                                 </div>
                               </div>
@@ -1454,9 +1454,9 @@ function App() {
                   {!playgroundResult && !playgroundLoading && (
                     <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", background: "#fff", border: "1px solid var(--line)" }}>
                       <Zap size={28} color="var(--blue)" style={{ marginBottom: "8px" }} />
-                      <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>Test Hybrid Retrieval & AI Answering</div>
+                      <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>Test Knowledge Base Answering</div>
                       <p style={{ margin: "4px auto 0", maxWidth: "450px", fontSize: "12px" }}>
-                        Click any starter question above or type a custom inquiry to inspect how Elasticsearch (BM25) and Pinecone (Dense Vectors) retrieve and formulate answers.
+                        Click any starter question above or type a custom inquiry to test answer retrieval and citations.
                       </p>
                     </div>
                   )}
