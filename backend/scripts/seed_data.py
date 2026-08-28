@@ -61,57 +61,72 @@ async def main() -> None:
 
     logger.info("Total chunks extracted across all sample documents: %d", len(all_chunks))
 
-    # 3. Index into Elasticsearch
-    logger.info("Indexing chunks into Elasticsearch index '%s'...", settings.elasticsearch_index)
-    es_indexed_count = 0
+    # 3. Batch Index into Elasticsearch / Elastic Cloud
+    logger.info("Indexing %d chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
+    es_docs = []
+    doc_ids = []
+    embed_prompts = []
+
+    for chunk in all_chunks:
+        doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+        doc_ids.append(doc_id)
+        embed_prompts.append(f"Topic: {chunk.question}\n{chunk.answer}")
+        es_docs.append({
+            "id": doc_id,
+            "tenant_id": chunk.tenant_id,
+            "question": chunk.question,
+            "answer": chunk.answer,
+            "category": chunk.category or "",
+            "metadata": chunk.metadata or {},
+        })
+
     try:
         await es_service.ensure_index_exists()
-        for chunk in all_chunks:
-            doc_id = f"kb-{uuid.uuid4().hex[:8]}"
-            success = await es_service.index_document(
-                doc_id=doc_id,
-                tenant_id=chunk.tenant_id,
-                question=chunk.question,
-                answer=chunk.answer,
-                category=chunk.category,
-                metadata=chunk.metadata,
-            )
-            if success:
-                es_indexed_count += 1
-        logger.info("✓ Elasticsearch indexing completed: %d documents indexed.", es_indexed_count)
+        indexed_count = await es_service.bulk_index_documents(es_docs)
+        if indexed_count > 0:
+            logger.info("✓ Elasticsearch bulk indexing completed: %d documents indexed.", indexed_count)
+        else:
+            logger.warning("Elasticsearch bulk indexing returned 0 documents indexed.")
     except Exception as exc:
         logger.error("✗ Failed to index in Elasticsearch: %s", exc)
     finally:
         await es_service.close()
 
-    # 4. Upsert into Pinecone
-    if pinecone_service.is_configured():
-        logger.info("Vectorizing and upserting chunks into Pinecone...")
-        pinecone_count = 0
+    # 4. Batch Embed & Bulk Upsert into Pinecone Serverless
+    if pinecone_service.is_configured() and settings.openai_api_key:
+        logger.info("Vectorizing and bulk-upserting %d chunks into Pinecone...", len(all_chunks))
         try:
-            for chunk in all_chunks:
-                doc_id = f"kb-{uuid.uuid4().hex[:8]}"
-                embed_text = f"Topic: {chunk.question}\n{chunk.answer}"
-                embedding = await hybrid_search.generate_embedding(embed_text)
-                if embedding:
-                    await pinecone_service.upsert_vector(
-                        doc_id=doc_id,
-                        vector=embedding,
-                        metadata={
+            await pinecone_service.ensure_index_exists()
+            embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
+            pc_vectors = []
+            for i, chunk in enumerate(all_chunks):
+                emb = embeddings[i] if i < len(embeddings) else None
+                if emb:
+                    pc_vectors.append({
+                        "id": doc_ids[i],
+                        "values": emb,
+                        "metadata": {
                             "tenant_id": chunk.tenant_id,
-                            "doc_id": doc_id,
+                            "doc_id": doc_ids[i],
                             "question": chunk.question,
                             "answer": chunk.answer[:1000],
                             "category": chunk.category or "",
                             "source_file": chunk.metadata.get("source_file", "sample_doc") if chunk.metadata else "sample_doc",
+                            "page_number": chunk.metadata.get("page_number", 1) if chunk.metadata else 1,
                         },
-                    )
-                    pinecone_count += 1
-            logger.info("✓ Pinecone vector upsert completed: %d vectors upserted.", pinecone_count)
+                    })
+            if pc_vectors:
+                upserted = await pinecone_service.bulk_upsert_vectors(pc_vectors)
+                logger.info("✓ Pinecone bulk vector upsert completed: %d vectors upserted.", upserted)
+            else:
+                logger.warning("No embeddings generated for Pinecone upsert.")
         except Exception as exc:
             logger.error("✗ Failed to upsert to Pinecone: %s", exc)
     else:
-        logger.info("ℹ Pinecone unconfigured or in offline mode, skipped vector upsert.")
+        if not pinecone_service.is_configured():
+            logger.info("ℹ Pinecone unconfigured (PINECONE_API_KEY is not set), skipping vector upsert.")
+        elif not settings.openai_api_key:
+            logger.info("ℹ OpenAI API Key is not set, skipping Pinecone vector generation.")
 
     logger.info("Knowledge base seeding process successfully finished.")
 

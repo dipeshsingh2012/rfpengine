@@ -8,6 +8,7 @@
     "test": "cd backend && ./.venv/bin/pytest tests -v",
     "test:db": "cd backend && ./.venv/bin/pytest tests/test_postgres_connection.py -v",
     "test:cloud": "cd backend && ./.venv/bin/python scripts/verify_cloud_connections.py",
+    "seed": "cd backend && ./.venv/bin/python scripts/seed_data.py",
     "secrets:audit": "cd backend && ./.venv/bin/python scripts/gcp_secrets_sync.py",
     "secrets:sync": "cd backend && ./.venv/bin/python scripts/gcp_secrets_sync.py --sync",
     "db:migrate": "cd backend && python3 -m alembic upgrade head",
