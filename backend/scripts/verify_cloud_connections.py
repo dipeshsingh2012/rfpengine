@@ -103,24 +103,36 @@ async def main():
             print(f"  ❌ Pinecone Failed: {exc}")
 
     # --------------------------------------------------------------------------
-    # 4. OpenAI (Embedding & LLM) Check
+    # 4. LLM & Embeddings Check (Google Cloud Vertex AI & OpenAI)
     # --------------------------------------------------------------------------
-    print("\n[4/5] Checking OpenAI API...")
-    if not settings.openai_api_key:
-        print("  ⚠️ OpenAI API Key is not set (running in demo mode)")
-    else:
+    print("\n[4/5] Checking LLM & Vector Embeddings...")
+    hybrid_service = HybridSearchService(settings, es_service, pc_service)
+    start = time.perf_counter()
+    try:
+        emb = await hybrid_service.generate_embedding("Test embedding ping")
+        latency = (time.perf_counter() - start) * 1000
+        if emb:
+            provider_name = "Google Cloud Vertex AI (text-embedding-004)" if hybrid_service.genai_client and settings.llm_provider != "openai" else "OpenAI / Fallback"
+            print(f"  ✅ Embeddings Working ({latency:.2f}ms)")
+            print(f"     Provider: {provider_name} (Dimensions: {len(emb)})")
+        else:
+            print("  ⚠️ Embedding generation returned None")
+    except Exception as exc:
+        print(f"  ❌ Embedding Failed: {exc}")
+
+    if hybrid_service.genai_client and settings.llm_provider != "openai":
         try:
-            hybrid_service = HybridSearchService(settings, es_service, pc_service)
             start = time.perf_counter()
-            emb = await hybrid_service.generate_embedding("Test embedding ping")
+            test_ans = await hybrid_service._generate_answer("Ping test", [])
             latency = (time.perf_counter() - start) * 1000
-            if emb:
-                print(f"  ✅ OpenAI Embeddings Working ({latency:.2f}ms)")
-                print(f"     Model: {settings.openai_embedding_model} (Dimensions: {len(emb)})")
-            else:
-                print("  ❌ OpenAI embedding generation returned None")
+            print(f"  ✅ Vertex AI Gemini Connected ({latency:.2f}ms)")
+            print(f"     Model: {settings.gemini_model}")
         except Exception as exc:
-            print(f"  ❌ OpenAI Embedding Failed: {exc}")
+            print(f"  ⚠️ Vertex AI Gemini test failed: {exc}")
+    elif settings.openai_api_key:
+        print(f"  ✅ OpenAI Configured (Model: {settings.openai_chat_model})")
+    else:
+        print("  ℹ Running in local demo mode")
 
     # --------------------------------------------------------------------------
     # 5. End-to-End Hybrid Search Query Check

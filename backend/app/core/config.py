@@ -25,7 +25,13 @@ class Settings(BaseSettings):
     gcp_secret_prefix: str = "rfpengine-"  # Standard Terraform prefix: rfpengine-
     google_application_credentials: Optional[str] = None
 
-    # OpenAI Settings
+    # LLM & Embedding Provider Settings ("vertexai" or "openai")
+    llm_provider: str = "vertexai"
+    gemini_model: str = "gemini-2.5-flash"
+    vertex_embedding_model: str = "text-embedding-004"
+    embedding_dimension: int = 768
+
+    # OpenAI Settings (Optional fallback)
     openai_api_key: Optional[str] = None
     openai_embedding_model: str = "text-embedding-3-small"
     openai_chat_model: str = "gpt-4o"
@@ -55,7 +61,7 @@ class Settings(BaseSettings):
     pinecone_host: Optional[str] = None
     pinecone_cloud: str = "aws"
     pinecone_region: str = "us-east-1"
-    pinecone_dimension: int = 1536
+    pinecone_dimension: int = 768
     pinecone_metric: str = "cosine"
 
     # CORS Settings

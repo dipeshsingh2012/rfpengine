@@ -60,6 +60,26 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.pinecone_region
       }
 
+      env {
+        name  = "LLM_PROVIDER"
+        value = var.llm_provider
+      }
+
+      env {
+        name  = "GEMINI_MODEL"
+        value = var.gemini_model
+      }
+
+      env {
+        name  = "VERTEX_EMBEDDING_MODEL"
+        value = var.vertex_embedding_model
+      }
+
+      env {
+        name  = "EMBEDDING_DIMENSION"
+        value = tostring(var.embedding_dimension)
+      }
+
       # Direct Secret Manager Injection at Container Boot
       env {
         name = "DATABASE_URL"

@@ -92,4 +92,29 @@ variable "cors_origins" {
   default     = "http://localhost:5173,https://your-domain.com"
 }
 
+variable "llm_provider" {
+  type        = string
+  description = "Primary LLM and Embedding provider (vertexai or openai)"
+  default     = "vertexai"
+}
+
+variable "gemini_model" {
+  type        = string
+  description = "Google Cloud Vertex AI Gemini model name"
+  default     = "gemini-2.0-flash"
+}
+
+variable "vertex_embedding_model" {
+  type        = string
+  description = "Google Cloud Vertex AI embedding model"
+  default     = "text-embedding-004"
+}
+
+variable "embedding_dimension" {
+  type        = number
+  description = "Vector embedding dimensionality (768 for Vertex AI text-embedding-004, 1536 for OpenAI)"
+  default     = 768
+}
+
+
 
