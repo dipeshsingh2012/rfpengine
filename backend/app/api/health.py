@@ -92,16 +92,16 @@ async def health_check(
             details="GCP_SECRET_MANAGER_ENABLED is false (using environment variables)",
         )
 
-    # 5. OpenAI check
-    if settings.openai_api_key:
-        services["openai"] = HealthServiceStatus(
+    # 5. Vertex AI check
+    if settings.gcp_project_id:
+        services["vertex_ai"] = HealthServiceStatus(
             status="configured",
-            details=f"Embedding model: {settings.openai_embedding_model}, Chat model: {settings.openai_chat_model}",
+            details=f"Gemini Model: {settings.gemini_model}, Embeddings: {settings.vertex_embedding_model} ({settings.embedding_dimension}-dim)",
         )
     else:
-        services["openai"] = HealthServiceStatus(
+        services["vertex_ai"] = HealthServiceStatus(
             status="unconfigured",
-            details="OPENAI_API_KEY is not set (demo mode enabled)",
+            details="GCP_PROJECT_ID is not set",
         )
 
     overall_status = "ok"

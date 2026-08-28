@@ -21,7 +21,6 @@ REQUIRED_PROJECT_SECRETS = [
     ("DATABASE_URL", "PostgreSQL database connection string (Neon)"),
     ("ELASTICSEARCH_API_KEY", "Elastic Cloud API key for BM25 indexing"),
     ("PINECONE_API_KEY", "Pinecone API Key for dense vector similarity search"),
-    ("OPENAI_API_KEY", "OpenAI API Key for embeddings and GPT-4o drafting"),
 ]
 
 
@@ -67,7 +66,6 @@ async def sync_secrets(service: GCPSecretService):
         "database-url": settings.database_url,
         "elasticsearch-api-key": settings.elasticsearch_api_key,
         "pinecone-api-key": settings.pinecone_api_key,
-        "openai-api-key": settings.openai_api_key,
     }
 
     for secret_id, val in secret_values.items():
@@ -100,4 +98,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

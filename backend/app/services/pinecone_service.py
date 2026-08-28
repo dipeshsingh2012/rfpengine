@@ -33,10 +33,7 @@ class PineconeService:
             return None
         if self._index is None:
             try:
-                if self.settings.pinecone_host:
-                    self._index = self.client.Index(name=self.index_name, host=self.settings.pinecone_host)
-                else:
-                    self._index = self.client.Index(self.index_name)
+                self._index = self.client.Index(self.index_name)
             except Exception as exc:
                 logger.error("Failed to connect to Pinecone index %s: %s", self.index_name, exc)
                 return None

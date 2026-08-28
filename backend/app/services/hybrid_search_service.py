@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
-import math
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
-from openai import AsyncOpenAI
+from google import genai
+from google.oauth2 import service_account
 
 from app.core.config import Settings
 from app.models.schemas import SearchRequest, SearchResponse, Source
@@ -14,16 +14,6 @@ from app.services.elasticsearch_service import ElasticsearchService
 from app.services.pinecone_service import PineconeService
 
 logger = logging.getLogger(__name__)
-
-
-def _generate_mock_embedding(text: str, dim: int = 768) -> List[float]:
-    """
-    Generates a deterministic unit vector from text when cloud LLM is offline.
-    """
-    h = hashlib.sha256(text.encode("utf-8")).digest()
-    vec = [(h[i % len(h)] - 128) / 128.0 + math.sin(i + len(text)) for i in range(dim)]
-    norm = math.sqrt(sum(x * x for x in vec)) or 1.0
-    return [x / norm for x in vec]
 
 
 def reciprocal_rank_fusion(
@@ -73,16 +63,11 @@ class HybridSearchService:
         self.settings = settings
         self.es_service = es_service
         self.pinecone_service = pinecone_service
-        self.openai_client: Optional[AsyncOpenAI] = None
-        self.genai_client = None
+        self.genai_client: Optional[genai.Client] = None
 
-        # 1. Initialize Google Vertex AI / Gemini (Default)
+        # Initialize Google Cloud Vertex AI Client
         if settings.gcp_project_id:
             try:
-                from pathlib import Path
-                from google import genai
-                from google.oauth2 import service_account
-
                 creds_path = settings.google_application_credentials
                 credentials = None
                 if creds_path:
@@ -114,19 +99,11 @@ class HybridSearchService:
             except Exception as exc:
                 logger.warning("Could not initialize Google Vertex AI client: %s", exc)
 
-        # 2. Initialize OpenAI Client (Optional Fallback)
-        if settings.openai_api_key:
-            try:
-                self.openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
-            except Exception as exc:
-                logger.warning("Could not initialize OpenAI client: %s", exc)
-
     async def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
-        Generates a vector embedding using Vertex AI text-embedding-004 or OpenAI.
+        Generates a 768-dimensional vector embedding using Google Cloud Vertex AI text-embedding-004.
         """
-        # A. Try Vertex AI
-        if self.genai_client and self.settings.llm_provider != "openai":
+        if self.genai_client:
             try:
                 resp = await asyncio.to_thread(
                     self.genai_client.models.embed_content,
@@ -137,30 +114,16 @@ class HybridSearchService:
                     return resp.embeddings[0].values
             except Exception as exc:
                 logger.error("Vertex AI embedding generation failed: %s", exc)
-
-        # B. Try OpenAI
-        if self.openai_client:
-            try:
-                resp = await self.openai_client.embeddings.create(
-                    model=self.settings.openai_embedding_model,
-                    input=text,
-                )
-                return resp.data[0].embedding
-            except Exception as exc:
-                logger.error("OpenAI embedding generation failed: %s", exc)
-
-        # C. Deterministic Fallback
-        return _generate_mock_embedding(text, dim=self.settings.embedding_dimension)
+        return None
 
     async def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
         """
-        Generates vector embeddings for a batch of text chunks / passages.
+        Generates 768-dimensional vector embeddings for a batch of text passages using Vertex AI.
         """
         if not texts:
             return []
 
-        # A. Try Vertex AI
-        if self.genai_client and self.settings.llm_provider != "openai":
+        if self.genai_client:
             try:
                 resp = await asyncio.to_thread(
                     self.genai_client.models.embed_content,
@@ -172,20 +135,7 @@ class HybridSearchService:
             except Exception as exc:
                 logger.error("Vertex AI batched embedding failed for %d texts: %s", len(texts), exc)
 
-        # B. Try OpenAI
-        if self.openai_client:
-            try:
-                resp = await self.openai_client.embeddings.create(
-                    model=self.settings.openai_embedding_model,
-                    input=texts,
-                )
-                embeddings_by_index = {item.index: item.embedding for item in resp.data}
-                return [embeddings_by_index.get(i) for i in range(len(texts))]
-            except Exception as exc:
-                logger.error("OpenAI batched embedding generation failed for %d texts: %s", len(texts), exc)
-
-        # C. Deterministic Fallback
-        return [_generate_mock_embedding(t, dim=self.settings.embedding_dimension) for t in texts]
+        return [None for _ in texts]
 
     async def search(self, request: SearchRequest) -> SearchResponse:
         sparse_task = self.es_service.search_sparse(
@@ -234,11 +184,9 @@ class HybridSearchService:
                 )
             )
 
-        # Synthesize grounded answer with Gemini or OpenAI
+        # Synthesize grounded answer with Gemini 2.5 Flash
         suggested_answer = await self._generate_answer(request.question, sources)
         confidence = min(1.0, max((s.score for s in sources), default=0.0) * 60)
-        if not sources and self.genai_client is None and self.openai_client is None:
-            confidence = 0.84
 
         return SearchResponse(
             suggested_answer=suggested_answer,
@@ -249,7 +197,7 @@ class HybridSearchService:
     async def _generate_answer(self, question: str, sources: List[Source]) -> str:
         context_blocks = []
         for s in sources:
-            source_info = s.source_file or s.metadata.get("source_file") if s.metadata else "Knowledge Base"
+            source_info = s.source_file or (s.metadata.get("source_file") if s.metadata else "Knowledge Base")
             page_info = f", Page {s.page_number}" if s.page_number else ""
             topic_info = f"Topic: {s.title}" if s.title else ""
             header = f"--- Source Document Passage [{s.id}] ({source_info}{page_info} | {topic_info}) ---"
@@ -271,8 +219,7 @@ class HybridSearchService:
             "Synthesized RFP Answer:"
         )
 
-        # A. Try Google Cloud Vertex AI Gemini
-        if self.genai_client and self.settings.llm_provider != "openai":
+        if self.genai_client:
             try:
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
@@ -284,28 +231,6 @@ class HybridSearchService:
             except Exception as exc:
                 logger.error("Vertex AI Gemini answer generation failed: %s", exc)
 
-        # B. Try OpenAI
-        if self.openai_client:
-            try:
-                completion = await self.openai_client.chat.completions.create(
-                    model=self.settings.openai_chat_model,
-                    temperature=0.0,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are an enterprise RFP response assistant. Return only the drafted answer.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                )
-                return completion.choices[0].message.content or ""
-            except Exception as exc:
-                logger.error("OpenAI chat completion failed: %s", exc)
-
-        # C. Source Fallback
         if sources:
             return sources[0].content or sources[0].answer
-        return (
-            "Customer data is retained for the duration of the active subscription and for up to "
-            "30 days after termination. Backups are rotated on a 35-day schedule."
-        )
+        return "Information regarding this questionnaire requirement is not available in approved documentation."

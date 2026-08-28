@@ -17,23 +17,13 @@ class ElasticsearchService:
         self.index_name = settings.elasticsearch_index
 
         client_kwargs: Dict[str, Any] = {
+            "hosts": [settings.elasticsearch_url],
+            "verify_certs": settings.elasticsearch_verify_certs if not settings.elasticsearch_url.startswith("https://") else True,
             "request_timeout": 15,
         }
 
-        # 1. Host / Cloud ID configuration
-        if settings.elastic_cloud_id:
-            client_kwargs["cloud_id"] = settings.elastic_cloud_id
-            client_kwargs["verify_certs"] = True
-        else:
-            client_kwargs["hosts"] = [settings.elasticsearch_url]
-            is_https = settings.elasticsearch_url.startswith("https://")
-            client_kwargs["verify_certs"] = True if is_https else settings.elasticsearch_verify_certs
-
-        # 2. Authentication (API Key takes precedence over basic auth)
         if settings.elasticsearch_api_key:
             client_kwargs["api_key"] = settings.elasticsearch_api_key
-        elif settings.elasticsearch_username and settings.elasticsearch_password:
-            client_kwargs["basic_auth"] = (settings.elasticsearch_username, settings.elasticsearch_password)
 
         self.client = AsyncElasticsearch(**client_kwargs)
 

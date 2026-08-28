@@ -49,3 +49,4 @@ All document formats (PDF, DOCX, Markdown, TXT, CSV, JSON) are chunked into cohe
 
 ### Negative / Trade-offs
 - Answering relies on LLM inference latency at search time rather than instant static lookup. This is mitigated by using Gemini 2.5 Flash with sub-second generation times.
+

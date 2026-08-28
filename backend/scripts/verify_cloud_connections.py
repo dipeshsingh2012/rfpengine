@@ -6,8 +6,8 @@ Verifies live connections and end-to-end operations across:
 1. PostgreSQL (Neon Database)
 2. Elasticsearch (Elastic Cloud)
 3. Pinecone (Serverless Vector Index)
-4. OpenAI (Embedding & GPT-4o)
-5. Hybrid RRF Retrieval Pipeline
+4. Google Cloud Vertex AI (Gemini 2.5 Flash & text-embedding-004)
+5. Hybrid RRF Retrieval & Grounded Answer Synthesis
 """
 
 import asyncio
@@ -76,7 +76,6 @@ async def main():
         if health.get("status") == "ok":
             print(f"  ✅ Elastic Cloud Connected ({latency:.2f}ms)")
             print(f"     Cluster: {health.get('cluster_name')}, ES Version: {health.get('version')}")
-            # Check / Ensure index
             idx_ok = await es_service.ensure_index_exists()
             print(f"     Target Index ('{settings.elasticsearch_index}'): {'Ready' if idx_ok else 'Failed'}")
         else:
@@ -103,7 +102,7 @@ async def main():
             print(f"  ❌ Pinecone Failed: {exc}")
 
     # --------------------------------------------------------------------------
-    # 4. LLM & Embeddings Check (Google Cloud Vertex AI & OpenAI)
+    # 4. LLM & Embeddings Check (Google Cloud Vertex AI)
     # --------------------------------------------------------------------------
     print("\n[4/5] Checking LLM & Vector Embeddings...")
     hybrid_service = HybridSearchService(settings, es_service, pc_service)
@@ -112,15 +111,14 @@ async def main():
         emb = await hybrid_service.generate_embedding("Test embedding ping")
         latency = (time.perf_counter() - start) * 1000
         if emb:
-            provider_name = "Google Cloud Vertex AI (text-embedding-004)" if hybrid_service.genai_client and settings.llm_provider != "openai" else "OpenAI / Fallback"
             print(f"  ✅ Embeddings Working ({latency:.2f}ms)")
-            print(f"     Provider: {provider_name} (Dimensions: {len(emb)})")
+            print(f"     Provider: Google Cloud Vertex AI ({settings.vertex_embedding_model}) (Dimensions: {len(emb)})")
         else:
             print("  ⚠️ Embedding generation returned None")
     except Exception as exc:
         print(f"  ❌ Embedding Failed: {exc}")
 
-    if hybrid_service.genai_client and settings.llm_provider != "openai":
+    if hybrid_service.genai_client:
         try:
             start = time.perf_counter()
             test_ans = await hybrid_service._generate_answer("Ping test", [])
@@ -129,17 +127,14 @@ async def main():
             print(f"     Model: {settings.gemini_model}")
         except Exception as exc:
             print(f"  ⚠️ Vertex AI Gemini test failed: {exc}")
-    elif settings.openai_api_key:
-        print(f"  ✅ OpenAI Configured (Model: {settings.openai_chat_model})")
     else:
-        print("  ℹ Running in local demo mode")
+        print("  ⚠️ Vertex AI client not initialized (check GCP_PROJECT_ID & credentials)")
 
     # --------------------------------------------------------------------------
     # 5. End-to-End Hybrid Search Query Check
     # --------------------------------------------------------------------------
     print("\n[5/5] Checking Hybrid Retrieval & Answering...")
     try:
-        hybrid_service = HybridSearchService(settings, es_service, pc_service)
         test_req = SearchRequest(
             tenant_id="acme-corp",
             question="What is the encryption standard at rest?",
@@ -162,4 +157,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

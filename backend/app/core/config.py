@@ -4,7 +4,6 @@ import json
 import re
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Union
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,24 +18,18 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.env.lower() in ("prod", "production")
 
-    # Google Cloud Secret Manager Settings
+    # Google Cloud & Vertex AI Settings
     gcp_project_id: Optional[str] = None
-    gcp_secret_manager_enabled: bool = False
-    gcp_secret_prefix: str = "rfpengine-"  # Standard Terraform prefix: rfpengine-
+    gcp_secret_manager_enabled: bool = True
+    gcp_secret_prefix: str = "rfpengine-"
     google_application_credentials: Optional[str] = None
 
-    # LLM & Embedding Provider Settings ("vertexai" or "openai")
     llm_provider: str = "vertexai"
     gemini_model: str = "gemini-2.5-flash"
     vertex_embedding_model: str = "text-embedding-004"
     embedding_dimension: int = 768
 
-    # OpenAI Settings (Optional fallback)
-    openai_api_key: Optional[str] = None
-    openai_embedding_model: str = "text-embedding-3-small"
-    openai_chat_model: str = "gpt-4o"
-
-    # PostgreSQL Database Settings
+    # PostgreSQL Database Settings (Neon Cloud)
     database_url: Optional[str] = None
     postgres_user: Optional[str] = None
     postgres_password: Optional[str] = None
@@ -48,17 +41,12 @@ class Settings(BaseSettings):
     # Elasticsearch / Elastic Cloud Settings
     elasticsearch_url: str = "http://localhost:9200"
     elasticsearch_api_key: Optional[str] = None
-    elastic_cloud_id: Optional[str] = None
-    elasticsearch_username: Optional[str] = None
-    elasticsearch_password: Optional[str] = None
     elasticsearch_index: str = "rfq_knowledge_base"
-    elasticsearch_verify_certs: bool = False
+    elasticsearch_verify_certs: bool = True
 
     # Pinecone Serverless Settings
     pinecone_api_key: Optional[str] = None
     pinecone_index: str = "rfq-knowledge-base"
-    pinecone_environment: Optional[str] = None
-    pinecone_host: Optional[str] = None
     pinecone_cloud: str = "aws"
     pinecone_region: str = "us-east-1"
     pinecone_dimension: int = 768
@@ -77,9 +65,7 @@ class Settings(BaseSettings):
 
         for k, v in secrets.items():
             normalized_key = k.upper().replace("-", "_")
-            if normalized_key.endswith("OPENAI_API_KEY") or normalized_key == "OPENAI_API_KEY":
-                self.openai_api_key = v
-            elif normalized_key.endswith("DATABASE_URL") or normalized_key == "DATABASE_URL":
+            if normalized_key.endswith("DATABASE_URL") or normalized_key == "DATABASE_URL":
                 self.database_url = v
             elif normalized_key.endswith("PINECONE_API_KEY") or normalized_key == "PINECONE_API_KEY":
                 self.pinecone_api_key = v
@@ -87,12 +73,8 @@ class Settings(BaseSettings):
                 self.pinecone_index = v
             elif normalized_key.endswith("ELASTICSEARCH_API_KEY") or normalized_key == "ELASTICSEARCH_API_KEY":
                 self.elasticsearch_api_key = v
-            elif normalized_key.endswith("ELASTIC_CLOUD_ID") or normalized_key == "ELASTIC_CLOUD_ID":
-                self.elastic_cloud_id = v
             elif normalized_key.endswith("ELASTICSEARCH_URL") or normalized_key == "ELASTICSEARCH_URL":
                 self.elasticsearch_url = v
-            elif normalized_key.endswith("ELASTICSEARCH_PASSWORD") or normalized_key == "ELASTICSEARCH_PASSWORD":
-                self.elasticsearch_password = v
 
     @property
     def effective_database_url(self) -> str:
