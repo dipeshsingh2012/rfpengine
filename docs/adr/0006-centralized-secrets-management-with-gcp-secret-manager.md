@@ -38,3 +38,4 @@ We adopt **GCP Secret Manager** as the primary cloud secrets store:
 
 ### Negative / Trade-offs
 - Cloud deployments are tied to Google Cloud Platform IAM and Secret Manager service.
+

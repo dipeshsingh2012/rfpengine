@@ -54,3 +54,4 @@ variable "cors_origins" {
   description = "Allowed CORS origins for the frontend and extension"
   default     = "http://localhost:5173,https://your-domain.com"
 }
+

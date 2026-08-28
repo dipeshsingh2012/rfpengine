@@ -24,3 +24,4 @@ resource "google_secret_manager_secret_iam_member" "pinecone_key_access" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
+

@@ -47,3 +47,4 @@ resource "google_secret_manager_secret_version" "pinecone_api_key_val" {
   secret      = google_secret_manager_secret.pinecone_api_key.id
   secret_data = var.pinecone_api_key
 }
+

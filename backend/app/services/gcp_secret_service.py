@@ -124,3 +124,4 @@ class GCPSecretService:
         except Exception as exc:
             logger.error("Failed to add secret version for '%s': %s", full_secret_name, exc)
             return False
+

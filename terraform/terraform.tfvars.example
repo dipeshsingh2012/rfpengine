@@ -10,3 +10,4 @@ openai_api_key   = ""
 pinecone_api_key = ""
 
 cors_origins    = "http://localhost:5173,https://your-domain.com"
+
