@@ -82,6 +82,16 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 
 ---
 
+## Product & Engineering Backlog
+
+Future roadmap items and upcoming architecture enhancements are tracked in [`docs/BACKLOG.md`](docs/BACKLOG.md):
+- **LLM-Powered Background Taxonomy Classification**: Asynchronously tag document categories and regulatory frameworks (`SOC 2`, `ISO 27001`, `GDPR`, `HIPAA`) using fast LLMs (`gpt-4o-mini`).
+- **Neural Cross-Encoder Reranking**: Cohere Rerank v3 integration on top of RRF.
+- **Direct Spreadsheet & PDF Questionnaire Parser**: Ingestion of multi-tab Excel (`.xlsx`) buyer questionnaires.
+- **Grounded Hallucination Guardrails**: Automated claim verification against retrieved source citations.
+
+---
+
 ## Knowledge Base Ingestion & Chunking
 
 RFPEngine supports uploading documents directly through the React UI or the API (`POST /api/v1/knowledge-base/upload`):
