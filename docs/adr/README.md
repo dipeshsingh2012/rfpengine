@@ -12,3 +12,4 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0004](0004-decoupled-seller-workspace-and-browser-extension.md) | Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture | Accepted | 2026-08-28 |
 | [0005](0005-database-migrations-with-alembic.md) | Database Migrations with Alembic | Accepted | 2026-08-28 |
 | [0006](0006-centralized-secrets-management-with-gcp-secret-manager.md) | Centralized Secrets Management with GCP Secret Manager and Terraform | Accepted | 2026-08-28 |
+| [0007](0007-knowledge-base-chunking-and-search-index-ingestion.md) | Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy | Accepted | 2026-08-28 |

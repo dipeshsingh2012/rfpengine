@@ -1,6 +1,6 @@
 # RFPEngine
 
-**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Elasticsearch** for BM25 keyword matching and **Pinecone** for dense vector similarity), persists canonical records and review lifecycles in **PostgreSQL** (e.g. Neon), manages secrets via **GCP Secret Manager**, drafts grounded responses with OpenAI, and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
+**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Elasticsearch** for BM25 keyword matching and **Pinecone** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages secrets via **GCP Secret Manager**, drafts grounded responses with OpenAI (`gpt-4o`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
 
 ---
 
@@ -9,8 +9,14 @@
 ```mermaid
 flowchart TD
     subgraph Clients ["Clients"]
-        FE[React Seller Workspace]
+        FE[React Seller Workspace\n& Knowledge Base Manager]
         EXT[Manifest V3 Browser Extension]
+    end
+
+    subgraph IngestionPipeline ["Knowledge Ingestion & Chunking"]
+        UPLOAD["POST /api/v1/knowledge-base/upload\n(.csv, .json, .pdf, .docx, .txt, .md)"]
+        PARSER["DocumentParserService\n(300–500 Token Chunking)"]
+        UPLOAD --> PARSER
     end
 
     subgraph GCPCloudRun ["Google Cloud Run (FastAPI Backend)"]
@@ -26,29 +32,36 @@ flowchart TD
         GSM[GCP Secret Manager\n(Database URL, OpenAI & Pinecone Keys)]
     end
 
-    subgraph DataStores ["Data & AI Services"]
-        PG[(Neon PostgreSQL 16\nCanonical Store)]
-        ES[(Elasticsearch 8\nBM25 Sparse)]
-        PC[(Pinecone\nDense Vector k-NN)]
-        OAI[OpenAI\ngpt-4o & Embeddings]
+    subgraph SearchIndexes ["Search & Chunk Storage (Dual Index)"]
+        ES[(Elasticsearch 8\nBM25 Sparse Keyword Match\n+ Full Chunk Text Store)]
+        PC[(Pinecone Vector DB\n1536-dim Dense Vector k-NN\nCosine Metric + Metadata)]
+        OAI[OpenAI\ntext-embedding-3-small & gpt-4o]
     end
 
-    FE -->|HTTP / JSON| API
+    subgraph RelationalStore ["Relational Persistence (PostgreSQL)"]
+        PG[(Neon PostgreSQL 16\nWorkspaces & Question Reviews)]
+    end
+
+    FE -->|HTTP / JSON / Upload| API
     EXT -->|HTTP / JSON| API
     GSM -->|Native Injection at Boot| GCPCloudRun
+
+    PARSER -->|1. Store Full Text & BM25| ES_SVC
+    PARSER -->|2. Generate Embeddings| OAI
+    OAI -->|3. Upsert Vectors + Meta| PC_SVC
+    ES_SVC --> ES
+    PC_SVC --> PC
 
     API --> HS
     API --> PG_SVC
     
     HS -->|Generate Query Vector| OAI
-    HS -->|1. Sparse Keyword Match| ES_SVC
-    HS -->|2. Dense Vector k-NN| PC_SVC
-    ES_SVC --> ES
-    PC_SVC --> PC
+    HS -->|Sparse Keyword Match| ES_SVC
+    HS -->|Dense Vector k-NN| PC_SVC
     
     ES_SVC & PC_SVC --> RRF
-    RRF -->|3. Grounded Sources| OAI
-    OAI -->|4. Suggested Answer| HS
+    RRF -->|Grounded Sources| OAI
+    OAI -->|Suggested Answer| HS
     
     PG_SVC --> PG
 ```
@@ -65,6 +78,28 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0004: Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture](docs/adr/0004-decoupled-seller-workspace-and-browser-extension.md)
 - [ADR 0005: Database Migrations with Alembic](docs/adr/0005-database-migrations-with-alembic.md)
 - [ADR 0006: Centralized Secrets Management with GCP Secret Manager and Terraform](docs/adr/0006-centralized-secrets-management-with-gcp-secret-manager.md)
+- [ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy](docs/adr/0007-knowledge-base-chunking-and-search-index-ingestion.md)
+
+---
+
+## Knowledge Base Ingestion & Chunking
+
+RFPEngine supports uploading documents directly through the React UI or the API (`POST /api/v1/knowledge-base/upload`):
+
+| File Type | Parsing & Chunking Strategy | Target Chunk Size | Synthesized Topic Header |
+| :--- | :--- | :--- | :--- |
+| **CSV / TSV** | **Atomic Q&A Pairs** (1 row = 1 record) | 100–300 tokens | Column: `question` / `prompt` |
+| **JSON / JSONL** | **Structured Objects / Lines** | 100–300 tokens | Key: `question` / `prompt` |
+| **Markdown (`.md`)** | **Heading-Aware Hierarchy** (`#`, `##`, `###`) | 300–500 tokens | Heading text (`## Data Encryption`) |
+| **DOCX (`.docx`)** | **Document & Heading Hierarchy** | 300–500 tokens | Heading / section title |
+| **PDF (`.pdf`)** | **Page & Paragraph Sliding Window** | 300–500 tokens (~1.6k chars) | Page number + first sentence |
+| **Text (`.txt`)** | **Recursive Character Sliding Window** | 300–500 tokens (50-tok overlap) | Document title + sentence |
+
+### Embedding Specifications
+* **Model**: OpenAI `text-embedding-3-small` (1,536 dimensions)
+* **Similarity Metric**: Cosine Similarity in Pinecone
+* **Chunk Text Format**: `Topic: {section_or_question}\n{chunk_text}`
+* **Storage Separation**: Document chunks are stored directly in **Elasticsearch** (text document store + BM25) and **Pinecone** (dense vectors + citation metadata). High-volume raw chunks bypass PostgreSQL.
 
 ---
 
@@ -94,6 +129,9 @@ cp .env.example .env
 Configure your `.env` file:
 
 ```ini
+# Environment ("dev", "staging", "prod")
+ENV=dev
+
 # Neon PostgreSQL Database
 DATABASE_URL=postgresql://neondb_owner:your_password@ep-rapid-truth-aqw82ysi-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require
 
@@ -121,7 +159,7 @@ PORT=8000
 docker-compose up -d
 ```
 
-### 3. Initialize Database Migrations & Seed Baseline Data
+### 3. Initialize Database Migrations & Virtual Environment
 
 ```bash
 cd backend
@@ -131,23 +169,26 @@ pip install -r requirements.txt
 
 # Run Alembic database migrations against Neon PostgreSQL
 python3 -m alembic upgrade head
-
-# Seed standard RFP knowledge records
-python3 scripts/seed_data.py
 cd ..
 ```
 
-### Database Migrations (Alembic)
+### 4. Database & Test Commands
 
 ```bash
-# Apply pending migrations
+# Run all backend tests (Document Parser, PostgreSQL connection, Uploads)
+npm test
+
+# Run PostgreSQL connection test suite specifically
+npm run test:db
+
+# Apply pending Alembic migrations
 npm run db:migrate
 
 # Generate a new migration revision after modifying models in backend/app/models/db_models.py
 npm run db:revision -- -m "add_new_feature_table"
 ```
 
-### 4. Start the FastAPI Backend
+### 5. Start the FastAPI Backend
 
 From `backend/`:
 
@@ -161,7 +202,7 @@ Verify health status:
 curl http://localhost:8000/health
 ```
 
-### 5. Start the React Frontend Workspace
+### 6. Start the React Frontend Workspace
 
 In a new terminal:
 
@@ -171,7 +212,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173/](http://localhost:5173/).
+Open [http://localhost:5173/](http://localhost:5173/). Click **Knowledge base** in the sidebar to open the file drag-and-drop uploader.
 
 ---
 
@@ -318,31 +359,16 @@ gcloud run deploy rfpengine-api \
       "top_k": 5
     }
     ```
-  - **Response**:
-    ```json
-    {
-      "suggested_answer": "Customer data is retained for the duration of the active subscription...",
-      "confidence_score": 0.94,
-      "sources": [
-        {
-          "id": "kb-2048",
-          "question": "How long is customer data retained after account termination?",
-          "answer": "Customer data is retained for 30 days...",
-          "score": 0.0323,
-          "source_type": "elasticsearch+pinecone"
-        }
-      ]
-    }
-    ```
 
-### 2. Knowledge Base Management
-- **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List all canonical knowledge records for a tenant.
+### 2. Knowledge Base Management & Ingestion
+- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into Elasticsearch (BM25 + text storage) and Pinecone (dense vectors).
+- **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records from Elasticsearch.
 - **`GET /api/v1/knowledge-base/{id}`**: Get a specific knowledge record.
-- **`POST /api/v1/knowledge-base`**: Create a new record in PostgreSQL and automatically sync to Elasticsearch and Pinecone.
-- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records and sync.
-- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record from PostgreSQL, Elasticsearch, and Pinecone.
+- **`POST /api/v1/knowledge-base`**: Create a single record in Elasticsearch and Pinecone.
+- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records into Elasticsearch and Pinecone.
+- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record from Elasticsearch and Pinecone.
 
-### 3. Workspaces & Review Persistence
+### 3. Workspaces & Review Persistence (PostgreSQL)
 - **`POST /api/v1/workspaces`**: Save an imported questionnaire workspace and its questions to PostgreSQL.
 - **`GET /api/v1/workspaces/{id}`**: Retrieve a workspace session and its review stages.
 - **`PATCH /api/v1/workspaces/{id}/questions/{question_index}`**: Update review status, assigned role, or edited answer for a specific question.
@@ -372,14 +398,15 @@ gcloud run deploy rfpengine-api \
 │       ├── 0003-human-in-the-loop-governance-and-extension-safety.md
 │       ├── 0004-decoupled-seller-workspace-and-browser-extension.md
 │       ├── 0005-database-migrations-with-alembic.md
-│       └── 0006-centralized-secrets-management-with-gcp-secret-manager.md
+│       ├── 0006-centralized-secrets-management-with-gcp-secret-manager.md
+│       └── 0007-knowledge-base-chunking-and-search-index-ingestion.md
 ├── backend/
 │   ├── Dockerfile                  # Production container for Cloud Run
 │   ├── alembic/                    # Database migration versions
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── health.py           # /health diagnostic endpoint
-│   │   │   ├── knowledge_base.py   # /api/v1/knowledge-base CRUD & sync
+│   │   │   ├── knowledge_base.py   # /api/v1/knowledge-base CRUD & /upload
 │   │   │   ├── responses.py        # /api/v1/workspaces persistence
 │   │   │   └── search.py           # /api/v1/search hybrid RRF retrieval
 │   │   ├── core/
@@ -389,17 +416,23 @@ gcloud run deploy rfpengine-api \
 │   │   │   ├── db_models.py        # SQLAlchemy relational models
 │   │   │   └── schemas.py          # Pydantic request/response schemas
 │   │   ├── services/
-│   │   │   ├── elasticsearch_service.py # Elasticsearch BM25 sparse search
-│   │   │   ├── gcp_secret_service.py    # Google Cloud Secret Manager client
-│   │   │   ├── pinecone_service.py      # Pinecone dense vector similarity search
-│   │   │   ├── postgres_service.py      # PostgreSQL database operations
-│   │   │   └── hybrid_search_service.py # RRF fusion & OpenAI generation
+│   │   │   ├── document_parser_service.py # Multi-format parser & 300-500 token chunker
+│   │   │   ├── elasticsearch_service.py   # Elasticsearch BM25 search & text store
+│   │   │   ├── gcp_secret_service.py      # Google Cloud Secret Manager client
+│   │   │   ├── pinecone_service.py        # Pinecone dense vector similarity search
+│   │   │   ├── postgres_service.py        # PostgreSQL database operations
+│   │   │   └── hybrid_search_service.py   # RRF fusion & OpenAI generation
 │   │   └── main.py                 # FastAPI application factory and lifespan
+│   ├── tests/
+│   │   ├── conftest.py             # Pytest async session fixtures
+│   │   ├── test_document_parser.py # Document parsing & upload tests
+│   │   └── test_postgres_connection.py # Production PostgreSQL validation suite
 │   ├── scripts/
 │   │   ├── gcp_secrets_sync.py     # CLI sync to GCP Secret Manager
 │   │   ├── init_services.py        # DB schema and index setup script
 │   │   └── seed_data.py            # Sample RFP data seed script
+│   ├── pytest.ini
 │   └── requirements.txt
-├── frontend/                       # React seller workspace
+├── frontend/                       # React seller workspace & KB library modal
 └── extension/                      # Manifest V3 browser extension
 ```
