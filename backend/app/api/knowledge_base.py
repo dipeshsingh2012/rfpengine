@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import (
     APIRouter,
     File,
@@ -14,11 +14,13 @@ from fastapi import (
     UploadFile,
     status,
 )
+from sqlalchemy import delete, select
 
+from app.core.db import get_session_factory
+from app.models.db_models import KBEntry
 from app.models.schemas import (
     KBEntryCreate,
     KBEntryResponse,
-    KBEntryUpdate,
     KBBatchImportRequest,
     KBUploadResponse,
 )
@@ -36,32 +38,25 @@ async def list_knowledge_base_entries(
     offset: int = Query(default=0, ge=0),
 ) -> List[KBEntryResponse]:
     """
-    Lists indexed knowledge entries from Elasticsearch, with PostgreSQL fallback.
+    Lists indexed knowledge entries from PostgreSQL (primary System of Record),
+    falling back to Elastic Cloud if the database is unavailable.
     """
-    es_service = getattr(request.app.state, "elasticsearch", None)
-    docs = []
-    if es_service:
-        try:
-            docs = await es_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
-        except Exception as es_err:
-            logger.warning("Elasticsearch list_documents failed: %s", es_err)
+    docs: List[Dict[str, Any]] = []
 
-    if not docs:
-        try:
-            from app.core.db import get_session_factory
-            from app.models.db_models import KBEntry
-            from sqlalchemy import select
-
-            session_factory = get_session_factory()
-            async with session_factory() as session:
-                query = (
-                    select(KBEntry)
-                    .where(KBEntry.tenant_id == tenant_id)
-                    .offset(offset)
-                    .limit(limit)
-                )
-                result = await session.execute(query)
-                pg_entries = result.scalars().all()
+    # 1. Primary: PostgreSQL
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            query = (
+                select(KBEntry)
+                .where(KBEntry.tenant_id == tenant_id)
+                .order_by(KBEntry.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+            result = await session.execute(query)
+            pg_entries = result.scalars().all()
+            if pg_entries:
                 docs = [
                     {
                         "id": e.id,
@@ -72,11 +67,22 @@ async def list_knowledge_base_entries(
                         "answer": e.content or e.answer,
                         "category": e.category or "",
                         "metadata": e.metadata_json or {},
+                        "created_at": e.created_at.isoformat() if e.created_at else None,
+                        "updated_at": e.updated_at.isoformat() if e.updated_at else None,
                     }
                     for e in pg_entries
                 ]
-        except Exception as pg_err:
-            logger.warning("PostgreSQL list fallback failed: %s", pg_err)
+    except Exception as pg_err:
+        logger.warning("PostgreSQL list query failed, attempting Elasticsearch fallback: %s", pg_err)
+
+    # 2. Fallback: Elasticsearch
+    if not docs:
+        es_service = getattr(request.app.state, "elasticsearch", None)
+        if es_service:
+            try:
+                docs = await es_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
+            except Exception as es_err:
+                logger.warning("Elasticsearch list fallback failed: %s", es_err)
 
     return [
         KBEntryResponse(
@@ -88,6 +94,8 @@ async def list_knowledge_base_entries(
             answer=d.get("content") or d.get("answer", ""),
             category=d.get("category", ""),
             metadata=d.get("metadata", {}),
+            created_at=d.get("created_at"),
+            updated_at=d.get("updated_at"),
         )
         for d in docs
     ]
@@ -99,24 +107,47 @@ async def get_knowledge_base_entry(
     entry_id: str,
 ) -> KBEntryResponse:
     """
-    Retrieves an indexed knowledge entry from Elasticsearch.
+    Retrieves a knowledge entry from PostgreSQL (primary), falling back to Elasticsearch.
     """
+    # 1. Primary: PostgreSQL
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            result = await session.execute(select(KBEntry).where(KBEntry.id == entry_id))
+            entry = result.scalar_one_or_none()
+            if entry:
+                return KBEntryResponse(
+                    id=entry.id,
+                    tenant_id=entry.tenant_id,
+                    title=entry.title or entry.question,
+                    content=entry.content or entry.answer,
+                    question=entry.title or entry.question,
+                    answer=entry.content or entry.answer,
+                    category=entry.category or "",
+                    metadata=entry.metadata_json or {},
+                    created_at=entry.created_at.isoformat() if entry.created_at else None,
+                    updated_at=entry.updated_at.isoformat() if entry.updated_at else None,
+                )
+    except Exception as pg_err:
+        logger.warning("PostgreSQL get failed for %s: %s", entry_id, pg_err)
+
+    # 2. Fallback: Elasticsearch
     es_service = getattr(request.app.state, "elasticsearch", None)
-    if not es_service:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Search index unavailable")
+    if es_service:
+        doc = await es_service.get_document(entry_id)
+        if doc:
+            return KBEntryResponse(
+                id=doc["id"],
+                tenant_id=doc["tenant_id"],
+                title=doc.get("title") or doc.get("question", ""),
+                content=doc.get("content") or doc.get("answer", ""),
+                question=doc.get("title") or doc.get("question", ""),
+                answer=doc.get("content") or doc.get("answer", ""),
+                category=doc.get("category", ""),
+                metadata=doc.get("metadata", {}),
+            )
 
-    doc = await es_service.get_document(entry_id)
-    if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge entry not found")
-
-    return KBEntryResponse(
-        id=doc["id"],
-        tenant_id=doc["tenant_id"],
-        question=doc["question"],
-        answer=doc["answer"],
-        category=doc["category"],
-        metadata=doc["metadata"],
-    )
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge entry not found")
 
 
 @router.post("", response_model=KBEntryResponse, status_code=status.HTTP_201_CREATED)
@@ -125,46 +156,75 @@ async def create_knowledge_base_entry(
     payload: KBEntryCreate,
 ) -> KBEntryResponse:
     """
-    Indexes a single knowledge entry directly into Elasticsearch and Pinecone.
+    Indexes a single knowledge entry across PostgreSQL, Elastic Cloud, and Pinecone.
     """
     doc_id = payload.id or f"kb-{uuid.uuid4().hex[:8]}"
+    title = payload.title or payload.question or "Untitled Passage"
+    content = payload.content or payload.answer or ""
 
-    # 1. Index in Elasticsearch (BM25 + text storage)
+    # 1. Persist to PostgreSQL (System of Record)
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            async with session.begin():
+                entry = KBEntry(
+                    id=doc_id,
+                    tenant_id=payload.tenant_id,
+                    question=title,
+                    answer=content,
+                    category=payload.category,
+                    metadata_json=payload.metadata or {},
+                )
+                session.add(entry)
+    except Exception as pg_err:
+        logger.error("Failed to insert KBEntry in PostgreSQL: %s", pg_err)
+
+    # 2. Index in Elasticsearch (BM25 Lexical Search)
     es_service = getattr(request.app.state, "elasticsearch", None)
     if es_service:
-        await es_service.index_document(
-            doc_id=doc_id,
-            tenant_id=payload.tenant_id,
-            question=payload.question,
-            answer=payload.answer,
-            category=payload.category,
-            metadata=payload.metadata,
-        )
+        try:
+            await es_service.index_document(
+                doc_id=doc_id,
+                tenant_id=payload.tenant_id,
+                question=title,
+                answer=content,
+                category=payload.category,
+                metadata=payload.metadata or {},
+            )
+        except Exception as es_err:
+            logger.warning("Elasticsearch index_document failed for %s: %s", doc_id, es_err)
 
-    # 2. Vectorize and index in Pinecone (Semantic Vector Search)
+    # 3. Vectorize and index in Pinecone (Dense Vector Search)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     if pinecone_service and pinecone_service.is_configured() and hybrid_search:
-        embed_text = f"Topic: {payload.question}\n{payload.answer}"
-        embedding = await hybrid_search.generate_embedding(embed_text)
-        if embedding:
-            await pinecone_service.upsert_vector(
-                doc_id=doc_id,
-                vector=embedding,
-                metadata={
-                    "tenant_id": payload.tenant_id,
-                    "doc_id": doc_id,
-                    "question": payload.question,
-                    "answer": payload.answer[:1000],
-                    "category": payload.category or "",
-                },
-            )
+        try:
+            embed_text = f"Topic: {title}\n{content}"
+            embedding = await hybrid_search.generate_embedding(embed_text)
+            if embedding:
+                await pinecone_service.upsert_vector(
+                    doc_id=doc_id,
+                    vector=embedding,
+                    metadata={
+                        "tenant_id": payload.tenant_id,
+                        "doc_id": doc_id,
+                        "title": title,
+                        "content": content[:1000],
+                        "question": title,
+                        "answer": content[:1000],
+                        "category": payload.category or "",
+                    },
+                )
+        except Exception as pc_err:
+            logger.warning("Pinecone upsert_vector failed for %s: %s", doc_id, pc_err)
 
     return KBEntryResponse(
         id=doc_id,
         tenant_id=payload.tenant_id,
-        question=payload.question,
-        answer=payload.answer,
+        title=title,
+        content=content,
+        question=title,
+        answer=content,
         category=payload.category,
         metadata=payload.metadata,
     )
@@ -176,53 +236,105 @@ async def batch_import_knowledge_base(
     payload: KBBatchImportRequest,
 ) -> List[KBEntryResponse]:
     """
-    Batch indexes knowledge entries into Elasticsearch and Pinecone.
+    Batch indexes knowledge entries across PostgreSQL, Elastic Cloud, and Pinecone.
     """
     es_service = getattr(request.app.state, "elasticsearch", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
     created_responses: List[KBEntryResponse] = []
+    pg_models: List[KBEntry] = []
+    es_docs: List[Dict[str, Any]] = []
+    embed_prompts: List[str] = []
+    doc_ids: List[str] = []
 
     for entry in payload.entries:
-        doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+        doc_id = entry.id or f"kb-{uuid.uuid4().hex[:8]}"
+        doc_ids.append(doc_id)
+        title = entry.title or entry.question or "Untitled Passage"
+        content = entry.content or entry.answer or ""
 
-        if es_service:
-            await es_service.index_document(
-                doc_id=doc_id,
+        pg_models.append(
+            KBEntry(
+                id=doc_id,
                 tenant_id=payload.tenant_id,
-                question=entry.question,
-                answer=entry.answer,
+                question=title,
+                answer=content,
                 category=entry.category,
-                metadata=entry.metadata,
+                metadata_json=entry.metadata or {},
             )
+        )
 
-        if pinecone_service and pinecone_service.is_configured() and hybrid_search:
-            embed_text = f"Topic: {entry.question}\n{entry.answer}"
-            embedding = await hybrid_search.generate_embedding(embed_text)
-            if embedding:
-                await pinecone_service.upsert_vector(
-                    doc_id=doc_id,
-                    vector=embedding,
-                    metadata={
-                        "tenant_id": payload.tenant_id,
-                        "doc_id": doc_id,
-                        "question": entry.question,
-                        "answer": entry.answer[:1000],
-                        "category": entry.category or "",
-                    },
-                )
+        es_docs.append({
+            "id": doc_id,
+            "tenant_id": payload.tenant_id,
+            "title": title,
+            "content": content,
+            "question": title,
+            "answer": content,
+            "category": entry.category or "",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "metadata": entry.metadata or {},
+        })
+
+        embed_prompts.append(f"Topic: {title}\n{content}")
 
         created_responses.append(
             KBEntryResponse(
                 id=doc_id,
                 tenant_id=payload.tenant_id,
-                question=entry.question,
-                answer=entry.answer,
+                title=title,
+                content=content,
+                question=title,
+                answer=content,
                 category=entry.category,
                 metadata=entry.metadata,
             )
         )
+
+    # 1. Bulk Insert into PostgreSQL
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            async with session.begin():
+                session.add_all(pg_models)
+    except Exception as pg_err:
+        logger.error("PostgreSQL batch insert failed: %s", pg_err)
+
+    # 2. Bulk Index into Elasticsearch
+    if es_service:
+        try:
+            await es_service.bulk_index_documents(es_docs)
+        except Exception as es_err:
+            logger.warning("Elasticsearch bulk index failed: %s", es_err)
+
+    # 3. Bulk Vector Upsert into Pinecone
+    if pinecone_service and pinecone_service.is_configured() and hybrid_search:
+        try:
+            embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
+            pc_vectors: List[Dict[str, Any]] = []
+            for i, p in enumerate(payload.entries):
+                emb = embeddings[i] if i < len(embeddings) else None
+                if emb:
+                    p_title = p.title or p.question or ""
+                    p_content = p.content or p.answer or ""
+                    pc_vectors.append({
+                        "id": doc_ids[i],
+                        "values": emb,
+                        "metadata": {
+                            "tenant_id": payload.tenant_id,
+                            "doc_id": doc_ids[i],
+                            "title": p_title,
+                            "content": p_content[:1000],
+                            "question": p_title,
+                            "answer": p_content[:1000],
+                            "category": p.category or "",
+                        },
+                    })
+            if pc_vectors:
+                await pinecone_service.bulk_upsert_vectors(pc_vectors)
+        except Exception as pc_err:
+            logger.warning("Pinecone bulk vector upsert failed: %s", pc_err)
 
     return created_responses
 
@@ -235,14 +347,14 @@ async def upload_knowledge_base_file(
     category: Optional[str] = Form(default=None, description="Optional default category override"),
 ) -> KBUploadResponse:
     """
-    Parses an uploaded knowledge file, applies 300-500 token chunking, and indexes chunks
-    directly into Elasticsearch (BM25) and Pinecone (Dense Vectors) without storing chunks in PostgreSQL.
+    Parses an uploaded document, chunks it into 300-500 token passages, and synchronizes
+    all chunks across PostgreSQL (System of Record), Elastic Cloud (BM25), and Pinecone (Dense Vectors).
     """
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
 
-    # 1. Parse document into KBEntryCreate chunks (300-500 tokens)
+    # 1. Parse document into structured passages
     try:
         parsed_entries = DocumentParserService.parse_document(
             content=content,
@@ -263,50 +375,77 @@ async def upload_knowledge_base_file(
             detail="Could not extract any valid knowledge records or chunks from the uploaded file.",
         )
 
-    # 2. Index into Elasticsearch & Pinecone using batched operations
     es_service = getattr(request.app.state, "elasticsearch", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
     created_responses: List[KBEntryResponse] = []
+    pg_models: List[KBEntry] = []
     es_docs: List[Dict[str, Any]] = []
     embed_prompts: List[str] = []
     doc_ids: List[str] = []
 
-    for i, entry in enumerate(parsed_entries):
-        doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+    for entry in parsed_entries:
+        doc_id = entry.id or f"kb-{uuid.uuid4().hex[:8]}"
         doc_ids.append(doc_id)
-        embed_prompts.append(f"Topic: {entry.question}\n{entry.answer}")
+        title = entry.title or entry.question or "Untitled Passage"
+        passage_content = entry.content or entry.answer or ""
+
+        pg_models.append(
+            KBEntry(
+                id=doc_id,
+                tenant_id=entry.tenant_id,
+                question=title,
+                answer=passage_content,
+                category=entry.category,
+                metadata_json=entry.metadata or {},
+            )
+        )
 
         es_docs.append({
             "id": doc_id,
             "tenant_id": entry.tenant_id,
-            "question": entry.question,
-            "answer": entry.answer,
+            "title": title,
+            "content": passage_content,
+            "question": title,
+            "answer": passage_content,
             "category": entry.category or "",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "metadata": entry.metadata or {},
         })
 
+        embed_prompts.append(f"Topic: {title}\n{passage_content}")
+
         created_responses.append(
             KBEntryResponse(
                 id=doc_id,
                 tenant_id=entry.tenant_id,
-                question=entry.question,
-                answer=entry.answer,
+                title=title,
+                content=passage_content,
+                question=title,
+                answer=passage_content,
                 category=entry.category,
                 metadata=entry.metadata,
             )
         )
 
-    # 2a. Bulk Index into Elastic Cloud / Elasticsearch
+    # 2a. Bulk Persist to PostgreSQL (System of Record)
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            async with session.begin():
+                session.add_all(pg_models)
+    except Exception as pg_err:
+        logger.warning("PostgreSQL bulk insert failed for uploaded file '%s': %s", file.filename, pg_err)
+
+    # 2b. Bulk Index into Elastic Cloud
     if es_service:
         try:
             await es_service.bulk_index_documents(es_docs)
         except Exception as es_err:
             logger.warning("Elasticsearch bulk indexing error: %s", es_err)
 
-    # 2b. Batch Embed & Bulk Upsert into Pinecone Serverless
+    # 2c. Batch Embed & Bulk Upsert into Pinecone Serverless
     if pinecone_service and pinecone_service.is_configured() and hybrid_search:
         try:
             embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
@@ -314,14 +453,18 @@ async def upload_knowledge_base_file(
             for i, entry in enumerate(parsed_entries):
                 emb = embeddings[i] if i < len(embeddings) else None
                 if emb:
+                    p_title = entry.title or entry.question or ""
+                    p_content = entry.content or entry.answer or ""
                     pc_vectors.append({
                         "id": doc_ids[i],
                         "values": emb,
                         "metadata": {
                             "tenant_id": entry.tenant_id,
                             "doc_id": doc_ids[i],
-                            "question": entry.question,
-                            "answer": entry.answer[:1000],
+                            "title": p_title,
+                            "content": p_content[:1000],
+                            "question": p_title,
+                            "answer": p_content[:1000],
                             "category": entry.category or "",
                             "source_file": file.filename or "uploaded_file",
                             "page_number": entry.metadata.get("page_number", 1) if entry.metadata else 1,
@@ -349,12 +492,29 @@ async def delete_knowledge_base_entry(
     entry_id: str,
 ) -> None:
     """
-    Deletes an entry from Elasticsearch and Pinecone.
+    Deletes an entry across PostgreSQL, Elastic Cloud, and Pinecone.
     """
+    # 1. Delete from PostgreSQL
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            async with session.begin():
+                await session.execute(delete(KBEntry).where(KBEntry.id == entry_id))
+    except Exception as pg_err:
+        logger.warning("PostgreSQL delete failed for %s: %s", entry_id, pg_err)
+
+    # 2. Delete from Elasticsearch
     es_service = getattr(request.app.state, "elasticsearch", None)
     if es_service:
-        await es_service.delete_document(entry_id)
+        try:
+            await es_service.delete_document(entry_id)
+        except Exception as es_err:
+            logger.warning("Elasticsearch delete failed for %s: %s", entry_id, es_err)
 
+    # 3. Delete from Pinecone
     pinecone_service = getattr(request.app.state, "pinecone", None)
     if pinecone_service and pinecone_service.is_configured():
-        await pinecone_service.delete_vector(entry_id)
+        try:
+            await pinecone_service.delete_vector(entry_id)
+        except Exception as pc_err:
+            logger.warning("Pinecone delete failed for %s: %s", entry_id, pc_err)
