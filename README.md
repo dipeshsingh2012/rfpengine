@@ -198,17 +198,26 @@ python3 -m alembic upgrade head
 cd ..
 ```
 
-### 4. Database, Cloud Diagnostics & Test Commands
+### 4. Database, Seeding, Cloud Diagnostics & Secrets Tooling
 
 ```bash
+# Idempotently seed knowledge base sample docs across PostgreSQL, Elastic Cloud, and Pinecone
+npm run seed
+
+# Run live Cloud Diagnostics across PostgreSQL, Elastic Cloud, Pinecone, and Vertex AI
+npm run test:cloud
+
+# Audit GCP Secret Manager against canonical project secrets
+npm run secrets:audit
+
+# Sync local .env secrets to GCP Secret Manager
+npm run secrets:sync
+
 # Run all backend tests (Document Parser, PostgreSQL, Uploads)
 npm test
 
 # Run PostgreSQL connection and CRUD test suite specifically
 npm run test:db
-
-# Run live Cloud Diagnostics across Neon, Elastic Cloud, Pinecone, and OpenAI
-npm run test:cloud
 
 # Apply pending Alembic migrations
 npm run db:migrate
