@@ -60,3 +60,11 @@ button:disabled { cursor: wait; opacity: .7; }
 .kb-delete-btn { border: 0; background: transparent; color: #aaa; padding: 4px; cursor: pointer; border-radius: 4px; }
 .kb-delete-btn:hover { color: #d94826; background: #fdf0ed; }
 
+.kb-samples-card { background: #fff; border: 1px solid var(--line); padding: 14px 18px; border-radius: 4px; display: flex; flex-direction: column; gap: 10px; }
+.kb-samples-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+.kb-samples-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.kb-sample-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f4f6fc; border: 1px solid #c9d4f5; color: var(--navy); text-decoration: none; font-size: 11px; font-weight: 500; border-radius: 4px; transition: all .15s ease; }
+.kb-sample-pill:hover { background: #e0e7ff; border-color: var(--blue); color: var(--blue); transform: translateY(-1px); }
+.kb-sample-name { white-space: nowrap; }
+.kb-sample-badge { font-family: 'DM Mono', monospace; font-size: 9px; padding: 1px 4px; background: #fff; border: 1px solid #dcd8cf; border-radius: 2px; color: var(--muted); }
+

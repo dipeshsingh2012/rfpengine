@@ -56,6 +56,15 @@ type SourceMode = "url" | "upload" | "extension";
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
+const sampleDemoFiles = [
+  { name: "Security Whitepaper", file: "01_Security_and_Compliance_Whitepaper.md", format: "MD" },
+  { name: "SLA & Operations", file: "02_SLA_Disaster_Recovery_and_Operations.pdf", format: "PDF" },
+  { name: "Privacy & Subprocessors", file: "03_Data_Privacy_GDPR_and_Subprocessors.json", format: "JSON" },
+  { name: "Vendor Security Q&A", file: "04_Standard_Vendor_Security_Questionnaire.csv", format: "CSV" },
+  { name: "API & Integrations", file: "05_Product_Features_and_API_Integrations.docx", format: "DOCX" },
+  { name: "Code of Conduct / HR", file: "06_Employee_Code_of_Conduct_and_HR_Policies.txt", format: "TXT" },
+];
+
 const demoResponse: SearchResponse = {
   suggested_answer:
     "Acme retains customer data for the duration of the active subscription and for up to 30 days after termination to support recovery and orderly account closure. Backups are rotated on a 35-day schedule, after which data is permanently deleted unless a longer period is required by law.",
@@ -1143,6 +1152,29 @@ function App() {
                       }}
                     />
                   </label>
+                </div>
+              </div>
+
+              {/* Sample Files Download Bar for Live Demo */}
+              <div className="kb-samples-card">
+                <div className="kb-samples-header">
+                  <span className="eyebrow" style={{ color: "var(--blue)" }}>Demo Sample Knowledge Documents</span>
+                  <small style={{ color: "var(--muted)", fontSize: "11px" }}>Single-click to download sample files for live upload demonstration</small>
+                </div>
+                <div className="kb-samples-grid">
+                  {sampleDemoFiles.map((sample) => (
+                    <a
+                      key={sample.file}
+                      href={`/sample_docs/${sample.file}`}
+                      download={sample.file}
+                      className="kb-sample-pill"
+                      title={`Download ${sample.file}`}
+                    >
+                      <Download size={13} />
+                      <span className="kb-sample-name">{sample.name}</span>
+                      <span className="kb-sample-badge">{sample.format}</span>
+                    </a>
+                  ))}
                 </div>
               </div>
 
