@@ -564,9 +564,15 @@ function App() {
 
   async function openOriginalForm() {
     const baseTargetUrl = formUrl || `${window.location.origin}/mock-questionnaire.html`;
-    
+    const allQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
     const currentAnswers = { ...answersByQuestion };
-    const missing = detectedQuestions.filter((q) => !currentAnswers[q] || !currentAnswers[q].trim());
+    
+    // Ensure current question is set
+    if (question && answer && !currentAnswers[question]) {
+      currentAnswers[question] = answer;
+    }
+
+    const missing = allQuestions.filter((q) => !currentAnswers[q] || !currentAnswers[q].trim());
 
     if (missing.length > 0) {
       showToast(`Generating answers for ${missing.length} questions...`);
@@ -581,6 +587,8 @@ function App() {
             if (result.ok) {
               const data = (await result.json()) as SearchResponse;
               currentAnswers[item] = data.suggested_answer;
+            } else {
+              currentAnswers[item] = demoAnswerFor(item).suggested_answer;
             }
           } catch {
             currentAnswers[item] = demoAnswerFor(item).suggested_answer;
@@ -592,12 +600,12 @@ function App() {
     }
 
     const payloadAnswers = Object.fromEntries(
-      detectedQuestions.map((item) => [item, currentAnswers[item] || ""])
+      allQuestions.map((item) => [item, currentAnswers[item] || ""])
     );
 
     const handoff = encodeURIComponent(
       JSON.stringify({
-        questions: detectedQuestions,
+        questions: allQuestions,
         answers: payloadAnswers,
         timestamp: Date.now(),
       })
@@ -605,7 +613,7 @@ function App() {
 
     const target = `${baseTargetUrl.split("#")[0]}#rfpengine=${handoff}`;
     window.open(target, "_blank", "noopener,noreferrer");
-    showToast(`Opened original form with all ${detectedQuestions.length} answers!`);
+    showToast(`Opened original form with all ${allQuestions.length} answers!`);
   }
 
   function exportAnswers() {

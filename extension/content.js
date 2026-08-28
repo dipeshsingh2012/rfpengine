@@ -63,19 +63,20 @@ function formHandoff() {
 function getScanFields() {
   const handoff = formHandoff();
   const handoffAnswers = handoff?.answers || {};
+  const handoffQuestions = handoff?.questions || Object.keys(handoffAnswers);
 
   return [...document.querySelectorAll('textarea, input:not([type="hidden"]), [contenteditable="true"]')]
     .map((field, index) => {
       const qText = fieldQuestion(field);
       let matchedAnswer = handoffAnswers[qText] || '';
 
-      // Fuzzy match if exact match not found
+      // 1. Fuzzy match if exact match not found
       if (!matchedAnswer && Object.keys(handoffAnswers).length > 0) {
         let bestScore = 0;
         let bestAnswer = '';
         for (const [hq, ans] of Object.entries(handoffAnswers)) {
           const score = calculateSimilarity(qText, hq);
-          if (score > bestScore && score >= 0.25) {
+          if (score > bestScore && score >= 0.20) {
             bestScore = score;
             bestAnswer = ans;
           }
@@ -83,10 +84,16 @@ function getScanFields() {
         matchedAnswer = bestAnswer;
       }
 
+      // 2. Sequential positional match as fallback
+      if (!matchedAnswer && handoffQuestions && handoffQuestions[index]) {
+        const indexQuestion = handoffQuestions[index];
+        matchedAnswer = handoffAnswers[indexQuestion] || '';
+      }
+
       return {
         index,
         element: field,
-        question: qText,
+        question: qText || (handoffQuestions && handoffQuestions[index]) || `Question ${index + 1}`,
         type: field.getAttribute('contenteditable') === 'true' ? 'contenteditable' : field.type || 'textarea',
         value: field.value || field.innerText || '',
         required: field.required || field.getAttribute('aria-required') === 'true',
