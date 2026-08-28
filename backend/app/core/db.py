@@ -65,7 +65,7 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
-        normalized_url = normalize_database_url(settings.database_url)
+        normalized_url = normalize_database_url(settings.effective_database_url)
         _engine = create_async_engine(
             normalized_url,
             echo=settings.debug,

@@ -10,4 +10,4 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0002](0002-relational-persistence-with-postgresql.md) | Relational Persistence with PostgreSQL for Canonical Records and Review Tracking | Accepted | 2026-08-28 |
 | [0003](0003-human-in-the-loop-governance-and-extension-safety.md) | Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety | Accepted | 2026-08-28 |
 | [0004](0004-decoupled-seller-workspace-and-browser-extension.md) | Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture | Accepted | 2026-08-28 |
-
+| [0005](0005-database-migrations-with-alembic.md) | Database Migrations with Alembic | Accepted | 2026-08-28 |

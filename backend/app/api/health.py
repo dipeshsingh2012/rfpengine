@@ -33,7 +33,7 @@ async def health_check(
     except Exception as exc:
         services["postgresql"] = HealthServiceStatus(
             status="error",
-            details=f"PostgreSQL connection failed: {exc}",
+            details=f"PostgreSQL connection failed: {type(exc).__name__}",
         )
 
     # 2. Elasticsearch check

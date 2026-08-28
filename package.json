@@ -4,7 +4,9 @@
   "private": true,
   "description": "Seller-side RFP and questionnaire response assistant",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:migrate": "cd backend && python3 -m alembic upgrade head",
+    "db:revision": "cd backend && python3 -m alembic revision --autogenerate"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.3.0",
@@ -12,4 +14,3 @@
     "husky": "^9.0.11"
   }
 }
-

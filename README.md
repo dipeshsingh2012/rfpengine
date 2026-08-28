@@ -58,6 +58,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0002: Relational Persistence with PostgreSQL for Canonical Records and Review Tracking](docs/adr/0002-relational-persistence-with-postgresql.md)
 - [ADR 0003: Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety](docs/adr/0003-human-in-the-loop-governance-and-extension-safety.md)
 - [ADR 0004: Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture](docs/adr/0004-decoupled-seller-workspace-and-browser-extension.md)
+- [ADR 0005: Database Migrations with Alembic](docs/adr/0005-database-migrations-with-alembic.md)
 
 ---
 
@@ -129,12 +130,27 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Create PostgreSQL tables, Elasticsearch index, and Pinecone index
-python3 scripts/init_services.py
+# Run database migrations (or init tables)
+python3 -m alembic upgrade head
+# Alternatively: python3 scripts/init_services.py
 
 # Seed sample approved RFP response records (security, data retention, SLAs, SOC 2)
 python3 scripts/seed_data.py
 cd ..
+```
+
+### Database Migrations (Alembic)
+
+To manage database schema changes over time:
+
+```bash
+# Apply pending migrations
+npm run db:migrate
+# or: cd backend && python3 -m alembic upgrade head
+
+# Generate a new migration after modifying models in backend/app/models/db_models.py
+npm run db:revision -- -m "add_new_feature_table"
+# or: cd backend && python3 -m alembic revision --autogenerate -m "add_new_feature_table"
 ```
 
 ### 4. Start the FastAPI Backend

@@ -1,7 +1,16 @@
+# Environments
+.env
+.env.*
+!.env.example
+
+# Python
 .venv/
-node_modules/
-dist/
 __pycache__/
 *.py[cod]
-.env
 .pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.DS_Store
