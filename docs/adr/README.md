@@ -15,4 +15,5 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0007](0007-knowledge-base-chunking-and-search-index-ingestion.md) | Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy | Accepted | 2026-08-28 |
 | [0008](0008-native-gcp-vertex-ai-gemini-and-embeddings.md) | Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference | Accepted | 2026-08-28 |
 | [0009](0009-passage-based-document-ingestion-and-llm-reasoning.md) | Passage-Based Document Ingestion and LLM Question-Answering Reasoning | Accepted | 2026-08-28 |
+| [0010](0010-multi-environment-isolation-and-production-secret-propagation.md) | Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation | Accepted | 2026-08-28 |
 

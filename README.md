@@ -81,6 +81,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy](docs/adr/0007-knowledge-base-chunking-and-search-index-ingestion.md)
 - [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
 - [ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning](docs/adr/0009-passage-based-document-ingestion-and-llm-reasoning.md)
+- [ADR 0010: Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation](docs/adr/0010-multi-environment-isolation-and-production-secret-propagation.md)
 
 ---
 
@@ -408,10 +409,31 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
 | Route Path | Page / View Name | Primary Features & User Workflows |
 | :--- | :--- | :--- |
 | **`GET /`** | **Overview & Importer** | • Import buyer questionnaires via URL or file upload (`.csv`, `.json`, `.pdf`, `.docx`)<br>• Quick-start with pre-configured starter questions<br>• Summary dashboard of recent RFP projects |
-| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gpt-4o`)<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
+| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gemini-2.5-flash`)<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
 | **`GET /review/:id`** | **Question Review & Governance** | • Multi-question review queue with role switcher (`Proposal manager`, `Security SME`, `Legal reviewer`, `Final approver`)<br>• Approval state machine badges (`Draft`, `SME review`, `Approved by SME`, `Legal review`, `Approved by Legal`, `Final approved`, `Rejected`)<br>• Question search and filtering<br>• Export approved answers to CSV or automated handoff to buyer form |
 | **`GET /knowledge-base`** | **Knowledge Base Ingestion** | • Drag-and-drop multi-format file uploader (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`)<br>• 300–500 token chunking with automatic taxonomy categorization<br>• Single-click demo sample downloads (`/sample_docs/`)<br>• Clean table of indexed knowledge chunks with single-click deletion |
-| **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection and hit breakdown<br>• Live AI answer generation (`gpt-4o`) with radial confidence scoring<br>• Quick-click sample test questions for live demonstrations |
+| **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection and hit breakdown<br>• Live AI answer generation (`gemini-2.5-flash`) with radial confidence scoring<br>• Quick-click sample test questions for live demonstrations |
+
+---
+
+## Multi-Environment Isolation & Secret Propagation
+
+RFPEngine enforces strict isolation between **Local Development** and **Cloud Production**:
+
+### 1. Vector Database Namespacing
+- **Pinecone Serverless**: Partitioned into environment namespaces (`namespace: "local"` vs `namespace: "prod"`).
+- Automated tests and local developer uploads write to the `local` namespace, ensuring production vectors remain pristine.
+
+### 2. Secret Propagation Pipeline
+- **Zero-Secret Docker Images**: `.env` and `.env.local` are excluded from Docker builds via `.dockerignore`.
+- **GCP Secret Manager**: Single source of truth for production secrets (`DATABASE_URL`, `ELASTICSEARCH_API_KEY`, `PINECONE_API_KEY`).
+- **Cloud Run Boot Injection**: Secrets are mounted directly into container memory via Terraform `secret_key_ref` definitions.
+- **CLI Sync Tool**: Run `npm run secrets:sync` to push updated keys from local `.env` to GCP Secret Manager.
+
+### 3. Production Regional Endpoint
+- **Cloud Run API**: `https://rfpengine-api-714049712844.us-central1.run.app`
+- **Swagger Documentation**: `https://rfpengine-api-714049712844.us-central1.run.app/docs`
+- **CORS Allowed Origins**: `http://localhost:5173`, `http://localhost:3000`, `https://www.rfpengine.net`, `https://rfpengine.net`, and Chrome Extensions (`chrome-extension://*`).
 
 ---
 
@@ -421,7 +443,7 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
 - **`POST /api/v1/search`**
   - Concurrently queries Elasticsearch (BM25) and Pinecone (dense vector k-NN).
   - Merges hits with Reciprocal Rank Fusion (RRF).
-  - Drafts grounded answer with OpenAI `gpt-4o`.
+  - Drafts grounded answer with Google Cloud Vertex AI `gemini-2.5-flash`.
   - **Request Body**:
     ```json
     {
@@ -432,12 +454,12 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
     ```
 
 ### 2. Knowledge Base Management & Ingestion
-- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into Elasticsearch (BM25 + text storage) and Pinecone (dense vectors).
-- **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records from Elasticsearch.
+- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into PostgreSQL (System of Record), Elasticsearch (BM25 + text storage), and Pinecone (dense vectors).
+- **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records from PostgreSQL with pagination.
 - **`GET /api/v1/knowledge-base/{id}`**: Get a specific knowledge record.
-- **`POST /api/v1/knowledge-base`**: Create a single record in Elasticsearch and Pinecone.
-- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records into Elasticsearch and Pinecone.
-- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record from Elasticsearch and Pinecone.
+- **`POST /api/v1/knowledge-base`**: Create a single record across PostgreSQL, Elasticsearch, and Pinecone.
+- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records across PostgreSQL, Elasticsearch, and Pinecone.
+- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record synchronously from PostgreSQL, Elasticsearch, and Pinecone.
 
 ### 3. Workspaces & Review Persistence (PostgreSQL)
 - **`POST /api/v1/workspaces`**: Save an imported questionnaire workspace and its questions to PostgreSQL.
@@ -445,7 +467,7 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
 - **`PATCH /api/v1/workspaces/{id}/questions/{question_index}`**: Update review status, assigned role, or edited answer for a specific question.
 
 ### 4. Health & Diagnostics
-- **`GET /health`**: Returns real-time connection status and latency metrics for PostgreSQL, Elasticsearch, Pinecone, GCP Secret Manager, and OpenAI.
+- **`GET /health`** / **`GET /api/health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Elasticsearch (Elastic Cloud 9.5.2), Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
 
 ---
 
