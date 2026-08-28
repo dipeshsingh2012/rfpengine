@@ -35,15 +35,22 @@ We establish a dedicated **multi-format ingestion pipeline** and a **search-inde
      embedding_payload = f"Topic: {section_or_question}\n{chunk_text}"
      ```
 
-3. **Search-Index-Only Ingestion**:
+3. **Automatic Category Inference**:
+   - The ingestion parser automatically infers enterprise taxonomy categories (`Security & Cryptography`, `Compliance & Security`, `SLA & Operations`, `Privacy & Legal`, `Product & Integrations`, `HR & Corporate Policies`) based on filename and section heading signals, eliminating manual input friction on upload.
+   - Paved path for an asynchronous background LLM worker (`gpt-4o-mini`) to perform fine-grained zero-shot classification and compliance tag enrichment.
+
+4. **Search-Index-Only Ingestion & Retrieval Playground**:
    - Ingested document chunks are indexed directly into **Elasticsearch** (BM25 inverted index + full document text in `_source`) and **Pinecone** (dense vectors + citation metadata).
    - **PostgreSQL Bypassed for Chunks**: PostgreSQL does not store raw chunk records and is reserved strictly for operational relational entities (`response_workspaces`, `question_reviews`, approval state machines).
-   - Knowledge Base library management (list, preview, delete) interacts directly with Elasticsearch and Pinecone.
+   - **Retrieval Playground (`/playground`)**: A dedicated testing interface allowing sellers and engineers to run ad-hoc queries, inspect Elasticsearch (BM25) vs Pinecone (dense vector) matches, observe RRF fusion scores, and review `gpt-4o` answer generation with confidence metrics.
+   - **Demo Sample Documents (`/sample_docs/`)**: Multi-format test documents (`.md`, `.pdf`, `.json`, `.csv`, `.docx`, `.txt`) are bundled in the web app's `public/` directory for instant single-click demo downloads on any machine.
 
 ## Consequences
 
 ### Positive
 - **Optimal Retrieval Precision**: 300–500 token chunks prevent vector dilution while giving `gpt-4o` enough context for complete answers.
+- **Zero-Friction Ingestion**: Sellers simply drop files into the UI without needing to configure or tag categories manually.
+- **Real-Time Retrieval Transparency**: The Playground enables immediate inspection of retrieval scoring and source passage ranking.
 - **Lean PostgreSQL Database**: Relational storage remains lean and unburdened by high-volume chunked document text.
 - **Rich Citation Lineage**: Every vector in Pinecone and document in Elasticsearch retains `source_file`, `page_number`, `section_title`, and `chunk_index` for granular citations in generated responses.
 - **Instant Keyword & Semantic Dual-Hydration**: Elasticsearch serves document text directly from its `_source` store with zero database round-trips.
