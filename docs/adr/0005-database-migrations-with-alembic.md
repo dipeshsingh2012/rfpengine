@@ -33,3 +33,4 @@ We adopt **Alembic** for managing asynchronous database migrations:
 
 ### Negative / Trade-offs
 - Developers must generate and commit migration revisions whenever modifying SQLAlchemy models in `db_models.py`.
+
