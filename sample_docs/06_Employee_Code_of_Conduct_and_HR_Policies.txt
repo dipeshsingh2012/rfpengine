@@ -1,0 +1,13 @@
+Acme Employee Code of Conduct and Information Security Responsibilities
+
+1. Confidentiality and NDA Obligations
+All employees, contractors, and temporary personnel are required to sign a comprehensive Non-Disclosure Agreement (NDA) prior to receiving access to any corporate systems. Confidential customer information, source code, and security architecture diagrams may never be transferred to personal devices or unauthorized external storage.
+
+2. Clean Desk and Clear Screen Policy
+Workstations must be locked automatically after 5 minutes of inactivity. Physical documents containing customer information or sensitive financial details must be securely shredded when no longer required and locked in cabinets outside business hours.
+
+3. Acceptable Use of AI Technologies
+Employees may only use approved enterprise AI tools that offer contractual zero-data-retention guarantees. Pasting customer Personally Identifiable Information (PII), proprietary source code, or unredacted contract terms into public unapproved AI platforms is strictly prohibited and subject to immediate disciplinary action.
+
+4. Device Security and Mobile Device Management (MDM)
+All company-owned laptops and mobile devices are enrolled in automated MDM (Jamf / Microsoft Intune) enforcing Full Disk Encryption (FileVault / BitLocker), remote wipe capability, endpoint detection and response (CrowdStrike Falcon), and daily operating system security patch enforcement.

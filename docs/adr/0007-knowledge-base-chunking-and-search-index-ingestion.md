@@ -50,3 +50,4 @@ We establish a dedicated **multi-format ingestion pipeline** and a **search-inde
 
 ### Negative / Trade-offs
 - Re-indexing entire knowledge bases requires re-uploading source documents or exporting raw documents directly from Elasticsearch.
+

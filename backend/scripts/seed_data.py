@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import uuid
 from pathlib import Path
 
 # Add backend directory to sys.path
@@ -10,74 +11,24 @@ backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from app.core.config import get_settings
-from app.core.db import get_session_factory
-from app.models.schemas import KBEntryBase
+from app.services.document_parser_service import DocumentParserService
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
-from app.services.postgres_service import PostgresService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("seed_data")
-
-SEED_ENTRIES = [
-    KBEntryBase(
-        question="Describe your data retention and deletion policy.",
-        answer=(
-            "Acme retains customer data for the duration of the active subscription and for up to 30 days "
-            "after termination to support recovery and orderly account closure. Backups are rotated on a 35-day schedule, "
-            "after which data is permanently deleted unless a longer period is required by law."
-        ),
-        category="Privacy & Retention",
-        metadata={"owner": "legal", "confidence": 0.98},
-    ),
-    KBEntryBase(
-        question="What encryption standards and key management practices do you use?",
-        answer=(
-            "Customer data is encrypted in transit using TLS 1.2 or higher and at rest using AES-256 encryption. "
-            "Cryptographic keys are managed through an automated key management service with annual key rotation."
-        ),
-        category="Security",
-        metadata={"owner": "security", "confidence": 0.99},
-    ),
-    KBEntryBase(
-        question="What security certifications and compliance audits do you maintain?",
-        answer=(
-            "Our security program complies with SOC 2 Type II and ISO 27001 standards. Third-party audit reports "
-            "and penetration test summaries are available upon request under mutual NDA."
-        ),
-        category="Compliance",
-        metadata={"owner": "compliance", "confidence": 0.95},
-    ),
-    KBEntryBase(
-        question="What is your standard implementation timeline and onboarding process?",
-        answer=(
-            "A standard implementation typically takes 4 to 8 weeks, depending on data migration complexity "
-            "and single sign-on integrations. A dedicated implementation manager is assigned to coordinate kickoff, "
-            "testing, and go-live."
-        ),
-        category="Implementation",
-        metadata={"owner": "product", "confidence": 0.92},
-    ),
-    KBEntryBase(
-        question="What technical support and SLA tiers are included with the platform?",
-        answer=(
-            "Standard subscriptions include 24x5 email and help-center support with a 4-hour critical issue SLA. "
-            "Enterprise tier adds 24x7 phone support, dedicated Slack channels, and a 1-hour critical response SLA."
-        ),
-        category="Support",
-        metadata={"owner": "support", "confidence": 0.94},
-    ),
-]
 
 
 async def main() -> None:
     settings = get_settings()
     tenant_id = "acme-corp"
-    logger.info("Starting seed data insertion for tenant '%s'...", tenant_id)
+    project_root = backend_dir.parent
+    sample_docs_dir = project_root / "sample_docs"
+
+    logger.info("Starting knowledge base ingestion from '%s' for tenant '%s'...", sample_docs_dir, tenant_id)
 
     # 1. Initialize services
-    session_factory = get_session_factory()
     es_service = ElasticsearchService(settings)
     pinecone_service = PineconeService(settings)
     hybrid_search = HybridSearchService(
@@ -86,31 +37,48 @@ async def main() -> None:
         pinecone_service=pinecone_service,
     )
 
-    # 2. Insert into PostgreSQL
-    logger.info("Seeding %d entries into PostgreSQL...", len(SEED_ENTRIES))
-    created_entries = []
-    try:
-        async with session_factory() as session:
-            created_entries = await PostgresService.create_batch_kb_entries(
-                session, tenant_id=tenant_id, entries=SEED_ENTRIES
+    # 2. Parse all sample documents
+    doc_files = sorted(list(sample_docs_dir.glob("*.*")))
+    if not doc_files:
+        logger.warning("No sample documents found in '%s'", sample_docs_dir)
+        return
+
+    all_chunks = []
+    for file_path in doc_files:
+        if file_path.name.startswith("."):
+            continue
+        try:
+            content = file_path.read_bytes()
+            chunks = DocumentParserService.parse_document(
+                content=content,
+                filename=file_path.name,
+                tenant_id=tenant_id,
             )
-        logger.info("✓ Inserted %d entries into PostgreSQL.", len(created_entries))
-    except Exception as exc:
-        logger.error("✗ Failed to insert entries into PostgreSQL: %s", exc)
+            logger.info("📄 Parsed %d chunks from %s", len(chunks), file_path.name)
+            all_chunks.extend(chunks)
+        except Exception as exc:
+            logger.error("Failed to parse %s: %s", file_path.name, exc)
+
+    logger.info("Total chunks extracted across all sample documents: %d", len(all_chunks))
 
     # 3. Index into Elasticsearch
-    logger.info("Indexing entries into Elasticsearch...")
+    logger.info("Indexing chunks into Elasticsearch index '%s'...", settings.elasticsearch_index)
+    es_indexed_count = 0
     try:
-        for entry in created_entries:
-            await es_service.index_document(
-                doc_id=entry.id,
-                tenant_id=entry.tenant_id,
-                question=entry.question,
-                answer=entry.answer,
-                category=entry.category,
-                metadata=entry.metadata_json,
+        await es_service.ensure_index_exists()
+        for chunk in all_chunks:
+            doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+            success = await es_service.index_document(
+                doc_id=doc_id,
+                tenant_id=chunk.tenant_id,
+                question=chunk.question,
+                answer=chunk.answer,
+                category=chunk.category,
+                metadata=chunk.metadata,
             )
-        logger.info("✓ Elasticsearch indexing completed.")
+            if success:
+                es_indexed_count += 1
+        logger.info("✓ Elasticsearch indexing completed: %d documents indexed.", es_indexed_count)
     except Exception as exc:
         logger.error("✗ Failed to index in Elasticsearch: %s", exc)
     finally:
@@ -118,31 +86,35 @@ async def main() -> None:
 
     # 4. Upsert into Pinecone
     if pinecone_service.is_configured():
-        logger.info("Vectorizing and upserting entries into Pinecone...")
+        logger.info("Vectorizing and upserting chunks into Pinecone...")
+        pinecone_count = 0
         try:
-            for entry in created_entries:
-                embedding = await hybrid_search.generate_embedding(entry.question)
+            for chunk in all_chunks:
+                doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+                embed_text = f"Topic: {chunk.question}\n{chunk.answer}"
+                embedding = await hybrid_search.generate_embedding(embed_text)
                 if embedding:
                     await pinecone_service.upsert_vector(
-                        doc_id=entry.id,
+                        doc_id=doc_id,
                         vector=embedding,
                         metadata={
-                            "tenant_id": entry.tenant_id,
-                            "doc_id": entry.id,
-                            "question": entry.question,
-                            "answer": entry.answer,
-                            "category": entry.category or "",
+                            "tenant_id": chunk.tenant_id,
+                            "doc_id": doc_id,
+                            "question": chunk.question,
+                            "answer": chunk.answer[:1000],
+                            "category": chunk.category or "",
+                            "source_file": chunk.metadata.get("source_file", "sample_doc") if chunk.metadata else "sample_doc",
                         },
                     )
-            logger.info("✓ Pinecone vector upsert completed.")
+                    pinecone_count += 1
+            logger.info("✓ Pinecone vector upsert completed: %d vectors upserted.", pinecone_count)
         except Exception as exc:
             logger.error("✗ Failed to upsert to Pinecone: %s", exc)
     else:
-        logger.info("ℹ Pinecone unconfigured, skipped vector upsert.")
+        logger.info("ℹ Pinecone unconfigured or in offline mode, skipped vector upsert.")
 
-    logger.info("Seed process completed.")
+    logger.info("Knowledge base seeding process successfully finished.")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
