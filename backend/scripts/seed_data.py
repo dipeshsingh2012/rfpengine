@@ -74,40 +74,80 @@ async def main() -> None:
 
     logger.info("Total chunks extracted across all sample documents: %d", len(all_chunks))
 
-    # Generate IDs and embedding prompts for chunks
+    import hashlib
+
+    # Generate deterministic IDs and embedding prompts for chunks
     doc_ids = []
     embed_prompts = []
     for chunk in all_chunks:
-        doc_id = f"kb-{uuid.uuid4().hex[:8]}"
+        raw_key = f"{chunk.tenant_id}::{chunk.question}::{chunk.answer}"
+        doc_id = f"kb-{hashlib.sha256(raw_key.encode('utf-8')).hexdigest()[:12]}"
         doc_ids.append(doc_id)
         embed_prompts.append(f"Topic: {chunk.question}\n{chunk.answer}")
 
-    # 3. Elasticsearch Indexing (Temporarily commented out)
-    # logger.info("Indexing %d chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
-    # es_docs = [
-    #     {
-    #         "id": doc_ids[i],
-    #         "tenant_id": chunk.tenant_id,
-    #         "question": chunk.question,
-    #         "answer": chunk.answer,
-    #         "category": chunk.category or "",
-    #         "metadata": chunk.metadata or {},
-    #     }
-    #     for i, chunk in enumerate(all_chunks)
-    # ]
-    # try:
-    #     await es_service.ensure_index_exists()
-    #     await es_service.bulk_index_documents(es_docs)
-    # except Exception as exc:
-    #     logger.warning("Elasticsearch indexing skipped: %s", exc)
-    # finally:
-    #     await es_service.close()
+    # 3. PostgreSQL Database Sync (kb_entries)
+    try:
+        from app.core.db import get_session_factory
+        from app.models.db_models import KBEntry
+        from sqlalchemy import delete
+        
+        logger.info("Syncing %d chunks into PostgreSQL 'kb_entries' for tenant '%s'...", len(all_chunks), tenant_id)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            # Clear existing seed chunks for this tenant to keep in sync
+            await session.execute(delete(KBEntry).where(KBEntry.tenant_id == tenant_id))
+            for i, chunk in enumerate(all_chunks):
+                db_entry = KBEntry(
+                    id=doc_ids[i],
+                    tenant_id=chunk.tenant_id,
+                    question=chunk.question,
+                    answer=chunk.answer,
+                    category=chunk.category or "General",
+                    metadata_json=chunk.metadata or {},
+                )
+                session.add(db_entry)
+            await session.commit()
+            logger.info("✓ PostgreSQL sync completed: %d kb_entries synced.", len(all_chunks))
+    except Exception as exc:
+        logger.warning("PostgreSQL sync skipped or encountered error: %s", exc)
 
-    # 4. Batch Embed & Bulk Upsert into Pinecone Serverless
+    # 4. Batch Index into Elasticsearch / Elastic Cloud
+    logger.info("Indexing %d chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
+    es_docs = [
+        {
+            "id": doc_ids[i],
+            "tenant_id": chunk.tenant_id,
+            "question": chunk.question,
+            "answer": chunk.answer,
+            "category": chunk.category or "",
+            "metadata": chunk.metadata or {},
+        }
+        for i, chunk in enumerate(all_chunks)
+    ]
+    try:
+        await es_service.ensure_index_exists()
+        indexed_count = await es_service.bulk_index_documents(es_docs)
+        if indexed_count > 0:
+            logger.info("✓ Elasticsearch bulk indexing completed: %d documents indexed.", indexed_count)
+        else:
+            logger.warning("Elasticsearch bulk indexing returned 0 documents indexed.")
+    except Exception as exc:
+        logger.error("✗ Failed to index in Elasticsearch: %s", exc)
+    finally:
+        await es_service.close()
+
+    # 5. Batch Embed & Bulk Upsert into Pinecone Serverless
     if pinecone_service.is_configured():
         logger.info("Vectorizing and bulk-upserting %d chunks into Pinecone (index: %s)...", len(all_chunks), settings.pinecone_index)
         try:
             await pinecone_service.ensure_index_exists()
+            index = pinecone_service.client.Index(settings.pinecone_index)
+            # Clear existing vectors in the namespace to keep strictly 1:1 in sync
+            try:
+                await asyncio.to_thread(index.delete, delete_all=True, namespace="")
+            except Exception as del_exc:
+                logger.debug("Pinecone delete_all warning: %s", del_exc)
+
             embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
             pc_vectors = []
             for i, chunk in enumerate(all_chunks):
