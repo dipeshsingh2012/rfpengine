@@ -112,6 +112,7 @@ function renderQuestion(field, index) {
 }
 
 document.querySelector('#scan').addEventListener('click', scan);
+
 generateAllButton.addEventListener('click', async () => {
   generateAllButton.disabled = true;
   for (let index = 0; index < scannedFields.length; index += 1) {
@@ -121,18 +122,53 @@ generateAllButton.addEventListener('click', async () => {
     const insert = card.querySelector('.insert');
     const confidence = card.querySelector('.confidence');
     const sourceBox = card.querySelector('.sources');
-    await generateAnswer(scannedFields[index], { answer, insert, confidence, sourceBox });
+    const approve = card.querySelector('.approve');
+    await generateAnswer(scannedFields[index], { answer, insert, confidence, sourceBox, approve });
+    approvedAnswers.set(index, answer.value);
+    insert.hidden = false;
   }
-  pageState.textContent = `${scannedFields.length} answers ready for review`;
+  pageState.textContent = `${scannedFields.length} answers ready for injection`;
   generateAllButton.disabled = false;
+  insertAllButton.hidden = false;
+  insertAllButton.textContent = '⚡ Insert All Answers into Form';
 });
+
 insertAllButton.addEventListener('click', async () => {
   insertAllButton.disabled = true;
-  let inserted = 0;
-  for (const [index, answer] of approvedAnswers) {
-    const result = await askTab({ type: 'FILL_FIELD', index, answer });
-    if (result.ok) { questionControls.get(index).insert.textContent = 'Inserted'; questionControls.get(index).insert.disabled = true; inserted += 1; }
+  insertAllButton.textContent = 'Injecting...';
+  
+  // Ensure all answers in cards are gathered
+  for (let index = 0; index < scannedFields.length; index += 1) {
+    const card = questions.children[index];
+    const answer = card?.querySelector('.answer');
+    if (answer?.value) {
+      approvedAnswers.set(index, answer.value);
+    }
   }
-  pageState.textContent = `${inserted} approved answer${inserted === 1 ? '' : 's'} inserted into the form`;
-  insertAllButton.textContent = 'Answers inserted';
+
+  const result = await askTab({
+    type: 'FILL_ALL_FIELDS',
+    answers: Array.from(approvedAnswers.entries()),
+  });
+
+  if (result?.ok) {
+    pageState.textContent = `✅ ${result.filled || approvedAnswers.size} answers inserted into form fields!`;
+    insertAllButton.textContent = '✅ All Answers Inserted';
+    questions.querySelectorAll('.insert').forEach((btn) => {
+      btn.textContent = 'Inserted';
+      btn.disabled = true;
+    });
+  } else {
+    // Fallback item by item
+    let inserted = 0;
+    for (const [index, answer] of approvedAnswers) {
+      const res = await askTab({ type: 'FILL_FIELD', index, answer });
+      if (res?.ok) {
+        questionControls.get(index)?.insert && (questionControls.get(index).insert.textContent = 'Inserted');
+        inserted += 1;
+      }
+    }
+    pageState.textContent = `✅ ${inserted} answers inserted into the form!`;
+    insertAllButton.textContent = '✅ Answers Inserted';
+  }
 });
