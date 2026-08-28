@@ -27,3 +27,36 @@ button:disabled { cursor: wait; opacity: .7; }
 .bottom-strip { border-top: 1px solid var(--line); margin-top: 42px; padding-top: 20px; display: flex; align-items: center; gap: 30px; }.confidence { display: flex; align-items: center; gap: 12px; }.confidence-ring { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at center, var(--paper) 57%, transparent 59%), conic-gradient(var(--blue) 91%, #dfe3e9 0); color: var(--blue); font-family: 'DM Mono'; font-size: 11px; }.confidence p { margin-bottom: 4px; }.confidence strong, .confidence small { display: block; }.confidence strong { font-size: 12px; }.confidence small { color: var(--muted); font-size: 10px; }.shortcut-hint { margin-left: auto; color: var(--muted); font-size: 10px; }.key { display: inline-grid; place-items: center; border: 1px solid #c9c5bc; background: #fbfaf7; min-width: 20px; height: 19px; margin-right: 3px; font-family: 'DM Mono'; }.send-button { background: var(--coral); color: #fff; padding: 11px 15px; }.send-button:hover { background: #dc6e55; }
 @media (max-width: 900px) { .app-shell { grid-template-columns: 1fr; }.topbar { padding: 0 18px; }.mobile-menu { display: grid; }.workspace-switcher { margin-left: 10px; }.sidebar { position: fixed; top: 64px; bottom: 0; left: 0; width: 240px; transform: translateX(-100%); transition: transform .2s ease; z-index: 2; box-shadow: 6px 0 18px rgba(32,38,45,.08); }.sidebar-open { transform: translateX(0); }.main-content { padding: 34px 24px 40px; }.workspace-grid { grid-template-columns: 1fr; gap: 32px; } }
 @media (max-width: 580px) { .brand-name { font-size: 16px; }.workspace-switcher { display: none; }.page-heading { align-items: flex-start; flex-direction: column; gap: 18px; }.page-heading .outline-button { align-self: stretch; justify-content: center; }.main-content { padding: 28px 15px 35px; }h1 { font-size: 27px; }.question-panel { padding: 18px 16px 15px; }.question-footer { align-items: flex-start; flex-direction: column; }.question-meta { flex-wrap: wrap; }.primary-button { width: 100%; justify-content: center; }.workspace-grid { margin-top: 30px; }.answer-panel { padding: 14px; }.answer-footer { align-items: flex-start; flex-direction: column; gap: 11px; }.answer-actions { width: 100%; }.reject-button, .approve-button { flex: 1; justify-content: center; }.bottom-strip { align-items: flex-start; flex-direction: column; gap: 18px; }.shortcut-hint { margin-left: 0; order: 3; }.send-button { width: 100%; justify-content: center; }.source-card p { max-height: 52px; overflow: hidden; } }
+
+/* --- Knowledge Base Modal & Uploader Styles --- */
+.kb-modal-backdrop { position: fixed; inset: 0; background: rgba(24, 36, 59, 0.6); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.kb-modal-container { background: #faf9f5; border: 1px solid var(--line); width: 100%; max-width: 960px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 45px rgba(0,0,0,0.2); overflow: hidden; }
+.kb-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--line); background: #fff; }
+.kb-modal-header h2 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.kb-modal-body { padding: 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 24px; }
+.kb-upload-card { border: 2px dashed #b8c1dd; background: #f4f6fc; padding: 28px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: all .2s ease; }
+.kb-upload-card:hover, .kb-upload-card.drag-over { border-color: var(--blue); background: #eef2ff; }
+.kb-upload-icon { width: 50px; height: 50px; border-radius: 50%; background: #e0e7ff; color: var(--blue); display: grid; place-items: center; }
+.kb-upload-fields { display: flex; gap: 12px; width: 100%; max-width: 500px; margin-top: 6px; }
+.kb-upload-fields input { flex: 1; padding: 10px 12px; border: 1px solid var(--line); font-size: 12px; background: #fff; outline: 0; }
+.kb-upload-btn { background: var(--navy); color: #fff; border: 0; padding: 10px 18px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.kb-upload-btn input { display: none; }
+.kb-upload-btn:hover { background: var(--blue); }
+.kb-alert { padding: 12px 16px; font-size: 12px; border-radius: 4px; display: flex; align-items: center; gap: 10px; }
+.kb-alert-success { background: #eaf5e9; color: #2e6930; border: 1px solid #c2e2bf; }
+.kb-alert-error { background: #fdf0ed; color: #9c3621; border: 1px solid #f7c9be; }
+.kb-records-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.kb-search-bar { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; padding: 6px 12px; flex: 1; min-width: 250px; }
+.kb-search-bar input { border: 0; outline: 0; flex: 1; font-size: 12px; }
+.kb-records-grid { display: grid; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
+.kb-record-card { background: #fff; border: 1px solid var(--line); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; position: relative; }
+.kb-record-card:hover { border-color: #a9b8f1; }
+.kb-record-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.kb-record-title { font-weight: 600; font-size: 13px; color: var(--ink); line-height: 1.4; }
+.kb-record-answer { font-size: 12px; color: #5a625f; line-height: 1.55; white-space: pre-wrap; }
+.kb-record-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.kb-tag { font-family: 'DM Mono'; font-size: 10px; padding: 2px 7px; background: #eef2ff; color: var(--blue); border-radius: 2px; }
+.kb-tag-file { background: #f0f0f0; color: #666; }
+.kb-delete-btn { border: 0; background: transparent; color: #aaa; padding: 4px; cursor: pointer; border-radius: 4px; }
+.kb-delete-btn:hover { color: #d94826; background: #fdf0ed; }
+

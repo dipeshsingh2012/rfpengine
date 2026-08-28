@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- Search Schemas ---
@@ -54,13 +54,20 @@ class KBEntryResponse(KBEntryBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KBBatchImportRequest(BaseModel):
     tenant_id: str = Field(min_length=1, default="acme-corp")
     entries: List[KBEntryBase]
+
+
+class KBUploadResponse(BaseModel):
+    filename: str
+    records_created: int
+    tenant_id: str
+    categories: List[str]
+    preview: List[KBEntryResponse]
 
 
 # --- Workspace & Review Schemas ---
@@ -96,8 +103,7 @@ class WorkspaceResponse(BaseModel):
     updated_at: datetime
     questions: List[QuestionReviewItem]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuestionReviewUpdate(BaseModel):

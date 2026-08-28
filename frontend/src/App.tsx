@@ -4,7 +4,9 @@ import {
   ArrowUpRight,
   BookOpen,
   Check,
+  CheckCircle2,
   ChevronDown,
+  Database,
   Download,
   FileText,
   FolderOpen,
@@ -18,8 +20,10 @@ import {
   Send,
   Settings,
   Sparkles,
+  Tag,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -35,6 +39,17 @@ type SearchResponse = {
   suggested_answer: string;
   confidence_score: number;
   sources: Source[];
+};
+
+type KBItem = {
+  id: string;
+  tenant_id: string;
+  question: string;
+  answer: string;
+  category?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
 };
 
 type SourceMode = "url" | "upload" | "extension";
@@ -167,6 +182,67 @@ function App() {
   const [responseId, setResponseId] = useState(() =>
     responseIdFromPath(window.location.pathname),
   );
+
+  // Knowledge Base State
+  const [showKBModal, setShowKBModal] = useState(false);
+  const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
+  const [kbSearch, setKbSearch] = useState("");
+  const [kbCategory, setKbCategory] = useState("");
+  const [isUploadingKB, setIsUploadingKB] = useState(false);
+  const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  async function fetchKBEntries() {
+    try {
+      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
+      if (res.ok) {
+        const data = await res.json();
+        setKbEntries(data);
+      }
+    } catch (e) {
+      console.warn("Could not fetch KB entries:", e);
+    }
+  }
+
+  async function handleKBUpload(file: File) {
+    if (!file) return;
+    setIsUploadingKB(true);
+    setKbUploadMsg(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("tenant_id", tenantId);
+      if (kbCategory.trim()) {
+        formData.append("category", kbCategory.trim());
+      }
+      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+        throw new Error(err.detail || "Upload failed");
+      }
+      const data = await res.json();
+      setKbUploadMsg({
+        text: `Successfully ingested ${data.records_created} chunks from "${data.filename}" into Knowledge Base!`,
+      });
+      fetchKBEntries();
+    } catch (err: any) {
+      setKbUploadMsg({ text: err.message || "Failed to upload file", isError: true });
+    } finally {
+      setIsUploadingKB(false);
+    }
+  }
+
+  async function handleDeleteKBEntry(id: string) {
+    try {
+      await fetch(`${apiBaseUrl}/v1/knowledge-base/${id}`, { method: "DELETE" });
+      setKbEntries((prev) => prev.filter((item) => item.id !== id));
+    } catch (e) {
+      console.warn("Failed to delete entry:", e);
+    }
+  }
 
   useEffect(() => {
     const handlePopState = () => setRoute(window.location.pathname || "/");
@@ -570,7 +646,13 @@ function App() {
               <FileText size={17} /> Responses{" "}
               <span className="nav-count">12</span>
             </button>
-            <button className="nav-item">
+            <button
+              className="nav-item"
+              onClick={() => {
+                setShowKBModal(true);
+                fetchKBEntries();
+              }}
+            >
               <FolderOpen size={17} /> Knowledge base
             </button>
             <button className="nav-item">
@@ -976,6 +1058,166 @@ function App() {
           </>
         )}
       </main>
+
+      {/* Knowledge Base Modal */}
+      {showKBModal && (
+        <div className="kb-modal-backdrop" onClick={() => setShowKBModal(false)}>
+          <div className="kb-modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="kb-modal-header">
+              <h2>
+                <Database size={20} color="var(--blue)" /> Knowledge Base Library
+              </h2>
+              <button
+                className="icon-button"
+                onClick={() => setShowKBModal(false)}
+                aria-label="Close Knowledge Base modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="kb-modal-body">
+              {/* Upload Card */}
+              <div
+                className={`kb-upload-card ${isDragOver ? "drag-over" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handleKBUpload(file);
+                }}
+              >
+                <div className="kb-upload-icon">
+                  <Upload size={24} />
+                </div>
+                <div>
+                  <strong style={{ fontSize: "14px" }}>
+                    Upload Knowledge Base Files
+                  </strong>
+                  <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
+                    Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code> (300-500 token chunking)
+                  </p>
+                </div>
+
+                <div className="kb-upload-fields">
+                  <input
+                    type="text"
+                    placeholder="Optional category (e.g. Security, SLA, Compliance)"
+                    value={kbCategory}
+                    onChange={(e) => setKbCategory(e.target.value)}
+                  />
+                  <label className="kb-upload-btn">
+                    {isUploadingKB ? (
+                      <>
+                        <RefreshCw size={14} className="spin" /> Ingesting...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={14} /> Choose File
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept=".csv,.tsv,.json,.jsonl,.pdf,.docx,.txt,.md"
+                      disabled={isUploadingKB}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleKBUpload(file);
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Status Alert */}
+              {kbUploadMsg && (
+                <div
+                  className={`kb-alert ${
+                    kbUploadMsg.isError ? "kb-alert-error" : "kb-alert-success"
+                  }`}
+                >
+                  {kbUploadMsg.isError ? (
+                    <AlertCircle size={16} />
+                  ) : (
+                    <CheckCircle2 size={16} />
+                  )}
+                  <span>{kbUploadMsg.text}</span>
+                </div>
+              )}
+
+              {/* Records Section */}
+              <div className="kb-records-header">
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
+                  <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
+                    {kbEntries.length} record{kbEntries.length === 1 ? "" : "s"} synchronized with PostgreSQL, Elasticsearch, and Pinecone
+                  </p>
+                </div>
+                <div className="kb-search-bar">
+                  <Search size={14} color="var(--muted)" />
+                  <input
+                    type="text"
+                    placeholder="Filter questions or answers..."
+                    value={kbSearch}
+                    onChange={(e) => setKbSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="kb-records-grid">
+                {kbEntries
+                  .filter(
+                    (entry) =>
+                      !kbSearch.trim() ||
+                      entry.question.toLowerCase().includes(kbSearch.toLowerCase()) ||
+                      entry.answer.toLowerCase().includes(kbSearch.toLowerCase()) ||
+                      (entry.category && entry.category.toLowerCase().includes(kbSearch.toLowerCase()))
+                  )
+                  .map((entry) => (
+                    <div key={entry.id} className="kb-record-card">
+                      <div className="kb-record-top">
+                        <div className="kb-record-title">{entry.question}</div>
+                        <button
+                          className="kb-delete-btn"
+                          title="Delete knowledge entry"
+                          onClick={() => handleDeleteKBEntry(entry.id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="kb-record-answer">{entry.answer}</div>
+                      <div className="kb-record-tags">
+                        {entry.category && (
+                          <span className="kb-tag">
+                            <Tag size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
+                            {entry.category}
+                          </span>
+                        )}
+                        {entry.metadata?.source_file && (
+                          <span className="kb-tag kb-tag-file">
+                            <FileText size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
+                            {entry.metadata.source_file}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                {kbEntries.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
+                    No knowledge records found. Upload a file above to get started.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
