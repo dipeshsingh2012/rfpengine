@@ -196,7 +196,6 @@ function App() {
   const [showKBModal, setShowKBModal] = useState(false);
   const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
   const [kbSearch, setKbSearch] = useState("");
-  const [kbCategory, setKbCategory] = useState("");
   const [isUploadingKB, setIsUploadingKB] = useState(false);
   const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -221,9 +220,6 @@ function App() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tenant_id", tenantId);
-      if (kbCategory.trim()) {
-        formData.append("category", kbCategory.trim());
-      }
       const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/upload`, {
         method: "POST",
         body: formData,
@@ -233,8 +229,9 @@ function App() {
         throw new Error(err.detail || "Upload failed");
       }
       const data = await res.json();
+      const primaryCat = data.categories?.[0] || "General";
       setKbUploadMsg({
-        text: `Successfully ingested ${data.records_created} chunks from "${data.filename}" into Knowledge Base!`,
+        text: `Successfully ingested ${data.records_created} chunks from "${data.filename}" (Auto-categorized as "${primaryCat}").`,
       });
       fetchKBEntries();
     } catch (err: any) {
@@ -1121,25 +1118,19 @@ function App() {
                     Upload Knowledge Base Files
                   </strong>
                   <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                    Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code> (300-500 token chunking)
+                    Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code> (300-500 token chunking & auto-categorization)
                   </p>
                 </div>
 
-                <div className="kb-upload-fields">
-                  <input
-                    type="text"
-                    placeholder="Optional category (e.g. Security, SLA, Compliance)"
-                    value={kbCategory}
-                    onChange={(e) => setKbCategory(e.target.value)}
-                  />
+                <div className="kb-upload-action">
                   <label className="kb-upload-btn">
                     {isUploadingKB ? (
                       <>
-                        <RefreshCw size={14} className="spin" /> Ingesting...
+                        <RefreshCw size={14} className="spin" /> Ingesting & Categorizing...
                       </>
                     ) : (
                       <>
-                        <Plus size={14} /> Choose File
+                        <Upload size={14} /> Browse & Ingest Document
                       </>
                     )}
                     <input

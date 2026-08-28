@@ -22,6 +22,34 @@ class DocumentParserService:
     CHUNK_OVERLAP_CHARS = 200  # ~50 tokens
 
     @classmethod
+    def infer_category(cls, filename: str, sample_text: str = "", override: Optional[str] = None) -> str:
+        """
+        Infers the enterprise taxonomy category from filename and content signals.
+        Supports seamless extension to LLM-based zero-shot classification later.
+        """
+        if override and override.strip():
+            return override.strip()
+
+        combined = f"{filename} {sample_text[:1200]}".lower()
+
+        if any(k in combined for k in ["soc", "iso", "compliance", "audit", "certif", "whitepaper", "hipaa", "pci"]):
+            return "Compliance & Security"
+        if any(k in combined for k in ["secur", "encrypt", "cipher", "tls", "aes", "kms", "vulnerab", "pen test", "auth", "mfa", "sso", "fido2"]):
+            return "Security & Cryptography"
+        if any(k in combined for k in ["privacy", "gdpr", "ccpa", "dsar", "subprocessor", "dpa", "retention", "erasure", "legal"]):
+            return "Privacy & Legal"
+        if any(k in combined for k in ["sla", "uptime", "disaster", "recovery", "rpo", "rto", "backup", "support tier", "incident", "failover", "sre", "operations"]):
+            return "SLA & Operations"
+        if any(k in combined for k in ["api", "integration", "webhook", "connector", "sdk", "rest", "endpoint", "salesforce", "jira"]):
+            return "Product & Integrations"
+        if any(k in combined for k in ["conduct", "employee", "hr", "human resource", "background check", "training", "policy"]):
+            return "HR & Corporate Policies"
+        if any(k in combined for k in ["architect", "cloud", "aws", "infrastructure", "vpc", "hosting", "kubernetes"]):
+            return "Cloud & Architecture"
+
+        return "General"
+
+    @classmethod
     def parse_document(
         cls,
         content: bytes,
@@ -95,8 +123,7 @@ class DocumentParserService:
                 or norm_row.get("section")
                 or norm_row.get("domain")
                 or norm_row.get("tag")
-                or default_category
-                or "General"
+                or cls.infer_category(filename, answer or "", default_category)
             )
 
             if question and answer:
@@ -149,7 +176,7 @@ class DocumentParserService:
                 continue
             question = item.get("question") or item.get("prompt") or item.get("topic") or item.get("q")
             answer = item.get("answer") or item.get("response") or item.get("content") or item.get("text") or item.get("a")
-            category = item.get("category") or item.get("section") or default_category or "General"
+            category = item.get("category") or item.get("section") or cls.infer_category(filename, str(answer or ""), default_category)
 
             if question and answer:
                 meta = item.get("metadata", {})
@@ -198,12 +225,13 @@ class DocumentParserService:
                     if len(chunk) < 30:
                         continue
                     question_title = f"{current_heading} (Part {chunk_idx})" if len(chunks) > 1 else current_heading
+                    inferred_cat = cls.infer_category(filename, f"{current_heading} {chunk}", default_category)
                     entries.append(
                         KBEntryCreate(
                             tenant_id=tenant_id,
                             question=question_title,
                             answer=chunk,
-                            category=default_category or "Policy & Documentation",
+                            category=inferred_cat,
                             metadata={
                                 "source_file": filename,
                                 "section": current_heading,
@@ -245,13 +273,14 @@ class DocumentParserService:
                 first_period = chunk.find(". ")
                 topic_snippet = chunk[:first_period].strip() if 10 < first_period < 120 else chunk[:80].strip()
                 question = f"{base_name} - Page {page_num}: {topic_snippet}..."
+                inferred_cat = cls.infer_category(filename, chunk, default_category)
 
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
                         question=question,
                         answer=chunk,
-                        category=default_category or "Compliance & Security",
+                        category=inferred_cat,
                         metadata={
                             "source_file": filename,
                             "page_number": page_num,
@@ -291,12 +320,13 @@ class DocumentParserService:
                     full_text = " ".join(current_buffer)
                     chunks = cls._chunk_text(full_text, cls.CHUNK_SIZE_CHARS, cls.CHUNK_OVERLAP_CHARS)
                     for c_idx, chunk in enumerate(chunks, start=1):
+                        inferred_cat = cls.infer_category(filename, f"{current_heading} {chunk}", default_category)
                         entries.append(
                             KBEntryCreate(
                                 tenant_id=tenant_id,
                                 question=f"{current_heading} (Part {c_idx})" if len(chunks) > 1 else current_heading,
                                 answer=chunk,
-                                category=default_category or "Documentation",
+                                category=inferred_cat,
                                 metadata={"source_file": filename, "section": current_heading},
                             )
                         )
@@ -309,12 +339,13 @@ class DocumentParserService:
             full_text = " ".join(current_buffer)
             chunks = cls._chunk_text(full_text, cls.CHUNK_SIZE_CHARS, cls.CHUNK_OVERLAP_CHARS)
             for c_idx, chunk in enumerate(chunks, start=1):
+                inferred_cat = cls.infer_category(filename, f"{current_heading} {chunk}", default_category)
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
                         question=f"{current_heading} (Part {c_idx})" if len(chunks) > 1 else current_heading,
                         answer=chunk,
-                        category=default_category or "Documentation",
+                        category=inferred_cat,
                         metadata={"source_file": filename, "section": current_heading},
                     )
                 )
@@ -341,12 +372,13 @@ class DocumentParserService:
                 continue
             first_period = chunk.find(". ")
             snippet = chunk[:first_period].strip() if 10 < first_period < 100 else chunk[:60].strip()
+            inferred_cat = cls.infer_category(filename, chunk, default_category)
             entries.append(
                 KBEntryCreate(
                     tenant_id=tenant_id,
                     question=f"{base_name} ({snippet})",
                     answer=chunk,
-                    category=default_category or "Knowledge Base",
+                    category=inferred_cat,
                     metadata={"source_file": filename, "chunk_index": idx},
                 )
             )
