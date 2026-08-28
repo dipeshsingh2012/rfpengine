@@ -22,14 +22,14 @@ We adopt a **Hybrid Retrieval Architecture** combining:
    - Performs BM25 keyword matching with query boosting on question fields and tenant filtering.
 2. **Pinecone (Dense / Vector k-NN)**:
    - Uses modern Pinecone SDK v5 with **Serverless** index auto-provisioning (`ServerlessSpec(cloud="aws", region="us-east-1")`).
-   - Indexes 1,536-dimensional embeddings generated with OpenAI (`text-embedding-3-small`) in single-request batch calls.
+   - Indexes 768-dimensional embeddings generated with **Google Cloud Vertex AI** (`text-embedding-004`) or 1,536-dimensional embeddings with OpenAI (`text-embedding-3-small`) in single-request batch calls.
    - Performs cosine similarity search with tenant metadata filtering (`{"tenant_id": {"$eq": tenant_id}}`).
 3. **Reciprocal Rank Fusion (RRF)**:
    - Merges ranked lists from both retrievers using the formula:
      $$RRF(d) = \sum_{m \in M} \frac{1}{k + r_m(d)} \quad (k=60)$$
-   - Grounded context from top-ranked fused documents is passed to OpenAI (`gpt-4o`) for strict, hallucination-free response drafting.
+   - Grounded context from top-ranked fused documents is passed to **Vertex AI Gemini 2.5 Flash** (or OpenAI `gpt-4o`) for strict, hallucination-free response drafting.
 4. **Diagnostics & Cloud Health Tooling**:
-   - Automated CLI diagnostics script (`backend/scripts/verify_cloud_connections.py`) and FastAPI `/health` endpoint validating live health, version, latency, and index readiness across PostgreSQL (Neon), Elastic Cloud, Pinecone Serverless, and OpenAI.
+   - Automated CLI diagnostics script (`backend/scripts/verify_cloud_connections.py`) and FastAPI `/health` endpoint validating live health, version, latency, and index readiness across PostgreSQL (Neon), Elastic Cloud, Pinecone Serverless, and Google Cloud Vertex AI.
 
 ## Consequences
 

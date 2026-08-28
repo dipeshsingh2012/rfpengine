@@ -1,6 +1,6 @@
 # RFPEngine
 
-**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Elasticsearch** for BM25 keyword matching and **Pinecone** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages secrets via **GCP Secret Manager**, drafts grounded responses with OpenAI (`gpt-4o`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
+**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Elasticsearch** for BM25 keyword matching and **Pinecone Serverless** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages cloud secrets via **GCP Secret Manager**, drafts grounded responses with **Google Cloud Vertex AI** (`gemini-2.5-flash` & `text-embedding-004`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
 
 ---
 
@@ -29,17 +29,17 @@ flowchart TD
     end
 
     subgraph Security ["Secrets Management"]
-        GSM[GCP Secret Manager\n(Database URL, OpenAI & Pinecone Keys)]
+        GSM[GCP Secret Manager\n(Database URL, Elastic & Pinecone Keys)]
     end
 
     subgraph SearchIndexes ["Search & Chunk Storage (Dual Index)"]
-        ES[(Elasticsearch 8\nBM25 Sparse Keyword Match\n+ Full Chunk Text Store)]
-        PC[(Pinecone Vector DB\n1536-dim Dense Vector k-NN\nCosine Metric + Metadata)]
-        OAI[OpenAI\ntext-embedding-3-small & gpt-4o]
+        ES[(Elasticsearch 8 / Elastic Cloud\nBM25 Sparse Keyword Match\n+ Full Chunk Text Store)]
+        PC[(Pinecone Serverless\n768-dim Dense Vector k-NN\nCosine Metric + Metadata)]
+        VAI[Google Cloud Vertex AI\ntext-embedding-004 & gemini-2.5-flash]
     end
 
     subgraph RelationalStore ["Relational Persistence (PostgreSQL)"]
-        PG[(Neon PostgreSQL 16\nWorkspaces & Question Reviews)]
+        PG[(Neon PostgreSQL 17\nWorkspaces & Question Reviews)]
     end
 
     FE -->|HTTP / JSON / Upload| API
@@ -47,21 +47,21 @@ flowchart TD
     GSM -->|Native Injection at Boot| GCPCloudRun
 
     PARSER -->|1. Store Full Text & BM25| ES_SVC
-    PARSER -->|2. Generate Embeddings| OAI
-    OAI -->|3. Upsert Vectors + Meta| PC_SVC
+    PARSER -->|2. Generate 768-dim Embeddings| VAI
+    VAI -->|3. Bulk Upsert Vectors + Meta| PC_SVC
     ES_SVC --> ES
     PC_SVC --> PC
 
     API --> HS
     API --> PG_SVC
     
-    HS -->|Generate Query Vector| OAI
+    HS -->|Generate Query Vector| VAI
     HS -->|Sparse Keyword Match| ES_SVC
     HS -->|Dense Vector k-NN| PC_SVC
     
     ES_SVC & PC_SVC --> RRF
-    RRF -->|Grounded Sources| OAI
-    OAI -->|Suggested Answer| HS
+    RRF -->|Grounded Sources| VAI
+    VAI -->|Drafted Response| HS
     
     PG_SVC --> PG
 ```
@@ -79,13 +79,14 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0005: Database Migrations with Alembic](docs/adr/0005-database-migrations-with-alembic.md)
 - [ADR 0006: Centralized Secrets Management with GCP Secret Manager and Terraform](docs/adr/0006-centralized-secrets-management-with-gcp-secret-manager.md)
 - [ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy](docs/adr/0007-knowledge-base-chunking-and-search-index-ingestion.md)
+- [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
 
 ---
 
 ## Product & Engineering Backlog
 
 Future roadmap items and upcoming architecture enhancements are tracked in [`docs/BACKLOG.md`](docs/BACKLOG.md):
-- **LLM-Powered Background Taxonomy Classification**: Asynchronously tag document categories and regulatory frameworks (`SOC 2`, `ISO 27001`, `GDPR`, `HIPAA`) using fast LLMs (`gpt-4o-mini`).
+- **LLM-Powered Background Taxonomy Classification**: Asynchronously tag document categories and regulatory frameworks (`SOC 2`, `ISO 27001`, `GDPR`, `HIPAA`) using fast LLMs (`gemini-2.5-flash-lite`).
 - **Neural Cross-Encoder Reranking**: Cohere Rerank v3 integration on top of RRF.
 - **Direct Spreadsheet & PDF Questionnaire Parser**: Ingestion of multi-tab Excel (`.xlsx`) buyer questionnaires.
 - **Grounded Hallucination Guardrails**: Automated claim verification against retrieved source citations.
@@ -106,8 +107,8 @@ RFPEngine supports uploading documents directly through the React UI or the API 
 | **Text (`.txt`)** | **Recursive Character Sliding Window** | 300–500 tokens (50-tok overlap) | Document title + sentence |
 
 ### Embedding Specifications
-* **Model**: OpenAI `text-embedding-3-small` (1,536 dimensions)
-* **Similarity Metric**: Cosine Similarity in Pinecone
+* **Primary Model**: Google Cloud Vertex AI `text-embedding-004` (768 dimensions)
+* **Similarity Metric**: Cosine Similarity in Pinecone Serverless
 * **Chunk Text Format**: `Topic: {section_or_question}\n{chunk_text}`
 * **Storage Separation**: Document chunks are stored directly in **Elasticsearch** (text document store + BM25) and **Pinecone** (dense vectors + citation metadata). High-volume raw chunks bypass PostgreSQL.
 
@@ -118,10 +119,10 @@ RFPEngine supports uploading documents directly through the React UI or the API 
 - **Python**: 3.11 or newer
 - **Node.js**: 20 or newer and `npm`
 - **Terraform**: 1.5 or newer (for GCP infrastructure provisioning)
-- **Docker & Docker Compose**: For local development
+- **Google Cloud SDK (`gcloud`)**: For managing Vertex AI and Cloud Run
+- **GCP Service Account Key (`gcp-key.json`)**: For local ADC authentication with Vertex AI and Secret Manager
 - **Neon PostgreSQL Connection String**: Cloud database URL
-- **OpenAI API Key**: For vector embeddings (`text-embedding-3-small`) and answer drafting (`gpt-4o`)
-- **Pinecone API Key**: For managed dense vector search
+- **Pinecone API Key**: For managed dense vector search (`aws / us-east-1`)
 - **Browser**: Google Chrome or Microsoft Edge (for loading the extension POC)
 
 ---
@@ -142,20 +143,28 @@ Configure your `.env` file:
 # Environment ("dev", "staging", "prod")
 ENV=dev
 
+# Google Cloud Project & IAM
+GCP_PROJECT_ID=rfpengine
+GCP_SECRET_MANAGER_ENABLED=true
+GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
+
+# LLM & Embedding Configuration (Vertex AI Native)
+LLM_PROVIDER=vertexai
+GEMINI_MODEL=gemini-2.5-flash
+VERTEX_EMBEDDING_MODEL=text-embedding-004
+EMBEDDING_DIMENSION=768
+
+# Optional OpenAI Fallback
+# OPENAI_API_KEY=sk-proj-...
+
 # Neon PostgreSQL Database
 DATABASE_URL=postgresql://neondb_owner:your_password@ep-rapid-truth-aqw82ysi-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require
 
-# OpenAI Configuration
-OPENAI_API_KEY=sk-proj-...
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-OPENAI_CHAT_MODEL=gpt-4o
-
 # Elasticsearch / Elastic Cloud Configuration
-# For local Docker:
 ELASTICSEARCH_URL=http://localhost:9200
-# For Elastic Cloud (uncomment and supply credentials):
-# ELASTICSEARCH_URL=https://my-deployment.es.us-east-1.aws.elastic.cloud:443
-# ELASTICSEARCH_API_KEY=V2V...==
+# For Elastic Cloud (supply API key):
+# ELASTICSEARCH_URL=https://my-deployment.es.us-central1.gcp.elastic.cloud:443
+# ELASTICSEARCH_API_KEY=your_elastic_api_key
 ELASTICSEARCH_INDEX=rfq_knowledge_base
 
 # Pinecone Serverless Configuration
@@ -163,6 +172,7 @@ PINECONE_API_KEY=pcsk_...
 PINECONE_INDEX=rfq-knowledge-base
 PINECONE_CLOUD=aws
 PINECONE_REGION=us-east-1
+PINECONE_DIMENSION=768
 
 # CORS & Server
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
