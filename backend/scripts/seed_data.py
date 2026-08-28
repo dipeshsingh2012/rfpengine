@@ -74,36 +74,34 @@ async def main() -> None:
 
     logger.info("Total chunks extracted across all sample documents: %d", len(all_chunks))
 
-    # 3. Batch Index into Elasticsearch / Elastic Cloud
-    logger.info("Indexing %d chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
-    es_docs = []
+    # Generate IDs and embedding prompts for chunks
     doc_ids = []
     embed_prompts = []
-
     for chunk in all_chunks:
         doc_id = f"kb-{uuid.uuid4().hex[:8]}"
         doc_ids.append(doc_id)
         embed_prompts.append(f"Topic: {chunk.question}\n{chunk.answer}")
-        es_docs.append({
-            "id": doc_id,
-            "tenant_id": chunk.tenant_id,
-            "question": chunk.question,
-            "answer": chunk.answer,
-            "category": chunk.category or "",
-            "metadata": chunk.metadata or {},
-        })
 
-    try:
-        await es_service.ensure_index_exists()
-        indexed_count = await es_service.bulk_index_documents(es_docs)
-        if indexed_count > 0:
-            logger.info("✓ Elasticsearch bulk indexing completed: %d documents indexed.", indexed_count)
-        else:
-            logger.warning("Elasticsearch bulk indexing returned 0 documents indexed.")
-    except Exception as exc:
-        logger.error("✗ Failed to index in Elasticsearch: %s", exc)
-    finally:
-        await es_service.close()
+    # 3. Elasticsearch Indexing (Temporarily commented out)
+    # logger.info("Indexing %d chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
+    # es_docs = [
+    #     {
+    #         "id": doc_ids[i],
+    #         "tenant_id": chunk.tenant_id,
+    #         "question": chunk.question,
+    #         "answer": chunk.answer,
+    #         "category": chunk.category or "",
+    #         "metadata": chunk.metadata or {},
+    #     }
+    #     for i, chunk in enumerate(all_chunks)
+    # ]
+    # try:
+    #     await es_service.ensure_index_exists()
+    #     await es_service.bulk_index_documents(es_docs)
+    # except Exception as exc:
+    #     logger.warning("Elasticsearch indexing skipped: %s", exc)
+    # finally:
+    #     await es_service.close()
 
     # 4. Batch Embed & Bulk Upsert into Pinecone Serverless
     if pinecone_service.is_configured() and settings.openai_api_key:
