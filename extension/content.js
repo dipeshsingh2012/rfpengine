@@ -45,7 +45,6 @@ function formHandoff() {
     const rawParam = hash.slice(hash.indexOf('rfpengine=') + 'rfpengine='.length);
     if (!rawParam) return null;
 
-    // Resilient JSON parsing
     try {
       return JSON.parse(decodeURIComponent(rawParam));
     } catch {
@@ -208,12 +207,16 @@ function createInPageOverlay() {
     align-items: center;
     gap: 16px;
     animation: rfpSlideUp 0.35s ease-out;
-    max-width: 520px;
+    max-width: 540px;
   `;
 
+  const headerTitle = hasHandoffAnswers ? '🟢 RFPEngine Handoff' : '⚡ RFPEngine Assistant';
   const countText = hasHandoffAnswers
-    ? `${answerableFields.length} Approved Answers Ready to Inject`
+    ? `${answerableFields.length} Approved Answers from Workspace (Zero LLM calls)`
     : `${fields.length} Questionnaire Fields Detected`;
+  const buttonLabel = hasHandoffAnswers
+    ? '⚡ Inject Approved Answers'
+    : '⚡ Auto-Fill with AI (LLM)';
 
   overlay.innerHTML = `
     <style>
@@ -260,13 +263,13 @@ function createInPageOverlay() {
         ⚡
       </div>
       <div>
-        <div style="font-weight: 700; font-size: 13px; letter-spacing: -0.2px;">RFPEngine Assistant</div>
+        <div style="font-weight: 700; font-size: 13px; letter-spacing: -0.2px;">${headerTitle}</div>
         <div style="font-size: 11px; color: #94a3b8;">${countText}</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
       <button class="rfp-btn-glow" id="rfp-auto-fill-btn">
-        ⚡ Auto-Fill All Fields
+        ${buttonLabel}
       </button>
       <button class="rfp-close-icon" id="rfp-dismiss-btn" title="Dismiss">×</button>
     </div>
@@ -286,18 +289,21 @@ function createInPageOverlay() {
 
     for (const item of currentFields) {
       if (!item.element) continue;
-      
+
       let answerText = item.handoffAnswer;
-      if (!answerText) {
-        // Generate on the fly from backend or heuristics
+      // Flow A: If handoff exists, NEVER call LLM! Use approved answer.
+      // Flow B: Only call LLM if NO handoff was provided
+      if (!answerText && !hasHandoffAnswers) {
         answerText = await generateAnswerForQuestion(item.question);
       }
 
-      setFieldValue(item.element, answerText);
-      item.element.style.transition = 'all 0.4s ease';
-      item.element.style.outline = '3px solid #22c55e';
-      item.element.style.backgroundColor = '#f0fdf4';
-      count++;
+      if (answerText) {
+        setFieldValue(item.element, answerText);
+        item.element.style.transition = 'all 0.4s ease';
+        item.element.style.outline = '3px solid #22c55e';
+        item.element.style.backgroundColor = '#f0fdf4';
+        count++;
+      }
     }
 
     if (btn) {
