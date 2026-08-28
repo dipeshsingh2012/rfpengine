@@ -1,4 +1,14 @@
-const API_URL = 'http://localhost:8000';
+const DEFAULT_API_URL = 'https://rfpengine-api-714049712844.us-central1.run.app';
+let API_URL = DEFAULT_API_URL;
+
+if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+  chrome.storage.local.get(['rfpengine_api_url'], (res) => {
+    if (res?.rfpengine_api_url) {
+      API_URL = res.rfpengine_api_url.trim().replace(/\/$/, '');
+    }
+  });
+}
+
 const questions = document.querySelector('#questions');
 const template = document.querySelector('#question-template');
 const pageState = document.querySelector('#page-state');

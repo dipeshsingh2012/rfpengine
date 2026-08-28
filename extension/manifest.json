@@ -2,12 +2,39 @@
   "manifest_version": 3,
   "name": "RFPEngine Response Assistant",
   "version": "0.1.0",
-  "description": "Scan seller questionnaires, draft grounded answers, and insert approved responses.",
-  "permissions": ["sidePanel", "activeTab", "tabs", "storage"],
-  "host_permissions": ["http://localhost:8000/*", "http://localhost:5173/*", "https://*/*", "http://*/*"],
-  "action": { "default_title": "Open RFPEngine" },
-  "background": { "service_worker": "background.js" },
-  "side_panel": { "default_path": "sidepanel.html" },
+  "description": "Scan buyer questionnaires, retrieve verified knowledge, and insert human-approved RFP responses.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://rfpengine-api-714049712844.us-central1.run.app/*",
+    "http://localhost:8000/*",
+    "http://localhost:5173/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "action": {
+    "default_title": "Open RFPEngine",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

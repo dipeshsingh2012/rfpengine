@@ -17,3 +17,4 @@ Remote teleoperation and fleet oversight are governed by certified FAA Part 107 
 
 5. Cargo Handling, Hazardous Materials Restrictions, and Secure Payload Release
 Titan cargo bays support a maximum payload capacity of 6.5 kg (14.3 lbs) housed within weatherproof carbon-fiber capsules. Transport of Class 1 explosives, radioactive materials, and volatile chemicals is strictly prohibited. Medical cargo, including temperature-sensitive vaccines and emergency blood units, is maintained within active thermal insulation pods keeping internal temperatures between 2°C and 8°C for up to 4 hours. Payload delivery is executed using a motorized high-tensile Spectra tether system with automated magnetic ground-release; the aircraft remains hovering at 25 feet AGL without landing during customer drop-off.
+
