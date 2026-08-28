@@ -58,9 +58,15 @@ type KBItem = {
 
 type SourceMode = "url" | "upload" | "extension";
 
+const CLOUD_RUN_PROD_API = "https://rfpengine-api-714049712844.us-central1.run.app/api";
+
 function getApiBaseUrl(): string {
   const envUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
-  if (!envUrl) {
+  if (!envUrl || envUrl === "/api") {
+    // If running in browser in production (e.g. www.rfpengine.net), use absolute Cloud Run endpoint
+    if (typeof window !== "undefined" && window.location.hostname && !window.location.hostname.includes("localhost") && window.location.hostname !== "127.0.0.1") {
+      return CLOUD_RUN_PROD_API;
+    }
     return "/api";
   }
   // If user provided a host without /api suffix (e.g. http://localhost:8000 or https://cloudrun.app)
@@ -221,7 +227,15 @@ function App() {
   const [backendEnv, setBackendEnv] = useState<string>(() => import.meta.env.VITE_APP_ENV || "local");
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
   const [activeApiBase, setActiveApiBase] = useState<string>(() => {
-    return localStorage.getItem("rfpengine.custom_api_url") || apiBaseUrl;
+    const saved = localStorage.getItem("rfpengine.custom_api_url");
+    if (saved) {
+      // If user is on a production web host (like rfpengine.net) and saved is /api, override with Cloud Run API
+      if ((saved === "/api" || saved.includes("rfpengine.net")) && typeof window !== "undefined" && window.location.hostname && !window.location.hostname.includes("localhost") && window.location.hostname !== "127.0.0.1") {
+        return CLOUD_RUN_PROD_API;
+      }
+      return saved;
+    }
+    return apiBaseUrl;
   });
 
   useEffect(() => {

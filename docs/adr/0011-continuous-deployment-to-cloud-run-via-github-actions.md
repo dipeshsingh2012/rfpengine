@@ -59,3 +59,4 @@ flowchart LR
 
 ### Negative / Trade-offs
 - Requires maintaining the `GCP_SA_KEY` secret within GitHub repository settings (or configuring Workload Identity Federation).
+
