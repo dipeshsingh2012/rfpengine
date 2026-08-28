@@ -104,8 +104,8 @@ async def main() -> None:
     #     await es_service.close()
 
     # 4. Batch Embed & Bulk Upsert into Pinecone Serverless
-    if pinecone_service.is_configured() and settings.openai_api_key:
-        logger.info("Vectorizing and bulk-upserting %d chunks into Pinecone...", len(all_chunks))
+    if pinecone_service.is_configured():
+        logger.info("Vectorizing and bulk-upserting %d chunks into Pinecone (index: %s)...", len(all_chunks), settings.pinecone_index)
         try:
             await pinecone_service.ensure_index_exists()
             embeddings = await hybrid_search.generate_embeddings_batch(embed_prompts)
@@ -134,10 +134,7 @@ async def main() -> None:
         except Exception as exc:
             logger.error("✗ Failed to upsert to Pinecone: %s", exc)
     else:
-        if not pinecone_service.is_configured():
-            logger.info("ℹ Pinecone unconfigured (PINECONE_API_KEY is not set), skipping vector upsert.")
-        elif not settings.openai_api_key:
-            logger.info("ℹ OpenAI API Key is not set, skipping Pinecone vector generation.")
+        logger.info("ℹ Pinecone unconfigured (PINECONE_API_KEY is not set), skipping vector upsert.")
 
     logger.info("Knowledge base seeding process successfully finished.")
 

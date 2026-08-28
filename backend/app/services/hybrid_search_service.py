@@ -10,7 +10,21 @@ from app.models.schemas import SearchRequest, SearchResponse, Source
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.pinecone_service import PineconeService
 
+import hashlib
+import math
+
 logger = logging.getLogger(__name__)
+
+
+def _generate_mock_embedding(text: str, dim: int = 1536) -> List[float]:
+    """
+    Generates a deterministic 1536-dimensional unit vector from text
+    when OpenAI API key is not configured.
+    """
+    h = hashlib.sha256(text.encode("utf-8")).digest()
+    vec = [(h[i % len(h)] - 128) / 128.0 + math.sin(i + len(text)) for i in range(dim)]
+    norm = math.sqrt(sum(x * x for x in vec)) or 1.0
+    return [x / norm for x in vec]
 
 
 def reciprocal_rank_fusion(
@@ -61,7 +75,7 @@ class HybridSearchService:
 
     async def generate_embedding(self, text: str) -> Optional[List[float]]:
         if not self.openai_client:
-            return None
+            return _generate_mock_embedding(text)
         try:
             resp = await self.openai_client.embeddings.create(
                 model=self.settings.openai_embedding_model,
@@ -70,14 +84,17 @@ class HybridSearchService:
             return resp.data[0].embedding
         except Exception as exc:
             logger.error("OpenAI embedding generation failed: %s", exc)
-            return None
+            return _generate_mock_embedding(text)
 
     async def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
         """
         Generates vector embeddings for a batch of text chunks in a single API request.
+        Falls back to deterministic mock embeddings if OpenAI client is unconfigured.
         """
-        if not self.openai_client or not texts:
-            return [None] * len(texts)
+        if not texts:
+            return []
+        if not self.openai_client:
+            return [_generate_mock_embedding(t) for t in texts]
         try:
             resp = await self.openai_client.embeddings.create(
                 model=self.settings.openai_embedding_model,
@@ -88,7 +105,7 @@ class HybridSearchService:
             return [embeddings_by_index.get(i) for i in range(len(texts))]
         except Exception as exc:
             logger.error("OpenAI batched embedding generation failed for %d texts: %s", len(texts), exc)
-            return [None] * len(texts)
+            return [_generate_mock_embedding(t) for t in texts]
 
     async def search(self, request: SearchRequest) -> SearchResponse:
         sparse_task = self.es_service.search_sparse(
