@@ -13,9 +13,9 @@ from app.core.config import get_settings
 from app.core.db import Base, close_db_connection, get_engine
 import app.models.db_models  # noqa: F401
 from app.services.elasticsearch_service import ElasticsearchService
+from app.services.gcp_secret_service import GCPSecretService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
-from app.services.vault_service import VaultService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,17 +29,17 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info("Initializing RFPEngine backend services...")
 
-    # 1. Initialize Vault Service & load dynamic secrets if enabled
-    vault_service = VaultService(settings)
-    app.state.vault = vault_service
-    if settings.vault_enabled:
+    # 1. Initialize GCP Secret Manager & load dynamic secrets if enabled
+    gcp_secret_service = GCPSecretService(settings)
+    app.state.gcp_secrets = gcp_secret_service
+    if settings.gcp_secret_manager_enabled and gcp_secret_service.is_configured():
         try:
-            secrets = await vault_service.read_secrets()
+            secrets = await gcp_secret_service.get_all_app_secrets()
             if secrets:
-                settings.apply_vault_secrets(secrets)
-                logger.info("Applied secrets dynamically from HashiCorp Vault.")
+                settings.apply_gcp_secrets(secrets)
+                logger.info("Applied %d secrets dynamically from GCP Secret Manager.", len(secrets))
         except Exception as exc:
-            logger.warning("Could not fetch secrets from Vault: %s", exc)
+            logger.warning("Could not fetch secrets from GCP Secret Manager: %s", exc)
 
     # 2. Initialize PostgreSQL tables
     try:

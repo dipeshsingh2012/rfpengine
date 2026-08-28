@@ -27,18 +27,6 @@ services:
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
 
-  vault:
-    image: hashicorp/vault:1.16.2
-    container_name: rfpengine-vault
-    restart: unless-stopped
-    ports:
-      - "8200:8200"
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: "root"
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
-    cap_add:
-      - IPC_LOCK
-
 volumes:
   postgres_data:
   elasticsearch_data:

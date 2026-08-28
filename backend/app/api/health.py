@@ -70,26 +70,26 @@ async def health_check(
             details="Pinecone service is not configured",
         )
 
-    # 4. HashiCorp Vault check
-    vault_service = getattr(request.app.state, "vault", None)
-    if vault_service and vault_service.is_configured():
-        v_start = time.perf_counter()
-        v_status = await vault_service.health_check()
-        v_latency = (time.perf_counter() - v_start) * 1000
-        services["vault"] = HealthServiceStatus(
-            status=v_status.get("status", "unknown"),
-            latency_ms=round(v_latency, 2) if v_status.get("status") == "ok" else None,
-            details=str(v_status.get("details") or f"Vault at {v_status.get('vault_addr')} (v{v_status.get('version')})"),
+    # 4. GCP Secret Manager check
+    gcp_secret_service = getattr(request.app.state, "gcp_secrets", None)
+    if gcp_secret_service and gcp_secret_service.is_configured():
+        gcp_start = time.perf_counter()
+        gcp_status = await gcp_secret_service.health_check()
+        gcp_latency = (time.perf_counter() - gcp_start) * 1000
+        services["gcp_secret_manager"] = HealthServiceStatus(
+            status=gcp_status.get("status", "unknown"),
+            latency_ms=round(gcp_latency, 2) if gcp_status.get("status") == "ok" else None,
+            details=str(gcp_status.get("details")),
         )
-    elif settings.vault_enabled:
-        services["vault"] = HealthServiceStatus(
+    elif settings.gcp_secret_manager_enabled:
+        services["gcp_secret_manager"] = HealthServiceStatus(
             status="unconfigured",
-            details=f"Vault is enabled but missing token or URL: {settings.vault_addr}",
+            details="GCP_PROJECT_ID is not set in environment",
         )
     else:
-        services["vault"] = HealthServiceStatus(
+        services["gcp_secret_manager"] = HealthServiceStatus(
             status="disabled",
-            details="VAULT_ENABLED is false (using environment variables)",
+            details="GCP_SECRET_MANAGER_ENABLED is false (using environment variables)",
         )
 
     # 5. OpenAI check

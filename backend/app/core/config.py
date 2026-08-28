@@ -14,12 +14,10 @@ class Settings(BaseSettings):
     app_version: str = "0.2.0"
     debug: bool = False
 
-    # HashiCorp Vault Settings
-    vault_enabled: bool = False
-    vault_addr: str = "http://localhost:8200"
-    vault_token: Optional[str] = None
-    vault_secret_path: str = "secret/data/rfpengine"
-    vault_mount_point: str = "secret"
+    # Google Cloud Secret Manager Settings
+    gcp_project_id: Optional[str] = None
+    gcp_secret_manager_enabled: bool = False
+    gcp_secret_prefix: str = ""  # e.g. "rfpengine_" or ""
 
     # OpenAI Settings
     openai_api_key: Optional[str] = None
@@ -54,32 +52,23 @@ class Settings(BaseSettings):
     cors_origins: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000"
     cors_origin_regex: str = r"chrome-extension://.*"
 
-    def apply_vault_secrets(self, secrets: Dict[str, Any]) -> None:
+    def apply_gcp_secrets(self, secrets: Dict[str, Any]) -> None:
         """
-        Dynamically applies secrets retrieved from HashiCorp Vault.
+        Dynamically applies secrets retrieved from GCP Secret Manager.
         """
         if not secrets:
             return
 
-        if "OPENAI_API_KEY" in secrets:
-            self.openai_api_key = secrets["OPENAI_API_KEY"]
-        elif "openai_api_key" in secrets:
-            self.openai_api_key = secrets["openai_api_key"]
-
-        if "DATABASE_URL" in secrets:
-            self.database_url = secrets["DATABASE_URL"]
-        elif "database_url" in secrets:
-            self.database_url = secrets["database_url"]
-
-        if "PINECONE_API_KEY" in secrets:
-            self.pinecone_api_key = secrets["PINECONE_API_KEY"]
-        elif "pinecone_api_key" in secrets:
-            self.pinecone_api_key = secrets["pinecone_api_key"]
-
-        if "ELASTICSEARCH_PASSWORD" in secrets:
-            self.elasticsearch_password = secrets["ELASTICSEARCH_PASSWORD"]
-        elif "elasticsearch_password" in secrets:
-            self.elasticsearch_password = secrets["elasticsearch_password"]
+        for k, v in secrets.items():
+            normalized_key = k.upper().replace("-", "_")
+            if normalized_key.endswith("OPENAI_API_KEY") or normalized_key == "OPENAI_API_KEY":
+                self.openai_api_key = v
+            elif normalized_key.endswith("DATABASE_URL") or normalized_key == "DATABASE_URL":
+                self.database_url = v
+            elif normalized_key.endswith("PINECONE_API_KEY") or normalized_key == "PINECONE_API_KEY":
+                self.pinecone_api_key = v
+            elif normalized_key.endswith("ELASTICSEARCH_PASSWORD") or normalized_key == "ELASTICSEARCH_PASSWORD":
+                self.elasticsearch_password = v
 
     @property
     def effective_database_url(self) -> str:

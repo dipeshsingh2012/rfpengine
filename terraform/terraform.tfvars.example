@@ -1,0 +1,12 @@
+project_id      = "your-gcp-project-id"
+region          = "us-central1"
+app_name        = "rfpengine"
+
+# Neon PostgreSQL Connection URL
+database_url    = "postgresql://neondb_owner:your_password@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
+
+# API Keys (Optional)
+openai_api_key   = ""
+pinecone_api_key = ""
+
+cors_origins    = "http://localhost:5173,https://your-domain.com"
