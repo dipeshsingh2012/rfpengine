@@ -85,6 +85,7 @@ const sampleDemoFiles = [
   { name: "Vendor Security Q&A", file: "04_Standard_Vendor_Security_Questionnaire.csv", format: "CSV" },
   { name: "API & Integrations", file: "05_Product_Features_and_API_Integrations.docx", format: "DOCX" },
   { name: "Code of Conduct / HR", file: "06_Employee_Code_of_Conduct_and_HR_Policies.txt", format: "TXT" },
+  { name: "Drone Fleet Safety SOP", file: "07_Autonomous_Drone_Fleet_Logistics_and_Aviation_Safety.txt", format: "TXT" },
 ];
 
 const playgroundStarterQueries = [
