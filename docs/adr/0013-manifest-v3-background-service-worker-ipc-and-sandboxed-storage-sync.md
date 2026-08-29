@@ -60,3 +60,4 @@ sequenceDiagram
 
 ### Negative / Trade-offs
 - Requires the Chrome extension to be installed and active in the user's browser (a backward-compatible URL hash fallback is retained if the extension is not detected).
+

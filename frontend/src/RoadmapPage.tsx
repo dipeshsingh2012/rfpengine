@@ -64,11 +64,14 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
 
-  // New Feature Submission Form State
+  // Continuous Discovery & Opportunity Framing State (Teresa Torres + JTBD)
   const [newTitle, setNewTitle] = useState("");
-  const [newProblem, setNewProblem] = useState("");
   const [newPersona, setNewPersona] = useState("Proposal Manager");
-  const [newTheme, setNewTheme] = useState<StrategicTheme>("Core AI & Retrieval");
+  const [newTheme, setNewTheme] = useState<StrategicTheme>("Smart Ingestion");
+  const [newSituation, setNewSituation] = useState("");
+  const [newWorkaround, setNewWorkaround] = useState("");
+  const [newOutcome, setNewOutcome] = useState("");
+  const [newHypothesis, setNewHypothesis] = useState("");
 
   useEffect(() => {
     localStorage.setItem("rfpengine.roadmap.initiatives", JSON.stringify(initiatives));
@@ -105,7 +108,10 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
 
   const handleCreateInitiative = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newProblem.trim()) return;
+    if (!newTitle.trim() || !newSituation.trim()) return;
+
+    const fullProblem = `Context: ${newSituation.trim()}\n\nCurrent Workaround: ${newWorkaround.trim() || "Manual copy-pasting and email coordination across departments."}`;
+    const userStory = `As a ${newPersona}, when ${newSituation.trim()}, I want ${newHypothesis.trim() || newTitle.trim()}, so that ${newOutcome.trim() || "our proposal turnaround time is reduced with zero errors"}.`;
 
     const newInit: RoadmapInitiative = {
       id: `custom-${Date.now()}`,
@@ -114,29 +120,36 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
       theme: newTheme,
       priority: "P1 - High",
       targetPersona: newPersona,
-      quarter: "In Backlog",
-      summary: newProblem.trim().slice(0, 140) + "...",
-      problemStatement: newProblem.trim(),
-      userStory: `As a ${newPersona}, I want ${newTitle.trim()}, so that our workflow is streamlined and errors are reduced.`,
+      quarter: "In Discovery",
+      summary: newSituation.trim().slice(0, 130) + "...",
+      problemStatement: fullProblem,
+      userStory: userStory,
       successMetrics: [
-        "Customer satisfaction rating > 90%",
-        "Adopted by > 50% of active bid teams",
+        newOutcome.trim() || "Reduce questionnaire completion time by > 50%",
+        `Adopted by > 75% of active ${newPersona} users`,
+        "Zero unverified hallucinations or compliance errors",
       ],
       acceptanceCriteria: [
-        `Given a ${newPersona} user, when they use ${newTitle.trim()}, then expected workflow completes with zero blockers.`,
+        `Given a ${newPersona} user encountering: "${newSituation.trim().slice(0, 80)}...",`,
+        `When they utilize: "${(newHypothesis.trim() || newTitle.trim()).slice(0, 80)}",`,
+        `Then they achieve: "${(newOutcome.trim() || "streamlined delivery").slice(0, 80)}" without resorting to manual workarounds.`,
       ],
-      technicalArchitecture: "FastAPI endpoint + React UI integration + Postgres schema extension.",
-      rice: { reach: 60, impact: 3, confidence: 70, effort: 3, score: 42.0 },
+      technicalArchitecture:
+        "FastAPI backend microservice + pgvector similarity indexing + React workspace component.",
+      rice: { reach: 70, impact: 3, confidence: 75, effort: 3, score: 52.5 },
       upvotes: 1,
-      tags: ["Community Request", "Product Discovery"],
+      tags: ["Continuous Discovery", "Opportunity", "JTBD", "Community Backlog"],
     };
 
     setInitiatives([newInit, ...initiatives]);
     setUpvotedIds((prev) => new Set([...prev, newInit.id]));
     setNewTitle("");
-    setNewProblem("");
+    setNewSituation("");
+    setNewWorkaround("");
+    setNewOutcome("");
+    setNewHypothesis("");
     setShowSubmitModal(false);
-    showToast("🎉 Feature request submitted to Product Discovery board!");
+    showToast("🎉 Customer Opportunity captured and framed in Discovery Backlog!");
     setSelectedInitiative(newInit);
   };
 
@@ -617,69 +630,108 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
         </div>
       )}
 
-      {/* --- SUBMIT FEATURE IDEA MODAL --- */}
+      {/* --- CONTINUOUS DISCOVERY & OPPORTUNITY INTAKE MODAL (Teresa Torres + JTBD) --- */}
       {showSubmitModal && (
         <div className="kb-modal-backdrop" onClick={() => setShowSubmitModal(false)}>
-          <div className="kb-modal-container review-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="kb-modal-container review-modal" style={{ maxWidth: "640px" }} onClick={(e) => e.stopPropagation()}>
             <div className="kb-modal-header">
-              <h2 style={{ fontSize: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                <Lightbulb size={18} color="var(--blue)" /> Submit Product Discovery Idea
-              </h2>
+              <div>
+                <h2 style={{ fontSize: "16px", margin: "0 0 4px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Lightbulb size={18} color="var(--blue)" /> Frame Customer Opportunity
+                </h2>
+                <span style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "'DM Mono', monospace" }}>
+                  Continuous Discovery Framework (Teresa Torres OST + Jobs-to-be-Done)
+                </span>
+              </div>
               <button className="icon-button" onClick={() => setShowSubmitModal(false)}>
                 <X size={18} />
               </button>
             </div>
-            <div className="kb-modal-body" style={{ padding: "20px 24px" }}>
-              <p style={{ margin: "0 0 14px", fontSize: "12px", color: "var(--muted)" }}>
-                Contribute to our product discovery backlog. Every request undergoes problem validation and RICE scoring.
-              </p>
+            <div className="kb-modal-body" style={{ padding: "20px 24px", maxHeight: "80vh", overflowY: "auto" }}>
+              <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "4px", padding: "10px 14px", marginBottom: "16px", fontSize: "11px", color: "var(--navy)", lineHeight: "1.45" }}>
+                <strong>💡 Product Discovery Principle:</strong> Great product teams discover the <em>unmet customer need and current workaround</em> before locking into specific technical implementations.
+              </div>
+
               <form onSubmit={handleCreateInitiative} className="review-modal-form">
                 <label>
-                  Feature / Initiative Title:
+                  1. Opportunity / Problem Title:
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Multi-Language RFP Translation & Localization"
+                    placeholder="e.g. Automated Spreadsheet Column Mapping for 300-Row Questionnaires"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     style={{ border: "1px solid var(--line)", padding: "10px 12px", borderRadius: "4px" }}
                   />
                 </label>
 
-                <label>
-                  Target User Persona:
-                  <select value={newPersona} onChange={(e) => setNewPersona(e.target.value)}>
-                    <option value="Proposal Manager">Proposal Manager</option>
-                    <option value="Security SME">Security SME</option>
-                    <option value="Legal Counsel">Legal Counsel</option>
-                    <option value="Head of Sales / RevOps">Head of Sales / RevOps</option>
-                    <option value="Bid Team">Bid Team</option>
-                  </select>
-                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <label>
+                    Target User Persona:
+                    <select value={newPersona} onChange={(e) => setNewPersona(e.target.value)}>
+                      <option value="Proposal Manager">Proposal Manager</option>
+                      <option value="Security SME">Security SME</option>
+                      <option value="Legal Counsel">Legal Counsel</option>
+                      <option value="Head of Sales / RevOps">Head of Sales / RevOps</option>
+                      <option value="Bid Team">Bid Team</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Strategic Pillar:
+                    <select value={newTheme} onChange={(e) => setNewTheme(e.target.value as StrategicTheme)}>
+                      {themes.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
 
                 <label>
-                  Strategic Theme:
-                  <select value={newTheme} onChange={(e) => setNewTheme(e.target.value as StrategicTheme)}>
-                    {themes.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Customer Problem Statement (The "Why"):
+                  2. Situation & Trigger (When...):
                   <textarea
                     required
-                    placeholder="Describe the specific customer pain point, friction in the bid process, or business cost..."
-                    value={newProblem}
-                    onChange={(e) => setNewProblem(e.target.value)}
-                    rows={4}
+                    placeholder="When in the procurement cycle does this pain happen? (e.g. When a buyer provides a multi-tab Excel spreadsheet with custom merged headers...)"
+                    value={newSituation}
+                    onChange={(e) => setNewSituation(e.target.value)}
+                    rows={3}
                   />
                 </label>
 
-                <div className="review-modal-actions">
+                <label>
+                  3. Current Workaround (How does the team cope today?):
+                  <textarea
+                    placeholder="e.g. Today, our bid team manually copies 300 questions one-by-one into Google Docs, emails 4 engineers, and pastes them back..."
+                    value={newWorkaround}
+                    onChange={(e) => setNewWorkaround(e.target.value)}
+                    rows={2}
+                  />
+                </label>
+
+                <label>
+                  4. Desired Outcome & Success KPI:
+                  <input
+                    type="text"
+                    placeholder="e.g. Reduce questionnaire completion time from 3 days to < 2 hours with 0 errors"
+                    value={newOutcome}
+                    onChange={(e) => setNewOutcome(e.target.value)}
+                    style={{ border: "1px solid var(--line)", padding: "10px 12px", borderRadius: "4px" }}
+                  />
+                </label>
+
+                <label>
+                  5. Proposed Solution Hypothesis (How might we solve this?):
+                  <textarea
+                    placeholder="e.g. A client-side WebAssembly parser with column heuristics and 1-click in-place export..."
+                    value={newHypothesis}
+                    onChange={(e) => setNewHypothesis(e.target.value)}
+                    rows={2}
+                  />
+                </label>
+
+                <div className="review-modal-actions" style={{ marginTop: "12px" }}>
                   <button
                     type="button"
                     className="outline-button"
@@ -688,7 +740,7 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
                     Cancel
                   </button>
                   <button type="submit" className="primary-button">
-                    <Plus size={14} /> Add to Discovery Backlog
+                    <Plus size={14} /> Frame Opportunity in Backlog
                   </button>
                 </div>
               </form>

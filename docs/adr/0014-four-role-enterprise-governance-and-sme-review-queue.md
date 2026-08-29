@@ -65,3 +65,4 @@ graph TD
 
 ### Negative / Trade-offs
 - Adds a structured workflow step before submission, requiring design and testing partner validation to maintain high deal velocity.
+
