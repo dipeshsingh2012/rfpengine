@@ -84,6 +84,8 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0010: Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation](docs/adr/0010-multi-environment-isolation-and-production-secret-propagation.md)
 - [ADR 0011: Continuous Deployment to Google Cloud Run via GitHub Actions](docs/adr/0011-continuous-deployment-to-cloud-run-via-github-actions.md)
 - [ADR 0012: In-App Product Discovery and RICE Prioritization Roadmap Hub](docs/adr/0012-product-discovery-and-prioritization-roadmap-hub.md)
+- [ADR 0013: Manifest V3 Background Service Worker IPC and Sandboxed Storage Sync](docs/adr/0013-manifest-v3-background-service-worker-ipc-and-sandboxed-storage-sync.md)
+- [ADR 0014: Four-Role Enterprise Governance and SME Review Queue](docs/adr/0014-four-role-enterprise-governance-and-sme-review-queue.md)
 
 ---
 

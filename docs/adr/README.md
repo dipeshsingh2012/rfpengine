@@ -18,3 +18,5 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0010](0010-multi-environment-isolation-and-production-secret-propagation.md) | Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation | Accepted | 2026-08-28 |
 | [0011](0011-continuous-deployment-to-cloud-run-via-github-actions.md) | Continuous Deployment to Google Cloud Run via GitHub Actions | Accepted | 2026-08-28 |
 | [0012](0012-product-discovery-and-prioritization-roadmap-hub.md) | In-App Product Discovery and RICE Prioritization Roadmap Hub | Accepted | 2026-08-29 |
+| [0013](0013-manifest-v3-background-service-worker-ipc-and-sandboxed-storage-sync.md) | Manifest V3 Background Service Worker IPC and Sandboxed Storage Sync | Accepted | 2026-08-28 |
+| [0014](0014-four-role-enterprise-governance-and-sme-review-queue.md) | Four-Role Enterprise Governance and SME Review Queue | Accepted | 2026-08-28 |
