@@ -16,4 +16,5 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0008](0008-native-gcp-vertex-ai-gemini-and-embeddings.md) | Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference | Accepted | 2026-08-28 |
 | [0009](0009-passage-based-document-ingestion-and-llm-reasoning.md) | Passage-Based Document Ingestion and LLM Question-Answering Reasoning | Accepted | 2026-08-28 |
 | [0010](0010-multi-environment-isolation-and-production-secret-propagation.md) | Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation | Accepted | 2026-08-28 |
-
+| [0011](0011-continuous-deployment-to-cloud-run-via-github-actions.md) | Continuous Deployment to Google Cloud Run via GitHub Actions | Accepted | 2026-08-28 |
+| [0012](0012-product-discovery-and-prioritization-roadmap-hub.md) | In-App Product Discovery and RICE Prioritization Roadmap Hub | Accepted | 2026-08-29 |

@@ -82,12 +82,30 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
 - [ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning](docs/adr/0009-passage-based-document-ingestion-and-llm-reasoning.md)
 - [ADR 0010: Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation](docs/adr/0010-multi-environment-isolation-and-production-secret-propagation.md)
+- [ADR 0011: Continuous Deployment to Google Cloud Run via GitHub Actions](docs/adr/0011-continuous-deployment-to-cloud-run-via-github-actions.md)
+- [ADR 0012: In-App Product Discovery and RICE Prioritization Roadmap Hub](docs/adr/0012-product-discovery-and-prioritization-roadmap-hub.md)
+
+---
+
+## Product Strategy & Discovery Roadmap (`/roadmap`)
+
+RFPEngine includes an interactive **Product Strategy & Discovery Hub** directly accessible via `/roadmap`:
+
+* **Multi-Stage Kanban Lifecycle**:
+  * 🔍 **In Discovery**: Problem validation, user research & persona pain points.
+  * 📐 **In Spec & Design**: PRD specifications, UX wireframing & technical architecture.
+  * 🏗️ **In Development**: Active engineering sprint execution.
+  * 🧪 **Beta & Testing**: Customer pilots with enterprise design partners.
+  * 🚀 **Shipped & Live**: Production features active in Google Cloud Run and Chrome Web Store.
+* **RICE Prioritization Matrix**: Data-driven ranking calculated via `(Reach × Impact × Confidence) ÷ Effort = RICE Score`.
+* **Interactive Mini-PRD Drawer**: Slide-over product specifications featuring Customer Problem Statements, User Stories, Gherkin Acceptance Criteria, and Target KPIs.
+* **Community Upvoting & Discovery Submissions**: Stakeholders can upvote features and submit new feature requests into the backlog.
 
 ---
 
 ## Product & Engineering Backlog
 
-Future roadmap items and upcoming architecture enhancements are tracked in [`docs/BACKLOG.md`](docs/BACKLOG.md):
+Future roadmap items and upcoming architecture enhancements are tracked in [`docs/BACKLOG.md`](docs/BACKLOG.md) and on the live [`/roadmap`](/roadmap) board:
 - **LLM-Powered Background Taxonomy Classification**: Asynchronously tag document categories and regulatory frameworks (`SOC 2`, `ISO 27001`, `GDPR`, `HIPAA`) using fast LLMs (`gemini-2.5-flash-lite`).
 - **Neural Cross-Encoder Reranking**: Cohere Rerank v3 integration on top of RRF.
 - **Direct Spreadsheet & PDF Questionnaire Parser**: Ingestion of multi-tab Excel (`.xlsx`) buyer questionnaires.

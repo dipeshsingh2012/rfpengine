@@ -31,7 +31,9 @@ import {
   Clock,
   MessageSquare,
   CheckCircle,
+  TrendingUp,
 } from "lucide-react";
+import { RoadmapPage } from "./RoadmapPage";
 
 type Source = {
   id: string;
@@ -840,6 +842,15 @@ function App() {
   ).length;
   const isAllApproved = allCurrentQuestions.length > 0 && approvedCount === allCurrentQuestions.length;
 
+  if (route === "/roadmap" || route.startsWith("/roadmap")) {
+    return (
+      <RoadmapPage
+        onNavigateBack={() => navigate(`/response/workspace/${responseId || "demo"}`)}
+        showToast={showToast}
+      />
+    );
+  }
+
   if (route.startsWith("/review/")) {
     return (
       <div className="import-page">
@@ -1000,6 +1011,24 @@ function App() {
           {backendEnv === "prod" || backendEnv === "production" ? "PROD CLOUD" : "LOCAL DEV"}
         </div>
         <div className="topbar-spacer" />
+        <button
+          className="outline-button"
+          style={{
+            padding: "6px 12px",
+            fontSize: "11px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            background: "#eef2ff",
+            borderColor: "#c7d2fe",
+            color: "var(--blue)",
+            fontWeight: 700,
+          }}
+          onClick={() => navigate("/roadmap")}
+          title="Product Discovery & RICE Roadmap"
+        >
+          <TrendingUp size={14} /> 🗺️ Product Roadmap
+        </button>
         <button className="icon-button" title="Open notifications">
           <AlertCircle size={18} />
         </button>
@@ -1036,6 +1065,25 @@ function App() {
               }}
             >
               <Zap size={17} /> KB Playground
+            </button>
+            <button
+              className={`nav-item ${route === "/roadmap" ? "active" : ""}`}
+              onClick={() => navigate("/roadmap")}
+            >
+              <TrendingUp size={17} /> Product Roadmap
+              <span
+                className="nav-count"
+                style={{
+                  background: "#e0e7ff",
+                  color: "var(--blue)",
+                  padding: "1px 5px",
+                  borderRadius: "10px",
+                  fontWeight: 700,
+                  fontSize: "9px",
+                }}
+              >
+                LIVE
+              </span>
             </button>
             <button className="nav-item">
               <History size={17} /> Activity
