@@ -135,7 +135,7 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
         `Then they achieve: "${(newOutcome.trim() || "streamlined delivery").slice(0, 80)}" without resorting to manual workarounds.`,
       ],
       technicalArchitecture:
-        "FastAPI backend microservice + pgvector similarity indexing + React workspace component.",
+        "To be determined during technical refinement spike with engineering leads.",
       rice: { reach: 70, impact: 3, confidence: 75, effort: 3, score: 52.5 },
       upvotes: 1,
       tags: ["Continuous Discovery", "Opportunity", "JTBD", "Community Backlog"],
@@ -611,9 +611,28 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
                 <h3>
                   <span className="section-number">05</span> Technical Architecture & Dependencies
                 </h3>
-                <div className="architecture-box">
-                  <p>{selectedInitiative.technicalArchitecture}</p>
-                </div>
+                {selectedInitiative.stage === "discovery" ? (
+                  <div
+                    style={{
+                      background: "#fffbeb",
+                      border: "1px solid #fef08a",
+                      padding: "14px 16px",
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      color: "#92400e",
+                      lineHeight: "1.55",
+                    }}
+                  >
+                    <strong style={{ display: "block", marginBottom: "4px", color: "#b45309" }}>
+                      ⏳ Pending Engineering Refinement & Technical Spike
+                    </strong>
+                    In continuous product discovery, the problem space, customer friction, and success metrics are validated first. Technical architecture, data models, and API dependencies will be scoped collaboratively with engineering leads during the <em>In Spec & Design</em> phase.
+                  </div>
+                ) : (
+                  <div className="architecture-box">
+                    <p>{selectedInitiative.technicalArchitecture}</p>
+                  </div>
+                )}
               </section>
 
               {/* 6. Tags */}

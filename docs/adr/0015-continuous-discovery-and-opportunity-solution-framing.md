@@ -71,3 +71,4 @@ This Opportunity-First Discovery methodology is utilized by world-class product 
 
 ### Negative / Trade-offs
 - Requires slightly more structured input from contributors compared to a basic one-line feature request form.
+
