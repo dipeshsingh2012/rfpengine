@@ -24,3 +24,4 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0016](0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md) | Relational Persistence for Product Roadmap and Discovery Backlog | Accepted | 2026-08-30 |
 | [0017](0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md) | Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution | Accepted | 2026-08-30 |
 | [0018](0018-enterprise-testing-strategy-and-automated-verification-matrix.md) | Enterprise Testing Strategy and Automated Verification Matrix | Accepted | 2026-08-30 |
+| [0019](0019-closed-loop-ai-feedback-architecture.md) | Closed-Loop AI Feedback Architecture: Golden Q&A Promotion, Edit Drift Analytics, and In-Context Exemplar Learning | Accepted | 2026-08-30 |

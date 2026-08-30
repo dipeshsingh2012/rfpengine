@@ -90,6 +90,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0016: Relational Persistence for Product Roadmap and Discovery Backlog](docs/adr/0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md)
 - [ADR 0017: Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution](docs/adr/0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md)
 - [ADR 0018: Enterprise Testing Strategy and Automated Verification Matrix](docs/adr/0018-enterprise-testing-strategy-and-automated-verification-matrix.md)
+- [ADR 0019: Closed-Loop AI Feedback Architecture: Golden Q&A Promotion, Edit Drift Analytics, and In-Context Exemplar Learning](docs/adr/0019-closed-loop-ai-feedback-architecture.md)
 
 ---
 

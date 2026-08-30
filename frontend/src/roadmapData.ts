@@ -260,6 +260,36 @@ export const INITIAL_ROADMAP_INITIATIVES: RoadmapInitiative[] = [
 
   // --- IN SPEC & DESIGN ---
   {
+    id: "feat-feedback-l1",
+    title: "Curated Golden Q&A Promotion & 1-Click KB Sync (Level 1 Feedback Loop)",
+    stage: "spec",
+    theme: "Core AI & Retrieval",
+    priority: "P0 - Critical",
+    targetPersona: "Security SME / Legal Counsel",
+    quarter: "Q3 2026",
+    summary: "1-click promotion of verified, SME-approved answers directly into the canonical knowledge base with cryptographic provenance.",
+    problemStatement:
+      "SMEs spend 15+ hours each month repeatedly correcting the same standard compliance answers across different customer RFPs because edits stay trapped in individual workspaces.",
+    userStory:
+      "As a Security SME or Legal Counsel, I want to promote my approved answer to the canonical knowledge base with one click, so that future AI drafts automatically reuse my vetted phrasing.",
+    successMetrics: [
+      "0 manual copy-pasting required from completed proposals to knowledge base",
+      "100% provenance tracking (who approved, when, for which client RFP)",
+      "< 1.5s dual-index sync time into Elasticsearch and Pinecone",
+    ],
+    acceptanceCriteria: [
+      "Given a question with review_status == 'Approved' by Security SME, Legal Counsel, or Approver.",
+      "When the user clicks [⭐ Promote to Knowledge Base] in the review drawer or question card.",
+      "Then a new KBEntry is created with category 'Golden Q&A' and metadata linking back to the origin workspace.",
+      "And an audit badge '⭐ Promoted to Knowledge Base' appears on the question card.",
+    ],
+    technicalArchitecture:
+      "FastAPI endpoint + PostgreSQL KBEntry with origin_workspace_id + Dual-sync to Pinecone namespace and Elasticsearch.",
+    rice: { reach: 90, impact: 4, confidence: 95, effort: 2, score: 171.0 },
+    upvotes: 92,
+    tags: ["Feedback Loop", "Golden Q&A", "Knowledge Sync", "RICE P0"],
+  },
+  {
     id: "multi-agent-fact-checker",
     title: "Autonomous Multi-Agent Fact-Checker & Hallucination Guard",
     stage: "spec",
@@ -404,6 +434,66 @@ export const INITIAL_ROADMAP_INITIATIVES: RoadmapInitiative[] = [
     rice: { reach: 50, impact: 3, confidence: 70, effort: 2, score: 52.5 },
     upvotes: 28,
     tags: ["Analytics", "Win/Loss", "Executive Dashboard", "Knowledge Gaps"],
+  },
+  {
+    id: "feat-feedback-l2",
+    title: "Edit-Distance Telemetry & Stale Document Drift Detector (Level 2 Feedback Loop)",
+    stage: "discovery",
+    theme: "Enterprise Governance",
+    priority: "P1 - High",
+    targetPersona: "Knowledge Manager / RevOps",
+    quarter: "Q4 2026",
+    summary: "Background telemetry pipeline calculating Levenshtein edit distance and semantic drift, flagging outdated policies.",
+    problemStatement:
+      "Company policies and SLAs evolve, but knowledge managers have zero visibility into which uploaded PDFs contain obsolete clauses until an SME flags a discrepancy.",
+    userStory:
+      "As a Knowledge Manager, I want telemetry tracking which source documents are frequently overwritten by SMEs, so that I can proactively update outdated company collateral.",
+    successMetrics: [
+      "Automated weekly 'Knowledge Drift & Staleness' health report",
+      "-40% average edit distance across repeat questionnaires over 90 days",
+      "Early detection of deprecated policies before buyer submission",
+    ],
+    acceptanceCriteria: [
+      "Given a completed RFP response set with human edits.",
+      "When responses are finalized, the system computes the edit distance (levenshtein_ratio).",
+      "Then it logs passage attribution quality metrics in PostgreSQL.",
+      "And if a source passage has >50% rewrite frequency across 5+ RFPs, it triggers a Stale Policy Alert in the Knowledge Hub.",
+    ],
+    technicalArchitecture:
+      "PostgreSQL response_feedback_telemetry table + background calculation worker + Knowledge Hub staleness heatmap.",
+    rice: { reach: 75, impact: 3, confidence: 80, effort: 3, score: 60.0 },
+    upvotes: 68,
+    tags: ["Feedback Loop", "Drift Analytics", "Stale Doc Alert", "RevOps"],
+  },
+  {
+    id: "feat-feedback-l3",
+    title: "Dynamic Few-Shot In-Context Learning from Exemplars (Level 3 Feedback Loop)",
+    stage: "discovery",
+    theme: "Core AI & Retrieval",
+    priority: "P1 - High",
+    targetPersona: "Proposal Drafter",
+    quarter: "H1 2027",
+    summary: "RAG prompt conditioning that retrieves top-2 historical winning responses to teach Gemini 2.5 Flash exact company pitch tone.",
+    problemStatement:
+      "Standard RAG provides factual policy text, but LLMs often produce generic or verbose prose that doesn't match the company's executive pitch style.",
+    userStory:
+      "As a Proposal Drafter, I want the AI to synthesize drafts that mimic the exact formatting and tone of our team's highest-rated past winning bids.",
+    successMetrics: [
+      "+35% baseline acceptance rate without human rephrasing",
+      "Consistent company tone and markdown formatting across all questionnaires",
+      "Zero fine-tuning infrastructure overhead",
+    ],
+    acceptanceCriteria: [
+      "Given a new RFP question query.",
+      "When search_knowledge_base executes.",
+      "Then it retrieves both raw document chunks AND top-2 approved Golden Q&A historical pairs.",
+      "And injects the approved pairs as dynamic few-shot exemplars inside the Gemini 2.5 Flash prompt context.",
+    ],
+    technicalArchitecture:
+      "Dual-retriever HybridSearch pipeline + dynamic exemplar few-shot prompt injection in Gemini 2.5 Flash.",
+    rice: { reach: 80, impact: 3, confidence: 70, effort: 4, score: 42.0 },
+    upvotes: 81,
+    tags: ["Feedback Loop", "In-Context Learning", "Few-Shot RAG", "Gemini 2.5"],
   },
 ];
 
