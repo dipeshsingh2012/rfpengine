@@ -222,19 +222,18 @@ Is multi-factor authentication mandatory?,MFA is enforced on all corporate syste
     data = {"tenant_id": "test-upload-tenant"}
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        async with app.router.lifespan_context(app):
-            response = await client.post(
-                "/api/v1/knowledge-base/upload",
-                files=files,
-                data=data,
-            )
+        response = await client.post(
+            "/api/v1/knowledge-base/upload",
+            files=files,
+            data=data,
+        )
 
-            assert response.status_code == 201, f"Upload failed: {response.text}"
-            payload = response.json()
-            assert payload["records_created"] == 2
-            assert payload["tenant_id"] == "test-upload-tenant"
-            assert payload["filename"] == "test_sla.csv"
-            assert len(payload["preview"]) == 2
+        assert response.status_code == 201, f"Upload failed: {response.text}"
+        payload = response.json()
+        assert payload["records_created"] == 2
+        assert payload["tenant_id"] == "test-upload-tenant"
+        assert payload["filename"] == "test_sla.csv"
+        assert len(payload["preview"]) == 2
 
 
 @pytest.mark.asyncio
@@ -249,17 +248,16 @@ Enforced with AES-256 and AWS KMS Customer-Managed Keys.
     data = {"tenant_id": "test-upload-tenant"}
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        async with app.router.lifespan_context(app):
-            response = await client.post(
-                "/api/v1/knowledge-base/upload",
-                files=files,
-                data=data,
-            )
+        response = await client.post(
+            "/api/v1/knowledge-base/upload",
+            files=files,
+            data=data,
+        )
 
-            assert response.status_code == 201
-            payload = response.json()
-            assert payload["records_created"] >= 2
-            assert "Security & Cryptography" in payload["categories"] or "Compliance & Security" in payload["categories"]
+        assert response.status_code == 201
+        payload = response.json()
+        assert payload["records_created"] >= 2
+        assert "Security & Cryptography" in payload["categories"] or "Compliance & Security" in payload["categories"]
 
 
 @pytest.mark.asyncio
@@ -269,15 +267,14 @@ async def test_upload_endpoint_empty_file_bad_request():
     data = {"tenant_id": "test-upload-tenant"}
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        async with app.router.lifespan_context(app):
-            response = await client.post(
-                "/api/v1/knowledge-base/upload",
-                files=files,
-                data=data,
-            )
+        response = await client.post(
+            "/api/v1/knowledge-base/upload",
+            files=files,
+            data=data,
+        )
 
-            assert response.status_code == 400
-            assert "empty" in response.json()["detail"].lower()
+        assert response.status_code == 400
+        assert "empty" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -287,13 +284,13 @@ async def test_upload_endpoint_unsupported_file_extension():
     data = {"tenant_id": "test-upload-tenant"}
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        async with app.router.lifespan_context(app):
-            response = await client.post(
-                "/api/v1/knowledge-base/upload",
-                files=files,
-                data=data,
-            )
+        response = await client.post(
+            "/api/v1/knowledge-base/upload",
+            files=files,
+            data=data,
+        )
 
-            assert response.status_code in [400, 422]
-            assert "Unsupported file format" in response.json()["detail"]
+        assert response.status_code in [400, 422]
+        assert "Unsupported file format" in response.json()["detail"]
+
 

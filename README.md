@@ -89,6 +89,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0015: Continuous Discovery and Opportunity-First Product Framing](docs/adr/0015-continuous-discovery-and-opportunity-solution-framing.md)
 - [ADR 0016: Relational Persistence for Product Roadmap and Discovery Backlog](docs/adr/0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md)
 - [ADR 0017: Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution](docs/adr/0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md)
+- [ADR 0018: Enterprise Testing Strategy and Automated Verification Matrix](docs/adr/0018-enterprise-testing-strategy-and-automated-verification-matrix.md)
 
 ---
 

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import (
     APIRouter,
+    Depends,
     File,
     Form,
     HTTPException,
@@ -15,8 +16,9 @@ from fastapi import (
     status,
 )
 from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_session_factory
+from app.core.db import get_db_session, get_session_factory
 from app.models.db_models import KBEntry
 from app.models.schemas import (
     KBEntryCreate,
@@ -36,6 +38,7 @@ async def list_knowledge_base_entries(
     tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db_session),
 ) -> List[KBEntryResponse]:
     """
     Lists indexed knowledge entries from PostgreSQL (primary System of Record),
@@ -45,33 +48,31 @@ async def list_knowledge_base_entries(
 
     # 1. Primary: PostgreSQL
     try:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            query = (
-                select(KBEntry)
-                .where(KBEntry.tenant_id == tenant_id)
-                .order_by(KBEntry.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-            )
-            result = await session.execute(query)
-            pg_entries = result.scalars().all()
-            if pg_entries:
-                docs = [
-                    {
-                        "id": e.id,
-                        "tenant_id": e.tenant_id,
-                        "title": e.title or e.question,
-                        "content": e.content or e.answer,
-                        "question": e.title or e.question,
-                        "answer": e.content or e.answer,
-                        "category": e.category or "",
-                        "metadata": e.metadata_json or {},
-                        "created_at": e.created_at.isoformat() if e.created_at else None,
-                        "updated_at": e.updated_at.isoformat() if e.updated_at else None,
-                    }
-                    for e in pg_entries
-                ]
+        query = (
+            select(KBEntry)
+            .where(KBEntry.tenant_id == tenant_id)
+            .order_by(KBEntry.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        pg_entries = result.scalars().all()
+        if pg_entries:
+            docs = [
+                {
+                    "id": e.id,
+                    "tenant_id": e.tenant_id,
+                    "title": e.title or e.question,
+                    "content": e.content or e.answer,
+                    "question": e.title or e.question,
+                    "answer": e.content or e.answer,
+                    "category": e.category or "",
+                    "metadata": e.metadata_json or {},
+                    "created_at": e.created_at.isoformat() if e.created_at else None,
+                    "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+                }
+                for e in pg_entries
+            ]
     except Exception as pg_err:
         logger.warning("PostgreSQL list query failed, attempting Elasticsearch fallback: %s", pg_err)
 
@@ -105,29 +106,28 @@ async def list_knowledge_base_entries(
 async def get_knowledge_base_entry(
     request: Request,
     entry_id: str,
+    db: AsyncSession = Depends(get_db_session),
 ) -> KBEntryResponse:
     """
     Retrieves a knowledge entry from PostgreSQL (primary), falling back to Elasticsearch.
     """
     # 1. Primary: PostgreSQL
     try:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            result = await session.execute(select(KBEntry).where(KBEntry.id == entry_id))
-            entry = result.scalar_one_or_none()
-            if entry:
-                return KBEntryResponse(
-                    id=entry.id,
-                    tenant_id=entry.tenant_id,
-                    title=entry.title or entry.question,
-                    content=entry.content or entry.answer,
-                    question=entry.title or entry.question,
-                    answer=entry.content or entry.answer,
-                    category=entry.category or "",
-                    metadata=entry.metadata_json or {},
-                    created_at=entry.created_at.isoformat() if entry.created_at else None,
-                    updated_at=entry.updated_at.isoformat() if entry.updated_at else None,
-                )
+        result = await db.execute(select(KBEntry).where(KBEntry.id == entry_id))
+        entry = result.scalar_one_or_none()
+        if entry:
+            return KBEntryResponse(
+                id=entry.id,
+                tenant_id=entry.tenant_id,
+                title=entry.title or entry.question,
+                content=entry.content or entry.answer,
+                question=entry.title or entry.question,
+                answer=entry.content or entry.answer,
+                category=entry.category or "",
+                metadata=entry.metadata_json or {},
+                created_at=entry.created_at.isoformat() if entry.created_at else None,
+                updated_at=entry.updated_at.isoformat() if entry.updated_at else None,
+            )
     except Exception as pg_err:
         logger.warning("PostgreSQL get failed for %s: %s", entry_id, pg_err)
 
@@ -154,6 +154,7 @@ async def get_knowledge_base_entry(
 async def create_knowledge_base_entry(
     request: Request,
     payload: KBEntryCreate,
+    db: AsyncSession = Depends(get_db_session),
 ) -> KBEntryResponse:
     """
     Indexes a single knowledge entry across PostgreSQL, Elastic Cloud, and Pinecone.
@@ -164,18 +165,16 @@ async def create_knowledge_base_entry(
 
     # 1. Persist to PostgreSQL (System of Record)
     try:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            async with session.begin():
-                entry = KBEntry(
-                    id=doc_id,
-                    tenant_id=payload.tenant_id,
-                    question=title,
-                    answer=content,
-                    category=payload.category,
-                    metadata_json=payload.metadata or {},
-                )
-                session.add(entry)
+        entry = KBEntry(
+            id=doc_id,
+            tenant_id=payload.tenant_id,
+            question=title,
+            answer=content,
+            category=payload.category,
+            metadata_json=payload.metadata or {},
+        )
+        db.add(entry)
+        await db.commit()
     except Exception as pg_err:
         logger.error("Failed to insert KBEntry in PostgreSQL: %s", pg_err)
 
@@ -231,9 +230,11 @@ async def create_knowledge_base_entry(
 
 
 @router.post("/batch", response_model=List[KBEntryResponse], status_code=status.HTTP_201_CREATED)
+@router.post("/bulk", response_model=List[KBEntryResponse], status_code=status.HTTP_201_CREATED)
 async def batch_import_knowledge_base(
     request: Request,
     payload: KBBatchImportRequest,
+    db: AsyncSession = Depends(get_db_session),
 ) -> List[KBEntryResponse]:
     """
     Batch indexes knowledge entries across PostgreSQL, Elastic Cloud, and Pinecone.
@@ -249,7 +250,7 @@ async def batch_import_knowledge_base(
     doc_ids: List[str] = []
 
     for entry in payload.entries:
-        doc_id = entry.id or f"kb-{uuid.uuid4().hex[:8]}"
+        doc_id = getattr(entry, "id", None) or f"kb-{uuid.uuid4().hex[:8]}"
         doc_ids.append(doc_id)
         title = entry.title or entry.question or "Untitled Passage"
         content = entry.content or entry.answer or ""
@@ -294,10 +295,8 @@ async def batch_import_knowledge_base(
 
     # 1. Bulk Insert into PostgreSQL
     try:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            async with session.begin():
-                session.add_all(pg_models)
+        db.add_all(pg_models)
+        await db.commit()
     except Exception as pg_err:
         logger.error("PostgreSQL batch insert failed: %s", pg_err)
 
@@ -490,16 +489,15 @@ async def upload_knowledge_base_file(
 async def delete_knowledge_base_entry(
     request: Request,
     entry_id: str,
+    db: AsyncSession = Depends(get_db_session),
 ) -> None:
     """
     Deletes an entry across PostgreSQL, Elastic Cloud, and Pinecone.
     """
     # 1. Delete from PostgreSQL
     try:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            async with session.begin():
-                await session.execute(delete(KBEntry).where(KBEntry.id == entry_id))
+        await db.execute(delete(KBEntry).where(KBEntry.id == entry_id))
+        await db.commit()
     except Exception as pg_err:
         logger.warning("PostgreSQL delete failed for %s: %s", entry_id, pg_err)
 

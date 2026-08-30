@@ -414,8 +414,8 @@ class PostgresService:
             session.add(review)
 
         await session.commit()
-        await session.refresh(workspace)
-        return workspace
+        refreshed = await PostgresService.get_workspace(session, workspace.id)
+        return refreshed or workspace
 
     @staticmethod
     async def get_workspace(
