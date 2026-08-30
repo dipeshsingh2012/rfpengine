@@ -22,3 +22,4 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0014](0014-four-role-enterprise-governance-and-sme-review-queue.md) | Four-Role Enterprise Governance and SME Review Queue | Accepted | 2026-08-28 |
 | [0015](0015-continuous-discovery-and-opportunity-solution-framing.md) | Continuous Discovery and Opportunity-First Product Framing | Accepted | 2026-08-29 |
 | [0016](0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md) | Relational Persistence for Product Roadmap and Discovery Backlog | Accepted | 2026-08-30 |
+| [0017](0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md) | Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution | Accepted | 2026-08-30 |

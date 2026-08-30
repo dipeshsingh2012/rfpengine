@@ -80,25 +80,25 @@ export const STAGE_CONFIG: Record<
 export const INITIAL_ROADMAP_INITIATIVES: RoadmapInitiative[] = [
   // --- SHIPPED ---
   {
-    id: "cloud-run-vertex-ai",
-    title: "Cloud Run Vertex AI Grounded Search",
+    id: "proposal-drafter-agent",
+    title: "Proposal Drafter Agent (Grounded Knowledge Engine)",
     stage: "shipped",
     theme: "Core AI & Retrieval",
     priority: "P0 - Critical",
-    targetPersona: "Proposal Manager",
+    targetPersona: "Proposal Drafter",
     quarter: "Shipped",
-    summary: "Production Python FastAPI service on Google Cloud Run with Gemini 2.5 Flash and hybrid retrieval.",
+    summary: "Production Python FastAPI service on Google Cloud Run with Gemini 2.5 Flash and hybrid retrieval, acting as the foundational drafting agent.",
     problemStatement:
       "Enterprise sales teams spend 30+ hours per RFP searching through outdated sales decks and disconnected wikis for accurate compliance answers, risking factual inaccuracies.",
     userStory:
-      "As a Proposal Manager, I want AI-generated drafts strictly grounded in verified company documents, so that answers never hallucinate or contradict official policy.",
+      "As a Proposal Drafter, I want an AI Proposal Drafter to generate baseline response drafts strictly grounded in verified company collateral with exact citations.",
     successMetrics: [
       "99.4% factual grounding precision",
       "< 1.2s end-to-end retrieval latency",
       "Zero ungrounded hallucinations in production",
     ],
     acceptanceCriteria: [
-      "Given a question, the API retrieves top-k passages with semantic and keyword scores.",
+      "Given a question, the Proposal Drafter retrieves top-k passages with semantic and keyword scores.",
       "When confidence is high, citations and exact source document IDs are returned.",
       "Responses return structured JSON with confidence score and passage attribution.",
     ],
@@ -106,7 +106,7 @@ export const INITIAL_ROADMAP_INITIATIVES: RoadmapInitiative[] = [
       "FastAPI + Vertex AI gemini-2.5-flash + pgvector cosine similarity + Cloud Run container with auto-scaling.",
     rice: { reach: 100, impact: 4, confidence: 95, effort: 3, score: 126.7 },
     upvotes: 84,
-    tags: ["Vertex AI", "Gemini 2.5", "Cloud Run", "pgvector"],
+    tags: ["Proposal Drafter", "Vertex AI", "Gemini 2.5", "Cloud Run", "pgvector"],
   },
   {
     id: "chrome-extension-mv3",

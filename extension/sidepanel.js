@@ -105,7 +105,7 @@ async function generateAnswer(field, controls) {
     if (!result.ok) throw new Error(`API returned HTTP ${result.status} ${result.statusText}`);
     const data = await result.json();
     controls.answer.value = data.suggested_answer;
-    controls.confidence.textContent = `${Math.round(data.confidence_score * 100)}% confidence`;
+    controls.confidence.textContent = `✍️ Proposal Drafter (${Math.round(data.confidence_score * 100)}%)`;
     controls.sourceBox.innerHTML = data.sources
       .map((source) => `<div class="source-line"><strong>${source.id}</strong> ${source.question}</div>`)
       .join('');
