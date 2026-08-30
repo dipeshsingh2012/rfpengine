@@ -20,9 +20,11 @@ def reciprocal_rank_fusion(
     result_sets: List[List[Dict[str, Any]]],
     limit: int = 5,
     k_constant: int = 60,
+    golden_qa_boost: float = 1.75,
 ) -> List[Dict[str, Any]]:
     """
     Combines ranked results from sparse (Elasticsearch BM25) and dense (Pinecone vector) retrievers using Reciprocal Rank Fusion.
+    Applies an Authority Multiplier (golden_qa_boost) to SME-approved Golden Q&A passages per ADR 0019.
     """
     fused: Dict[str, Dict[str, Any]] = {}
     for result_list in result_sets:
@@ -31,20 +33,34 @@ def reciprocal_rank_fusion(
             if doc_id not in fused:
                 title = item.get("title") or item.get("question", "")
                 content = item.get("content") or item.get("answer", "")
+                category = item.get("category", "")
+                metadata = item.get("metadata", {}) or {}
+                is_golden_qa = (
+                    category == "Golden Q&A"
+                    or metadata.get("is_golden_qa") is True
+                    or doc_id.startswith("kb-gold-")
+                )
                 fused[doc_id] = {
                     "id": doc_id,
                     "title": title,
                     "content": content,
                     "question": title,
                     "answer": content,
-                    "category": item.get("category", ""),
+                    "category": category,
+                    "is_golden_qa": is_golden_qa,
                     "source_file": item.get("source_file"),
                     "page_number": item.get("page_number"),
-                    "metadata": item.get("metadata", {}),
+                    "metadata": metadata,
                     "score": 0.0,
                     "matched_retrievers": [],
                 }
-            fused[doc_id]["score"] += 1.0 / (k_constant + rank)
+
+            # Base RRF score with Authority Multiplier for SME-approved Golden Q&A
+            rank_score = 1.0 / (k_constant + rank)
+            if fused[doc_id].get("is_golden_qa"):
+                rank_score *= golden_qa_boost
+
+            fused[doc_id]["score"] += rank_score
             source_type = item.get("source_type", "search")
             if source_type not in fused[doc_id]["matched_retrievers"]:
                 fused[doc_id]["matched_retrievers"].append(source_type)
@@ -169,11 +185,15 @@ class HybridSearchService:
             retriever_label = "+".join(source_types) if source_types else "hybrid"
             title = hit.get("title") or hit.get("question", "")
             content = hit.get("content") or hit.get("answer", "")
+            category = hit.get("category") or ""
+            is_golden = bool(hit.get("is_golden_qa"))
             sources.append(
                 Source(
                     id=hit["id"],
                     title=title,
                     content=content,
+                    category=category,
+                    is_golden_qa=is_golden,
                     question=title,
                     answer=content,
                     score=round(hit["score"], 6),
@@ -200,22 +220,32 @@ class HybridSearchService:
             source_info = s.source_file or (s.metadata.get("source_file") if s.metadata else "Knowledge Base")
             page_info = f", Page {s.page_number}" if s.page_number else ""
             topic_info = f"Topic: {s.title}" if s.title else ""
-            header = f"--- Source Document Passage [{s.id}] ({source_info}{page_info} | {topic_info}) ---"
+            is_golden = (
+                s.is_golden_qa
+                or s.category == "Golden Q&A"
+                or (s.metadata and s.metadata.get("is_golden_qa") is True)
+                or s.id.startswith("kb-gold-")
+            )
+            authority_badge = " [⭐ SME-APPROVED GOLDEN Q&A - HIGHEST CANONICAL AUTHORITY]" if is_golden else ""
+            header = f"--- Source Document Passage [{s.id}]{authority_badge} ({source_info}{page_info} | {topic_info}) ---"
             context_blocks.append(f"{header}\n{s.content}")
 
         context = "\n\n".join(context_blocks) if context_blocks else "No relevant documentation passages found in the knowledge base."
 
         prompt = (
-            "You are an enterprise RFP response assistant for technical, security, and compliance questionnaires.\n\n"
-            "Your task is to synthesize a direct, authoritative, and professional answer to the buyer's questionnaire requirement "
+            "You are an enterprise AI Proposal Drafter specializing in technical, security, and compliance RFP questionnaires.\n\n"
+            "Your task is to synthesize a direct, authoritative, and audit-ready answer to the buyer's questionnaire requirement "
             "based SOLELY on the approved documentation passages provided below.\n\n"
-            "Guidelines:\n"
-            "1. Address the requirement directly and clearly (e.g. state 'Yes' or confirm capabilities when supported by documentation).\n"
-            "2. Extract and incorporate specific standards, protocols, SLAs, and technical details mentioned in the passages.\n"
-            "3. If the documentation passages do not provide sufficient information to answer the question, state clearly that the information is not specified in current approved documentation.\n"
-            "4. Do NOT hallucinate, invent unmentioned capabilities, or extrapolate beyond the provided text passages.\n\n"
+            "Precedence & Grounding Hierarchy (ADR 0019 Closed-Loop AI Feedback):\n"
+            "1. Golden Q&A Precedence: If any provided passage is tagged '[⭐ SME-APPROVED GOLDEN Q&A - HIGHEST CANONICAL AUTHORITY]', "
+            "it represents a recent verified human sign-off by a Security SME or Legal Counsel. "
+            "STRICTLY prioritize the Golden Q&A as the latest authoritative ground truth, using its exact terms to override any contradictory statements in older raw PDF/policy documents.\n"
+            "2. Direct & Professional Tone: Address the requirement directly and clearly (e.g. state 'Yes' or confirm capabilities when supported by documentation).\n"
+            "3. Exact Specifics: Extract and incorporate specific standards, protocols, SLAs, ciphers, and technical metrics mentioned in the passages.\n"
+            "4. Anti-Hallucination: If the documentation passages do not provide sufficient information to answer the question, state clearly that the information is not specified in current approved documentation.\n"
+            "5. Strict Boundary: Do NOT extrapolate, assume unmentioned features, or invent capabilities beyond the provided text passages.\n\n"
             f"Questionnaire Requirement / Buyer Question:\n{question}\n\n"
-            f"Approved Documentation Passages:\n{context}\n\n"
+            f"Approved Documentation Passages (Ordered by Relevance & SME Authority):\n{context}\n\n"
             "Synthesized RFP Answer:"
         )
 

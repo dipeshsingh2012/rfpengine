@@ -17,6 +17,8 @@ class Source(BaseModel):
     id: str
     title: Optional[str] = ""
     content: str = ""
+    category: Optional[str] = None
+    is_golden_qa: Optional[bool] = False
     score: float = 0.0
     source_type: Optional[str] = "hybrid"  # "elasticsearch", "pinecone", "hybrid"
     source_file: Optional[str] = None
@@ -36,6 +38,10 @@ class Source(BaseModel):
             data["content"] = content
             data["question"] = title
             data["answer"] = content
+            if "category" in data and data["category"] == "Golden Q&A":
+                data["is_golden_qa"] = True
+            elif data.get("metadata") and data["metadata"].get("is_golden_qa") is True:
+                data["is_golden_qa"] = True
         return data
 
 
