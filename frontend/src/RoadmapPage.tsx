@@ -16,6 +16,8 @@ import {
   TrendingUp,
   User,
   X,
+  RotateCcw,
+  GripVertical,
 } from "lucide-react";
 import {
   INITIAL_ROADMAP_INITIATIVES,
@@ -64,6 +66,10 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
 
+  // Drag-and-Drop Kanban State
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<RoadmapStage | null>(null);
+
   // Continuous Discovery & Opportunity Framing State (Teresa Torres + JTBD)
   const [newTitle, setNewTitle] = useState("");
   const [newPersona, setNewPersona] = useState("Proposal Manager");
@@ -80,6 +86,65 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
   useEffect(() => {
     localStorage.setItem("rfpengine.roadmap.upvoted", JSON.stringify([...upvotedIds]));
   }, [upvotedIds]);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedItemId(id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, stage: RoadmapStage) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverStage !== stage) {
+      setDragOverStage(stage);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, stage: RoadmapStage) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (dragOverStage === stage) {
+      setDragOverStage(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStage: RoadmapStage) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain") || draggedItemId;
+    setDragOverStage(null);
+    setDraggedItemId(null);
+
+    if (!id) return;
+
+    const targetItem = initiatives.find((i) => i.id === id);
+    if (!targetItem || targetItem.stage === targetStage) return;
+
+    setInitiatives((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const updatedQuarter = targetStage === "shipped" ? "Shipped" : item.quarter === "Shipped" ? "In Backlog" : item.quarter;
+          return { ...item, stage: targetStage, quarter: updatedQuarter };
+        }
+        return item;
+      })
+    );
+
+    const cfg = STAGE_CONFIG[targetStage];
+    showToast(`Moved "${targetItem.title}" to ${cfg.label} ${cfg.icon}`);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
+    setDragOverStage(null);
+  };
+
+  const handleResetToDefault = () => {
+    if (window.confirm("Reset all roadmap initiatives back to default backlog?")) {
+      setInitiatives(INITIAL_ROADMAP_INITIATIVES);
+      localStorage.removeItem("rfpengine.roadmap.initiatives");
+      showToast("🔄 Roadmap restored to default product backlog.");
+    }
+  };
 
   const handleUpvote = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -293,18 +358,34 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
             <option value="RevOps">Head of Sales / RevOps</option>
             <option value="Bid Team">Bid Team</option>
           </select>
+
+          <button
+            className="outline-button"
+            style={{ padding: "7px 11px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "5px", color: "var(--muted)" }}
+            onClick={handleResetToDefault}
+            title="Reset to default roadmap backlog"
+          >
+            <RotateCcw size={12} /> Reset
+          </button>
         </div>
       </div>
 
-      {/* --- 1. KANBAN BOARD VIEW --- */}
+      {/* --- 1. KANBAN BOARD VIEW (DRAG AND DROP) --- */}
       {viewMode === "kanban" && (
         <div className="kanban-board">
           {stages.map((st) => {
             const stageItems = filteredInitiatives.filter((i) => i.stage === st);
             const cfg = STAGE_CONFIG[st];
+            const isColumnDragOver = dragOverStage === st;
 
             return (
-              <div className="kanban-column" key={st}>
+              <div
+                className={`kanban-column ${isColumnDragOver ? "is-drag-over" : ""}`}
+                key={st}
+                onDragOver={(e) => handleDragOver(e, st)}
+                onDragLeave={(e) => handleDragLeave(e, st)}
+                onDrop={(e) => handleDrop(e, st)}
+              >
                 <div className="kanban-column-header">
                   <div className="stage-title-wrap">
                     <span className="stage-icon">{cfg.icon}</span>
@@ -316,21 +397,30 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
 
                 <div className="kanban-cards-list">
                   {stageItems.length === 0 ? (
-                    <div className="empty-column-placeholder">No initiatives in this filter</div>
+                    <div className={`empty-column-placeholder ${isColumnDragOver ? "active-drop-zone" : ""}`}>
+                      {isColumnDragOver ? "📥 Drop here to move" : "No initiatives in this filter"}
+                    </div>
                   ) : (
                     stageItems.map((item) => {
                       const isUpvoted = upvotedIds.has(item.id);
+                      const isItemDragging = draggedItemId === item.id;
 
                       return (
                         <article
                           key={item.id}
-                          className="kanban-card"
+                          className={`kanban-card ${isItemDragging ? "is-dragging" : ""}`}
+                          draggable={true}
+                          onDragStart={(e) => handleDragStart(e, item.id)}
+                          onDragEnd={handleDragEnd}
                           onClick={() => setSelectedInitiative(item)}
                         >
                           <div className="kanban-card-top">
-                            <span className={`priority-tag ${item.priority.slice(0, 2).toLowerCase()}`}>
-                              {item.priority}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <GripVertical size={13} className="drag-handle-icon" />
+                              <span className={`priority-tag ${item.priority.slice(0, 2).toLowerCase()}`}>
+                                {item.priority}
+                              </span>
+                            </div>
                             <span className="quarter-tag">{item.quarter}</span>
                           </div>
 

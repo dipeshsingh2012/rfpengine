@@ -34,12 +34,16 @@ The hub implements:
      - Measurable KPIs & Success Metrics
      - Gherkin-formatted Acceptance Criteria (`Given... When... Then...`)
      - Technical Architecture & Infrastructure Notes
-5. **Community Upvoting & Discovery Feedback Loop**:
+5. **Tactile Drag-and-Drop Lifecycle Transitions**:
+   - Native HTML5 drag-and-drop interaction allowing product managers and contributors to transition initiatives across the 5 lifecycle columns (`In Discovery` -> `In Spec & Design` -> `In Development` -> `Beta & Testing` -> `Shipped & Live`).
+   - Dynamic lifecycle governance: updates status, triggers toast confirmations, and persists state in `localStorage`.
+6. **Community Upvoting & Discovery Feedback Loop**:
    - Interactive upvoting with local storage persistence and a modal for capturing stakeholder feature requests.
 
 ## Consequences
 
 ### Positive
+- **Tactile Product Management UX**: Enables fluid re-prioritization and stage progression directly on the board without leaving the workspace.
 - **Demonstrates Product Management & Discovery Rigor**: Clearly showcases the strategic rationale, target personas, and quantitative prioritization driving technical decisions.
 - **Enhanced Stakeholder Transparency**: Gives enterprise customers and design partners a live window into upcoming capabilities and release timelines.
 - **Continuous Feedback Ingestion**: Provides a native mechanism to capture, validate, and upvote new feature ideas directly within the product.
