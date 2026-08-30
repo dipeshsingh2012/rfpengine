@@ -138,3 +138,4 @@ promoted_kb_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 ### Considerations & Mitigations
 * **Knowledge Base Growth**: Over time, hundreds of Golden Q&As may be promoted. Level 2 drift analytics and deduplication filters ensure obsolete entries are superseded.
 * **Role-Based Promotion Permissions**: Only verified roles (`Security SME`, `Legal reviewer`, `Final approver`) are permitted to promote entries to canonical status.
+
