@@ -174,3 +174,64 @@ class HealthResponse(BaseModel):
     version: str
     environment: str = "local"
     services: Dict[str, HealthServiceStatus]
+
+
+# --- Roadmap & Product Discovery Schemas ---
+
+class RICEScoreSchema(BaseModel):
+    reach: int = Field(default=50, ge=1, le=100)
+    impact: int = Field(default=3, ge=1, le=4)
+    confidence: int = Field(default=80, ge=10, le=100)
+    effort: int = Field(default=3, ge=1, le=20)
+    score: float = 40.0
+
+
+class RoadmapInitiativeBase(BaseModel):
+    title: str = Field(min_length=1)
+    stage: str = Field(default="discovery")  # "discovery", "spec", "development", "beta", "shipped"
+    theme: str = Field(default="Core AI & Retrieval")
+    priority: str = Field(default="P1 - High")
+    target_persona: str = Field(default="Proposal Manager")
+    quarter: str = Field(default="In Discovery")
+    summary: str = Field(default="")
+    problem_statement: str = Field(default="")
+    user_story: str = Field(default="")
+    success_metrics: List[str] = Field(default_factory=list)
+    acceptance_criteria: List[str] = Field(default_factory=list)
+    technical_architecture: str = Field(default="")
+    rice: RICEScoreSchema = Field(default_factory=RICEScoreSchema)
+    upvotes: int = Field(default=0)
+    tags: List[str] = Field(default_factory=list)
+
+
+class RoadmapInitiativeCreate(RoadmapInitiativeBase):
+    id: Optional[str] = None
+    tenant_id: str = Field(default="default")
+
+
+class RoadmapInitiativeUpdate(BaseModel):
+    title: Optional[str] = None
+    stage: Optional[str] = None
+    theme: Optional[str] = None
+    priority: Optional[str] = None
+    target_persona: Optional[str] = None
+    quarter: Optional[str] = None
+    summary: Optional[str] = None
+    problem_statement: Optional[str] = None
+    user_story: Optional[str] = None
+    success_metrics: Optional[List[str]] = None
+    acceptance_criteria: Optional[List[str]] = None
+    technical_architecture: Optional[str] = None
+    rice: Optional[RICEScoreSchema] = None
+    upvotes: Optional[int] = None
+    tags: Optional[List[str]] = None
+
+
+class RoadmapInitiativeResponse(RoadmapInitiativeBase):
+    id: str
+    tenant_id: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+

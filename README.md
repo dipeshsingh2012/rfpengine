@@ -87,6 +87,7 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0013: Manifest V3 Background Service Worker IPC and Sandboxed Storage Sync](docs/adr/0013-manifest-v3-background-service-worker-ipc-and-sandboxed-storage-sync.md)
 - [ADR 0014: Four-Role Enterprise Governance and SME Review Queue](docs/adr/0014-four-role-enterprise-governance-and-sme-review-queue.md)
 - [ADR 0015: Continuous Discovery and Opportunity-First Product Framing](docs/adr/0015-continuous-discovery-and-opportunity-solution-framing.md)
+- [ADR 0016: Relational Persistence for Product Roadmap and Discovery Backlog](docs/adr/0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md)
 
 ---
 

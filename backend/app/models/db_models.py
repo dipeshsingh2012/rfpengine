@@ -101,3 +101,36 @@ class QuestionReview(Base):
         Index("ix_workspace_question_idx", "workspace_id", "question_index", unique=True),
     )
 
+
+class RoadmapInitiativeModel(Base):
+    __tablename__ = "roadmap_initiatives"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False, default="default")
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    stage: Mapped[str] = mapped_column(String(32), default="discovery", index=True)
+    theme: Mapped[str] = mapped_column(String(64), default="Core AI & Retrieval", index=True)
+    priority: Mapped[str] = mapped_column(String(32), default="P1 - High")
+    target_persona: Mapped[str] = mapped_column(String(128), default="Proposal Manager")
+    quarter: Mapped[str] = mapped_column(String(32), default="In Discovery")
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    problem_statement: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    user_story: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    success_metrics: Mapped[List[str]] = mapped_column(JSON, default=list)
+    acceptance_criteria: Mapped[List[str]] = mapped_column(JSON, default=list)
+    technical_architecture: Mapped[str] = mapped_column(Text, default="")
+    rice_reach: Mapped[int] = mapped_column(Integer, default=50)
+    rice_impact: Mapped[int] = mapped_column(Integer, default=3)
+    rice_confidence: Mapped[int] = mapped_column(Integer, default=80)
+    rice_effort: Mapped[int] = mapped_column(Integer, default=3)
+    rice_score: Mapped[float] = mapped_column(Float, default=40.0)
+    upvotes: Mapped[int] = mapped_column(Integer, default=0)
+    tags: Mapped[List[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        Index("ix_roadmap_tenant_stage", "tenant_id", "stage"),
+    )
+
+

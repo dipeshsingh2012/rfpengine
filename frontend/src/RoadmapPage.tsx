@@ -32,9 +32,27 @@ type ViewMode = "kanban" | "rice" | "themes";
 interface RoadmapPageProps {
   onNavigateBack: () => void;
   showToast: (msg: string) => void;
+  apiBaseUrl?: string;
 }
 
-export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showToast }) => {
+const CLOUD_RUN_PROD_API = "https://rfpengine-api-714049712844.us-central1.run.app/api";
+
+function resolveApiBase(): string {
+  const envUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+  if (!envUrl || envUrl === "/api") {
+    if (typeof window !== "undefined" && window.location.hostname && !window.location.hostname.includes("localhost") && window.location.hostname !== "127.0.0.1") {
+      return CLOUD_RUN_PROD_API;
+    }
+    return "/api";
+  }
+  if (!envUrl.startsWith("/") && !envUrl.endsWith("/api")) {
+    return `${envUrl}/api`;
+  }
+  return envUrl;
+}
+
+export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showToast, apiBaseUrl }) => {
+  const resolvedBase = apiBaseUrl || resolveApiBase();
   const [initiatives, setInitiatives] = useState<RoadmapInitiative[]>(() => {
     const saved = localStorage.getItem("rfpengine.roadmap.initiatives");
     if (saved) {
@@ -65,6 +83,7 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
   const [personaFilter, setPersonaFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
 
   // Drag-and-Drop Kanban State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -78,6 +97,32 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
   const [newWorkaround, setNewWorkaround] = useState("");
   const [newOutcome, setNewOutcome] = useState("");
   const [newHypothesis, setNewHypothesis] = useState("");
+
+  // Load initiatives from PostgreSQL database on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchFromDb() {
+      try {
+        setIsLoadingDb(true);
+        const res = await fetch(`${resolvedBase}/v1/roadmap`);
+        if (res.ok) {
+          const data: RoadmapInitiative[] = await res.json();
+          if (isMounted && Array.isArray(data) && data.length > 0) {
+            setInitiatives(data);
+            localStorage.setItem("rfpengine.roadmap.initiatives", JSON.stringify(data));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not sync roadmap from database (using offline local cache):", err);
+      } finally {
+        if (isMounted) setIsLoadingDb(false);
+      }
+    }
+    fetchFromDb();
+    return () => {
+      isMounted = false;
+    };
+  }, [resolvedBase]);
 
   useEffect(() => {
     localStorage.setItem("rfpengine.roadmap.initiatives", JSON.stringify(initiatives));
@@ -108,7 +153,7 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
     }
   };
 
-  const handleDrop = (e: React.DragEvent, targetStage: RoadmapStage) => {
+  const handleDrop = async (e: React.DragEvent, targetStage: RoadmapStage) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain") || draggedItemId;
     setDragOverStage(null);
@@ -119,10 +164,12 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
     const targetItem = initiatives.find((i) => i.id === id);
     if (!targetItem || targetItem.stage === targetStage) return;
 
+    const updatedQuarter = targetStage === "shipped" ? "Shipped" : targetItem.quarter === "Shipped" ? "In Backlog" : targetItem.quarter;
+
+    // Optimistic UI update
     setInitiatives((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const updatedQuarter = targetStage === "shipped" ? "Shipped" : item.quarter === "Shipped" ? "In Backlog" : item.quarter;
           return { ...item, stage: targetStage, quarter: updatedQuarter };
         }
         return item;
@@ -131,6 +178,17 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
 
     const cfg = STAGE_CONFIG[targetStage];
     showToast(`Moved "${targetItem.title}" to ${cfg.label} ${cfg.icon}`);
+
+    // Sync with PostgreSQL
+    try {
+      await fetch(`${resolvedBase}/v1/roadmap/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: targetStage, quarter: updatedQuarter }),
+      });
+    } catch (err) {
+      console.warn("Failed to persist stage change to database:", err);
+    }
   };
 
   const handleDragEnd = () => {
@@ -138,23 +196,29 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
     setDragOverStage(null);
   };
 
-  const handleResetToDefault = () => {
-    if (window.confirm("Reset all roadmap initiatives back to default backlog?")) {
+  const handleResetToDefault = async () => {
+    if (window.confirm("Reset all roadmap initiatives back to default backlog in database?")) {
       setInitiatives(INITIAL_ROADMAP_INITIATIVES);
       localStorage.removeItem("rfpengine.roadmap.initiatives");
       showToast("🔄 Roadmap restored to default product backlog.");
+      try {
+        await fetch(`${resolvedBase}/v1/roadmap/reset`, { method: "POST" });
+      } catch (err) {
+        console.warn("Failed to reset database roadmap:", err);
+      }
     }
   };
 
-  const handleUpvote = (id: string, e: React.MouseEvent) => {
+  const handleUpvote = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const isUpvoted = upvotedIds.has(id);
     const nextUpvoted = new Set(upvotedIds);
+    const delta = isUpvoted ? -1 : 1;
 
+    // Optimistic UI update
     setInitiatives((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const delta = isUpvoted ? -1 : 1;
           return { ...item, upvotes: Math.max(0, item.upvotes + delta) };
         }
         return item;
@@ -169,9 +233,18 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
       showToast("👍 Feature request upvoted! Added to discovery backlog.");
     }
     setUpvotedIds(nextUpvoted);
+
+    // Sync with PostgreSQL
+    try {
+      await fetch(`${resolvedBase}/v1/roadmap/${id}/upvote?delta=${delta}`, {
+        method: "POST",
+      });
+    } catch (err) {
+      console.warn("Failed to persist upvote to database:", err);
+    }
   };
 
-  const handleCreateInitiative = (e: React.FormEvent) => {
+  const handleCreateInitiative = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newSituation.trim()) return;
 
@@ -206,6 +279,7 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
       tags: ["Continuous Discovery", "Opportunity", "JTBD", "Community Backlog"],
     };
 
+    // Optimistic UI update
     setInitiatives([newInit, ...initiatives]);
     setUpvotedIds((prev) => new Set([...prev, newInit.id]));
     setNewTitle("");
@@ -214,8 +288,19 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
     setNewOutcome("");
     setNewHypothesis("");
     setShowSubmitModal(false);
-    showToast("🎉 Customer Opportunity captured and framed in Discovery Backlog!");
+    showToast("🎉 Customer Opportunity captured in PostgreSQL Discovery Backlog!");
     setSelectedInitiative(newInit);
+
+    // Sync with PostgreSQL
+    try {
+      await fetch(`${resolvedBase}/v1/roadmap`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newInit),
+      });
+    } catch (err) {
+      console.warn("Failed to persist new opportunity to database:", err);
+    }
   };
 
   const filteredInitiatives = useMemo(() => {

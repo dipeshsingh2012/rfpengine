@@ -847,6 +847,7 @@ function App() {
       <RoadmapPage
         onNavigateBack={() => navigate(`/response/workspace/${responseId || "demo"}`)}
         showToast={showToast}
+        apiBaseUrl={apiBaseUrl}
       />
     );
   }
