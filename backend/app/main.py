@@ -44,10 +44,13 @@ async def lifespan(app: FastAPI):
 
     # 2. Initialize PostgreSQL tables
     try:
+        from sqlalchemy import text
         engine = get_engine()
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("PostgreSQL database tables verified/created.")
+            await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS is_promoted_to_kb BOOLEAN DEFAULT FALSE;"))
+            await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS promoted_kb_id VARCHAR(64);"))
+        logger.info("PostgreSQL database tables and columns verified/created.")
     except Exception as exc:
         logger.warning("Could not automatically create PostgreSQL tables (DB may be offline): %s", exc)
 

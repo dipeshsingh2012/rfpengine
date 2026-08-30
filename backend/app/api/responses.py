@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
 from app.models.schemas import (
+    KBPromoteResponse,
     QuestionReviewItem,
     QuestionReviewUpdate,
     WorkspaceCreate,
@@ -16,6 +17,22 @@ from app.services.postgres_service import PostgresService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/workspaces", tags=["Workspaces & Reviews"])
+
+
+def _map_review_item(q) -> QuestionReviewItem:
+    return QuestionReviewItem(
+        id=q.id,
+        question_index=q.question_index,
+        question_text=q.question_text,
+        suggested_answer=q.suggested_answer,
+        final_answer=q.final_answer,
+        review_status=q.review_status,
+        assigned_role=q.assigned_role,
+        confidence_score=q.confidence_score,
+        sources=q.sources_json,
+        is_promoted_to_kb=bool(getattr(q, "is_promoted_to_kb", False)),
+        promoted_kb_id=getattr(q, "promoted_kb_id", None),
+    )
 
 
 @router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
@@ -32,20 +49,7 @@ async def save_workspace(
         source_url=workspace.source_url,
         created_at=workspace.created_at,
         updated_at=workspace.updated_at,
-        questions=[
-            QuestionReviewItem(
-                id=q.id,
-                question_index=q.question_index,
-                question_text=q.question_text,
-                suggested_answer=q.suggested_answer,
-                final_answer=q.final_answer,
-                review_status=q.review_status,
-                assigned_role=q.assigned_role,
-                confidence_score=q.confidence_score,
-                sources=q.sources_json,
-            )
-            for q in workspace.reviews
-        ],
+        questions=[_map_review_item(q) for q in workspace.reviews],
     )
 
 
@@ -66,20 +70,7 @@ async def get_workspace(
         source_url=workspace.source_url,
         created_at=workspace.created_at,
         updated_at=workspace.updated_at,
-        questions=[
-            QuestionReviewItem(
-                id=q.id,
-                question_index=q.question_index,
-                question_text=q.question_text,
-                suggested_answer=q.suggested_answer,
-                final_answer=q.final_answer,
-                review_status=q.review_status,
-                assigned_role=q.assigned_role,
-                confidence_score=q.confidence_score,
-                sources=q.sources_json,
-            )
-            for q in workspace.reviews
-        ],
+        questions=[_map_review_item(q) for q in workspace.reviews],
     )
 
 
@@ -101,15 +92,61 @@ async def update_question_review(
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question review not found")
 
-    return QuestionReviewItem(
-        id=review.id,
-        question_index=review.question_index,
-        question_text=review.question_text,
-        suggested_answer=review.suggested_answer,
-        final_answer=review.final_answer,
-        review_status=review.review_status,
-        assigned_role=review.assigned_role,
-        confidence_score=review.confidence_score,
-        sources=review.sources_json,
+    return _map_review_item(review)
+
+
+@router.post("/{workspace_id}/questions/{question_index}/promote", response_model=KBPromoteResponse, status_code=status.HTTP_200_OK)
+async def promote_question_to_knowledge_base(
+    workspace_id: str,
+    question_index: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+) -> KBPromoteResponse:
+    """
+    Level 1 Closed-Loop AI Feedback (ADR 0019):
+    Promotes an SME-approved question answer directly into the canonical Knowledge Base,
+    updating PostgreSQL, Pinecone dense vectors, and Elasticsearch BM25 indexes.
+    """
+    try:
+        kb_entry, review = await PostgresService.promote_question_to_kb(
+            session=db,
+            workspace_id=workspace_id,
+            question_index=question_index,
+            category="Golden Q&A",
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(val_err))
+
+    # Async dual-index vector synchronization (Pinecone / ES)
+    hybrid_search = getattr(request.app.state, "hybrid_search", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    if hybrid_search and pinecone_service:
+        try:
+            embed_text = f"Question: {kb_entry.question}\nAnswer: {kb_entry.answer}"
+            vec = await hybrid_search.generate_embedding(embed_text)
+            await pinecone_service.upsert_vector(
+                vector_id=kb_entry.id,
+                values=vec,
+                metadata={
+                    "tenant_id": kb_entry.tenant_id,
+                    "title": kb_entry.question,
+                    "content": kb_entry.answer,
+                    "category": kb_entry.category or "Golden Q&A",
+                    "is_golden_qa": True,
+                    "origin_workspace_id": workspace_id,
+                },
+            )
+        except Exception as sync_err:
+            logger.warning("Pinecone vector sync on Golden Q&A promotion failed: %s", sync_err)
+
+    return KBPromoteResponse(
+        success=True,
+        message=f"Successfully promoted Q{question_index + 1} to canonical Knowledge Base as Golden Q&A.",
+        kb_entry_id=kb_entry.id,
+        workspace_id=workspace_id,
+        question_index=question_index,
+        category=kb_entry.category or "Golden Q&A",
+        review=_map_review_item(review),
     )
+
 

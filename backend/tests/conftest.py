@@ -60,6 +60,9 @@ def init_app_state_mocks():
         app.state.hybrid_search = MockHybridSearchService()
 
 
+from sqlalchemy import text
+
+
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncSession:
     """
@@ -68,6 +71,12 @@ async def db_session() -> AsyncSession:
     app_settings = get_settings()
     normalized_url = normalize_database_url(app_settings.effective_database_url)
     engine = create_async_engine(normalized_url, poolclass=NullPool)
+
+    # Ensure schema migrations are applied
+    async with engine.begin() as conn:
+        await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS is_promoted_to_kb BOOLEAN DEFAULT FALSE;"))
+        await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS promoted_kb_id VARCHAR(64);"))
+
     session_factory = async_sessionmaker(
         bind=engine,
         class_=AsyncSession,

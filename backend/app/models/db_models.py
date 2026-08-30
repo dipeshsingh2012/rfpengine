@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -92,6 +93,8 @@ class QuestionReview(Base):
     assigned_role: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     sources_json: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
+    is_promoted_to_kb: Mapped[bool] = mapped_column(Boolean, default=False)
+    promoted_kb_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

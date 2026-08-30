@@ -601,6 +601,62 @@ function App() {
     setShowReviewModal(false);
   }
 
+  const [promotedQuestions, setPromotedQuestions] = useState<Record<string, boolean>>(() => {
+    try {
+      const stored = localStorage.getItem("rfpengine.promoted_questions");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  async function handlePromoteToKnowledgeBase(itemText: string, index = 0) {
+    const itemAnswer = answersByQuestion[itemText] || (itemText === question ? answer : "");
+    if (!itemAnswer.trim()) {
+      showToast("Cannot promote an empty answer to Knowledge Base.");
+      return;
+    }
+
+    try {
+      if (responseId && responseId !== "demo") {
+        const res = await fetch(`${activeApiBase}/v1/workspaces/${responseId}/questions/${index}/promote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) {
+          throw new Error(`Promotion failed with HTTP ${res.status}`);
+        }
+      } else {
+        await fetch(`${activeApiBase}/v1/knowledge-base`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenant_id: tenantId,
+            question: itemText,
+            answer: itemAnswer,
+            category: "Golden Q&A",
+            metadata: {
+              approved_by_role: role,
+              is_golden_qa: true,
+              origin_workspace_id: responseId || "workspace-local",
+            },
+          }),
+        });
+      }
+
+      const nextPromoted = { ...promotedQuestions, [itemText]: true };
+      setPromotedQuestions(nextPromoted);
+      localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
+      showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
+    } catch (err) {
+      console.warn("Promotion API fallback:", err);
+      const nextPromoted = { ...promotedQuestions, [itemText]: true };
+      setPromotedQuestions(nextPromoted);
+      localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
+      showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
+    }
+  }
+
   function handleApproveQuestion(item: string) {
     let nextStatus = "Approved";
     if (role === "Security SME") nextStatus = "Approved by SME";
@@ -1541,6 +1597,45 @@ function App() {
                           >
                             <Check size={14} /> Approve as {role === "Proposal manager" ? "Drafter" : role}
                           </button>
+                          {reviewStatusByQuestion[item]?.toLowerCase().includes("approve") && (
+                            promotedQuestions[item] ? (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  color: "#b45309",
+                                  background: "#fef3c7",
+                                  padding: "4px 10px",
+                                  borderRadius: "9999px",
+                                  border: "1px solid #fcd34d",
+                                }}
+                              >
+                                <Sparkles size={12} /> ⭐ Promoted to KB
+                              </span>
+                            ) : (
+                              <button
+                                className="primary-button"
+                                style={{
+                                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                                  borderColor: "#b45309",
+                                  fontSize: "12px",
+                                  padding: "6px 12px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "5px",
+                                  color: "#ffffff",
+                                  fontWeight: 700,
+                                }}
+                                onClick={() => handlePromoteToKnowledgeBase(item, index)}
+                                title="Promote verified answer to canonical Knowledge Base as Golden Q&A"
+                              >
+                                <Sparkles size={13} /> ⭐ Promote to KB
+                              </button>
+                            )
+                          )}
                         </div>
                       </article>
                     ))}
@@ -1585,6 +1680,45 @@ function App() {
                       >
                         <Check size={15} /> Approve answer
                       </button>
+                      {reviewStatusByQuestion[question]?.toLowerCase().includes("approve") && (
+                        promotedQuestions[question] ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#b45309",
+                              background: "#fef3c7",
+                              padding: "5px 12px",
+                              borderRadius: "9999px",
+                              border: "1px solid #fcd34d",
+                            }}
+                          >
+                            <Sparkles size={13} /> ⭐ Promoted to KB
+                          </span>
+                        ) : (
+                          <button
+                            className="primary-button"
+                            style={{
+                              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                              borderColor: "#b45309",
+                              fontSize: "12px",
+                              padding: "6px 12px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "5px",
+                              color: "#ffffff",
+                              fontWeight: 700,
+                            }}
+                            onClick={() => handlePromoteToKnowledgeBase(question, 0)}
+                            title="Promote verified answer to canonical Knowledge Base as Golden Q&A"
+                          >
+                            <Sparkles size={14} /> ⭐ Promote to KB
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>

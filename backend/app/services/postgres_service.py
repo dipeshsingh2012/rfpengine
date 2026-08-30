@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -126,11 +127,11 @@ DEFAULT_SEEDS = [
     {
         "id": "feat-feedback-l1",
         "title": "Curated Golden Q&A Promotion & 1-Click KB Sync (Level 1 Feedback Loop)",
-        "stage": "spec",
+        "stage": "shipped",
         "theme": "Core AI & Retrieval",
         "priority": "P0 - Critical",
         "target_persona": "Security SME / Legal Counsel",
-        "quarter": "Q3 2026",
+        "quarter": "Shipped",
         "summary": "1-click promotion of verified, SME-approved answers directly into the canonical knowledge base with cryptographic provenance.",
         "problem_statement": "SMEs spend 15+ hours each month repeatedly correcting the same standard compliance answers across different customer RFPs because edits stay trapped in individual workspaces.",
         "user_story": "As a Security SME or Legal Counsel, I want to promote my approved answer to the canonical knowledge base with one click, so that future AI drafts automatically reuse my vetted phrasing.",
@@ -524,3 +525,71 @@ class PostgresService:
         await session.commit()
         await session.refresh(review)
         return review
+
+    @staticmethod
+    async def promote_question_to_kb(
+        session: AsyncSession,
+        workspace_id: str,
+        question_index: int,
+        category: str = "Golden Q&A",
+    ) -> Tuple[KBEntry, QuestionReview]:
+        workspace_res = await session.execute(
+            select(ResponseWorkspace).where(ResponseWorkspace.id == workspace_id)
+        )
+        workspace = workspace_res.scalars().first()
+        if not workspace:
+            raise ValueError(f"Workspace '{workspace_id}' not found.")
+
+        review_res = await session.execute(
+            select(QuestionReview).where(
+                QuestionReview.workspace_id == workspace_id,
+                QuestionReview.question_index == question_index,
+            )
+        )
+        review = review_res.scalars().first()
+        if not review:
+            raise ValueError(f"Question index {question_index} not found in workspace '{workspace_id}'.")
+
+        answer_text = review.final_answer or review.suggested_answer or ""
+        if not answer_text.strip():
+            raise ValueError("Cannot promote an empty answer to the Knowledge Base.")
+
+        kb_id = review.promoted_kb_id or f"kb-gold-{uuid.uuid4().hex[:8]}"
+
+        existing_kb = await session.execute(select(KBEntry).where(KBEntry.id == kb_id))
+        kb_entry = existing_kb.scalars().first()
+
+        metadata_dict = {
+            "origin_workspace_id": workspace.id,
+            "origin_question_index": question_index,
+            "approved_by_role": review.assigned_role or "Proposal Drafter",
+            "is_golden_qa": True,
+            "promoted_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if kb_entry:
+            kb_entry.question = review.question_text
+            kb_entry.answer = answer_text
+            kb_entry.category = category
+            kb_entry.metadata_json = metadata_dict
+        else:
+            kb_entry = KBEntry(
+                id=kb_id,
+                tenant_id=workspace.tenant_id,
+                question=review.question_text,
+                answer=answer_text,
+                category=category,
+                metadata_json=metadata_dict,
+            )
+            session.add(kb_entry)
+
+        review.is_promoted_to_kb = True
+        review.promoted_kb_id = kb_id
+        if review.review_status != "Approved":
+            review.review_status = "Approved"
+
+        await session.commit()
+        await session.refresh(kb_entry)
+        await session.refresh(review)
+        return kb_entry, review
+

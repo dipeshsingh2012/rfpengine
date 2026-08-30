@@ -131,6 +131,8 @@ class QuestionReviewItem(BaseModel):
     assigned_role: Optional[str] = None
     confidence_score: Optional[float] = None
     sources: Optional[List[Dict[str, Any]]] = None
+    is_promoted_to_kb: bool = False
+    promoted_kb_id: Optional[str] = None
 
 
 class WorkspaceCreate(BaseModel):
@@ -159,6 +161,16 @@ class QuestionReviewUpdate(BaseModel):
     final_answer: Optional[str] = None
     review_status: Optional[str] = None
     assigned_role: Optional[str] = None
+
+
+class KBPromoteResponse(BaseModel):
+    success: bool = True
+    message: str
+    kb_entry_id: str
+    workspace_id: str
+    question_index: int
+    category: str = "Golden Q&A"
+    review: QuestionReviewItem
 
 
 # --- Health & Diagnostic Schemas ---
