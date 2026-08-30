@@ -1,0 +1,50 @@
+version: '3'
+
+dir: '{{.USER_WORKING_DIR}}/backend'
+
+tasks:
+  install:
+    desc: "Install Python virtual environment and dependencies"
+    cmds:
+      - python3 -m venv .venv
+      - .venv/bin/pip install -r requirements.txt
+
+  dev:
+    desc: "Start FastAPI development server with hot-reload"
+    cmds:
+      - .venv/bin/uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
+
+  test:
+    desc: "Run backend pytest suite across all test modules"
+    cmds:
+      - .venv/bin/pytest -q
+
+  test:unit:
+    desc: "Run fast unit tests (RRF scoring, chunking, secret handling)"
+    cmds:
+      - .venv/bin/pytest tests/test_services_unit.py -v
+
+  test:feedback:
+    desc: "Run Level 1 closed-loop feedback and promotion tests"
+    cmds:
+      - .venv/bin/pytest tests/test_feedback_loop_api.py -v
+
+  test:roadmap:
+    desc: "Run roadmap API tests"
+    cmds:
+      - .venv/bin/pytest tests/test_roadmap_api.py -v
+
+  db:sync:
+    desc: "Synchronize all canonical initiatives into Neon PostgreSQL"
+    cmds:
+      - .venv/bin/python scripts/sync_roadmap_to_postgres.py
+
+  db:verify:
+    desc: "Verify live PostgreSQL schema integrity and roadmap records"
+    cmds:
+      - .venv/bin/python scripts/verify_roadmap_and_schema.py
+
+  migrate:
+    desc: "Run Alembic database schema migrations"
+    cmds:
+      - .venv/bin/alembic upgrade head

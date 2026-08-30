@@ -1,0 +1,29 @@
+version: '3'
+
+dir: '{{.USER_WORKING_DIR}}/frontend'
+
+tasks:
+  install:
+    desc: "Install frontend NPM dependencies"
+    cmds:
+      - npm install
+
+  dev:
+    desc: "Start Vite development server with HMR"
+    cmds:
+      - npm run dev
+
+  build:
+    desc: "Run TypeScript typecheck and build production bundle"
+    cmds:
+      - npm run build
+
+  preview:
+    desc: "Preview production build locally"
+    cmds:
+      - npm run preview
+
+  lint:
+    desc: "Run ESLint checks"
+    cmds:
+      - npm run lint --if-present
