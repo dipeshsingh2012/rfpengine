@@ -1,0 +1,30 @@
+name: Autonomous Agentic SDLC
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, synchronize, labeled]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  agentic-orchestrator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Target Repository
+        uses: actions/checkout@v4
+
+      - name: Checkout Central Agent Fleet
+        uses: actions/checkout@v4
+        with:
+          repository: dipeshsingh2012/agentic-fleet
+          path: .agentic-fleet
+
+      - name: Run Agentic Fleet Action
+        uses: ./.agentic-fleet
+        with:
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
