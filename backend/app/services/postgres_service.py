@@ -357,6 +357,7 @@ class PostgresService:
                 session.add(init_obj)
                 synced_count += 1
             else:
+                existing.tenant_id = tenant_id
                 existing.title = s["title"]
                 existing.stage = s["stage"]
                 existing.theme = s["theme"]
@@ -396,6 +397,9 @@ class PostgresService:
             stmt = stmt.where(RoadmapInitiativeModel.stage == stage)
         if theme:
             stmt = stmt.where(RoadmapInitiativeModel.theme == theme)
+        stmt = stmt.order_by(RoadmapInitiativeModel.created_at.desc())
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
         stmt = stmt.order_by(RoadmapInitiativeModel.created_at.desc())
         res = await session.execute(stmt)
         return list(res.scalars().all())
