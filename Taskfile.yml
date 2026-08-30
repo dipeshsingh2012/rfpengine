@@ -51,3 +51,4 @@ tasks:
       - task: backend:test
       - task: backend:db:verify
       - task: frontend:build
+

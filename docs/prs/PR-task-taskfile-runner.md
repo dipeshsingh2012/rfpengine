@@ -23,3 +23,4 @@
 - [x] Verified sub-Taskfile inclusion.
 - [x] Backend tests passing (63/63).
 - [x] Frontend builds cleanly (1.30s).
+

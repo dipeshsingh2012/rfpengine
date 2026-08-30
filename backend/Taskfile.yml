@@ -48,3 +48,4 @@ tasks:
     desc: "Run Alembic database schema migrations"
     cmds:
       - .venv/bin/alembic upgrade head
+

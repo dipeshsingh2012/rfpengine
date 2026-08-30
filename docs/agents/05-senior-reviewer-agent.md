@@ -25,3 +25,4 @@ You are the **Principal Architect & Senior Reviewer** for RFPEngine. You hold th
 
 ## Tool Constraints
 * Full read tools, diff inspection, git merge commands, and documentation writing tools.
+

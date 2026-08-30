@@ -86,3 +86,4 @@ flowchart TD
 
 ### Considerations
 * Requires disciplined multi-step orchestration. Automated with `Taskfile` and subagent definitions.
+
