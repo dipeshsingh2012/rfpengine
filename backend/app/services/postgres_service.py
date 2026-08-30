@@ -125,6 +125,132 @@ DEFAULT_SEEDS = [
         "upvotes": 91, "tags": ["Excel Parser", "SIG Lite", "CAIQ", "Spreadsheets"]
     },
     {
+        "id": "compliance-matrix-exporter",
+        "title": "Automated Compliance Matrix & Audit Package Exporter",
+        "stage": "development",
+        "theme": "Enterprise Governance",
+        "priority": "P1 - High",
+        "target_persona": "Security Director",
+        "quarter": "Q2 2026",
+        "summary": "One-click export of approved RFP responses into audit-ready PDF, Word (DOCX), and CSV compliance packages.",
+        "problem_statement": "Enterprise buyers and procurement auditors require signed compliance packages with timestamps, SME signatures, and citation appendices.",
+        "user_story": "As a Security Director, I want to generate a branded, audit-stamped Compliance Report PDF with verified sources, so that our submission looks professional and compliant.",
+        "success_metrics": ["-80% time spent formatting final RFP deliverables", "Branded company template customization", "100% citation inclusion in exported appendices"],
+        "acceptance_criteria": [
+            "Generates PDF and DOCX documents with corporate branding and table of contents.",
+            "Appends full audit trail of reviewer approvals and timestamps.",
+            "Includes structured appendix of all cited SOC 2 / ISO clauses."
+        ],
+        "technical_architecture": "Headless document generator (Docx templating + PDF rendering engine) + cryptographic hash verification.",
+        "rice_reach": 75, "rice_impact": 3, "rice_confidence": 90, "rice_effort": 2, "rice_score": 101.3,
+        "upvotes": 38, "tags": ["DOCX Export", "PDF Generation", "Audit Stamping", "Compliance"]
+    },
+    {
+        "id": "multi-agent-fact-checker",
+        "title": "Autonomous Multi-Agent Fact-Checker & Hallucination Guard",
+        "stage": "spec",
+        "theme": "Core AI & Retrieval",
+        "priority": "P0 - Critical",
+        "target_persona": "Legal Counsel / Security SME",
+        "quarter": "Q3 2026",
+        "summary": "Agentic critic swarm that cross-examines AI drafts against contract clauses, rejecting unverified claims.",
+        "problem_statement": "Standard LLM outputs occasionally make unsubstantiated product roadmap claims or commit to SLA terms that exceed standard contract boundaries.",
+        "user_story": "As Legal Counsel, I want an automated AI Fact-Checker to highlight any commitment that is not backed by an approved policy, so that our company is protected from breach of contract.",
+        "success_metrics": ["100% identification of unverified commitments", "Confidence-weighted sentence highlighting", "-75% time spent by legal scanning for liability traps"],
+        "acceptance_criteria": [
+            "Specialized Critic Agent cross-checks every sentence against knowledge base embeddings.",
+            "Flags high-risk keywords (e.g. 'guarantee', 'indemnify', 'unlimited liability', '100% uptime').",
+            "Provides inline suggested redlines with cited policy bounds."
+        ],
+        "technical_architecture": "LangGraph / AutoGen multi-agent pipeline with parallel Critic, Security, and Compliance evaluators.",
+        "rice_reach": 85, "rice_impact": 4, "rice_confidence": 75, "rice_effort": 4, "rice_score": 63.8,
+        "upvotes": 76, "tags": ["Multi-Agent", "Fact-Checking", "Hallucination Guard", "Risk Scoring"]
+    },
+    {
+        "id": "cloud-connectors-sync",
+        "title": "Continuous Knowledge Connectors (Drive, Confluence, Notion)",
+        "stage": "spec",
+        "theme": "Ecosystem Integrations",
+        "priority": "P1 - High",
+        "target_persona": "Head of Sales / RevOps",
+        "quarter": "Q3 2026",
+        "summary": "Automated background sync connecting Google Drive folders, Confluence spaces, and Notion docs.",
+        "problem_statement": "Company policies change weekly, but RFP response databases become stale when product managers update documentation in Confluence without notifying proposal teams.",
+        "user_story": "As RevOps Lead, I want RFPEngine to continuously sync with our engineering Confluence space and product Notion, so that answers always reflect the latest release notes.",
+        "success_metrics": ["Zero manual knowledge re-uploads required", "Daily incremental sync with change delta detection", "Automatic archiving of deprecated documentation"],
+        "acceptance_criteria": [
+            "OAuth 2.0 connectors for Google Drive, Atlassian Confluence, and Notion.",
+            "Webhook-driven incremental change indexing.",
+            "Admin dashboard showing sync health and document freshness score."
+        ],
+        "technical_architecture": "Cloud Tasks background worker + OAuth token vault + incremental vector index updater.",
+        "rice_reach": 70, "rice_impact": 3, "rice_confidence": 80, "rice_effort": 3, "rice_score": 56.0,
+        "upvotes": 52, "tags": ["Google Drive", "Confluence", "Notion", "Continuous Sync"]
+    },
+    {
+        "id": "realtime-multiplayer-collab",
+        "title": "Real-Time Multiplayer Collaborative Drafting & Presence",
+        "stage": "discovery",
+        "theme": "Collaboration & Workflow",
+        "priority": "P1 - High",
+        "target_persona": "Bid Team",
+        "quarter": "H2 2026",
+        "summary": "Live collaborative workspace with multi-user presence cursors, inline comments, and section assignment.",
+        "problem_statement": "Large enterprise bids require 5+ simultaneous contributors (Technical Architects, Pricing, Legal), causing version conflicts when working in silos.",
+        "user_story": "As a Proposal Manager, I want to see which team members are editing each section in real time and @mention colleagues for instant review, so that collaboration is seamless.",
+        "success_metrics": ["Zero edit overwrite conflicts", "< 100ms multi-cursor sync latency", "Integrated Slack review notifications"],
+        "acceptance_criteria": [
+            "Displays live user avatars on active question cards.",
+            "Field locking prevents simultaneous conflicting edits.",
+            "Inline comment threads with @mention alerts."
+        ],
+        "technical_architecture": "WebSocket connection gateway + CRDT / Yjs conflict resolution + Redis PubSub cluster.",
+        "rice_reach": 65, "rice_impact": 3, "rice_confidence": 70, "rice_effort": 4, "rice_score": 34.1,
+        "upvotes": 49, "tags": ["Multiplayer", "WebSockets", "Live Cursors", "CRDT"]
+    },
+    {
+        "id": "advanced-portal-adapters",
+        "title": "Advanced Buyer Portal Automation (Coupa, Ariba, Loopio)",
+        "stage": "discovery",
+        "theme": "Ecosystem Integrations",
+        "priority": "P2 - Medium",
+        "target_persona": "Proposal Drafter",
+        "quarter": "H2 2026",
+        "summary": "Deep browser extension adapters for dropdowns, radio matrices, and multi-page questionnaire navigation.",
+        "problem_statement": "Complex procurement portals use custom dropdowns, yes/no radio groups, and multi-page wizards that basic DOM scanners struggle to automate.",
+        "user_story": "As a Proposal Drafter, I want the extension to automatically select the right compliance dropdowns (e.g. 'Compliant', 'Partially Compliant') based on AI reasoning.",
+        "success_metrics": ["95% accuracy on standard dropdown and radio option mapping", "Multi-page auto-navigation support for Coupa and Ariba"],
+        "acceptance_criteria": [
+            "Extension detects and maps non-standard select2/custom dropdowns.",
+            "Selects Yes/No/Partial based on answer context.",
+            "Handles paginated form transitions without losing session state."
+        ],
+        "technical_architecture": "Custom DOM shadow-root parser + selector heuristics + client-side option matcher.",
+        "rice_reach": 60, "rice_impact": 2, "rice_confidence": 65, "rice_effort": 3, "rice_score": 26.0,
+        "upvotes": 31, "tags": ["Coupa", "Ariba", "Dropdown Automator", "Browser Extension"]
+    },
+    {
+        "id": "win-loss-analytics",
+        "title": "Proposal Win/Loss Intelligence & Knowledge Gap Analytics",
+        "stage": "discovery",
+        "theme": "Enterprise Governance",
+        "priority": "P2 - Medium",
+        "target_persona": "Head of Sales / RevOps",
+        "quarter": "H2 2026",
+        "summary": "Executive analytics dashboard identifying repetitive question trends, win rates, and knowledge base gaps.",
+        "problem_statement": "Sales leadership lacks visibility into which product areas cause the most friction in security reviews or where documentation is lacking.",
+        "user_story": "As Head of Sales, I want an executive report highlighting questions with low retrieval confidence, so that we can prioritize updating documentation on weak product areas.",
+        "success_metrics": ["Identifies top 10 most frequent buyer questions per quarter", "Automated Knowledge Gap Health Score", "Correlation insights between response speed and deal win rate"],
+        "acceptance_criteria": [
+            "Visual charts for question frequency, confidence distributions, and turnaround times.",
+            "Knowledge gap alert triggers when repeat questions yield low confidence scores.",
+            "Exportable quarterly RFP performance summaries."
+        ],
+        "technical_architecture": "Aggregated query analytics table + Chart.js / Recharts visualizer + trend clustering algorithm.",
+        "rice_reach": 50, "rice_impact": 3, "rice_confidence": 70, "rice_effort": 2, "rice_score": 52.5,
+        "upvotes": 28, "tags": ["Analytics", "Win/Loss", "Executive Dashboard", "Knowledge Gaps"]
+    },
+    {
         "id": "feat-feedback-l1",
         "title": "Curated Golden Q&A Promotion & 1-Click KB Sync (Level 1 Feedback Loop)",
         "stage": "shipped",
@@ -195,12 +321,16 @@ DEFAULT_SEEDS = [
 
 class PostgresService:
     @staticmethod
-    async def seed_roadmap_if_empty(session: AsyncSession, tenant_id: str = "default") -> None:
-        count_res = await session.execute(
-            select(RoadmapInitiativeModel).where(RoadmapInitiativeModel.tenant_id == tenant_id).limit(1)
-        )
-        if count_res.scalars().first() is None:
-            for s in DEFAULT_SEEDS:
+    async def sync_roadmap_seeds(session: AsyncSession, tenant_id: str = "default") -> int:
+        """
+        Synchronizes all canonical initiatives from DEFAULT_SEEDS into PostgreSQL.
+        Inserts new seeds if missing, or updates baseline fields if existing, ensuring
+        PostgreSQL is always the authoritative source of truth.
+        """
+        synced_count = 0
+        for s in DEFAULT_SEEDS:
+            existing = await PostgresService.get_roadmap_initiative(session, s["id"])
+            if existing is None:
                 init_obj = RoadmapInitiativeModel(
                     id=s["id"],
                     tenant_id=tenant_id,
@@ -225,7 +355,33 @@ class PostgresService:
                     tags=s["tags"],
                 )
                 session.add(init_obj)
-            await session.commit()
+                synced_count += 1
+            else:
+                existing.title = s["title"]
+                existing.stage = s["stage"]
+                existing.theme = s["theme"]
+                existing.priority = s["priority"]
+                existing.target_persona = s["target_persona"]
+                existing.quarter = s["quarter"]
+                existing.summary = s["summary"]
+                existing.problem_statement = s["problem_statement"]
+                existing.user_story = s["user_story"]
+                existing.success_metrics = s["success_metrics"]
+                existing.acceptance_criteria = s["acceptance_criteria"]
+                existing.technical_architecture = s["technical_architecture"]
+                existing.rice_reach = s["rice_reach"]
+                existing.rice_impact = s["rice_impact"]
+                existing.rice_confidence = s["rice_confidence"]
+                existing.rice_effort = s["rice_effort"]
+                existing.rice_score = s["rice_score"]
+                existing.tags = s["tags"]
+                synced_count += 1
+        await session.commit()
+        return synced_count
+
+    @staticmethod
+    async def seed_roadmap_if_empty(session: AsyncSession, tenant_id: str = "default") -> None:
+        await PostgresService.sync_roadmap_seeds(session, tenant_id)
 
     @staticmethod
     async def list_roadmap_initiatives(
@@ -234,7 +390,7 @@ class PostgresService:
         stage: Optional[str] = None,
         theme: Optional[str] = None,
     ) -> List[RoadmapInitiativeModel]:
-        await PostgresService.seed_roadmap_if_empty(session, tenant_id)
+        await PostgresService.sync_roadmap_seeds(session, tenant_id)
         stmt = select(RoadmapInitiativeModel).where(RoadmapInitiativeModel.tenant_id == tenant_id)
         if stage:
             stmt = stmt.where(RoadmapInitiativeModel.stage == stage)
