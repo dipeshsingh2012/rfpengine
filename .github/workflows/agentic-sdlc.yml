@@ -37,7 +37,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: rfqengine
+          POSTGRES_DB: rfpengine
         ports:
           - 5432:5432
         options: >-
