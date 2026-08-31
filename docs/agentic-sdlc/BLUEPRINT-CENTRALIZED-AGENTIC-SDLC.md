@@ -177,3 +177,17 @@ When ready to build the central infrastructure, follow this execution checklist:
 - [ ] **Step 4**: Implement `event_router.py` to dispatch events to `pm-agent`, `dev-agent`, `security-agent`, `qa-agent`, and `senior-reviewer-agent`.
 - [ ] **Step 5**: Test end-to-end flow with a sample repository (Issue $\rightarrow$ Cloud Dev Branch $\rightarrow$ PR $\rightarrow$ Review $\rightarrow$ QA $\rightarrow$ Merge).
 - [ ] **Step 6**: Enable GitHub App integration for zero-config organization-wide adoption.
+
+
+---
+
+## 🗺️ SDLC Evolution Roadmap
+
+- [ ] **Dedicated Reviewer Identity & PAT / GitHub App Support (`REVIEWER_GITHUB_TOKEN`)**
+  - Implement dual-identity authentication so `senior-reviewer-agent` acts as an independent entity, satisfying strict branch protection rules with green `APPROVED` status.
+- [ ] **Autonomous Pipeline Chaining**
+  - Enable one-click end-to-end execution where `pm-agent` immediately cascades through `dev-agent`, `security-agent`, `qa-agent`, and `senior-reviewer-agent` in a single workflow.
+- [ ] **Interactive Inline Suggestion Diffs**
+  - Allow reviewer agents to place line-by-line review comments with direct `suggestion` diffs on PR files.
+- [ ] **Automated Release Gating & Changelog Generation**
+  - Automatically tag semantic releases and generate changelogs upon senior-reviewer merge.
