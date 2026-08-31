@@ -9,6 +9,9 @@
 gcp-*.json
 *.key.json
 
+# Agentic Fleet Central Runner
+.agentic-fleet/
+
 # Python
 .venv/
 __pycache__/
