@@ -17,3 +17,4 @@ This directory contains the architecture specifications, operational blueprints,
 2. **Centralized Multi-Repo Swarm**: Agents live in `agentic-sdlc-central`; target projects only hold application code.
 3. **5 Role-Bound Autonomous Agents**: `pm-agent`, `dev-agent`, `security-agent`, `qa-agent`, and `senior-reviewer-agent`.
 4. **Dual Integration Modes**: Reusable GitHub Actions or Account-Level GitHub App.
+
