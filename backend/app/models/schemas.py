@@ -167,6 +167,8 @@ class QuestionReviewUpdate(BaseModel):
     final_answer: Optional[str] = None
     review_status: Optional[str] = None
     assigned_role: Optional[str] = None
+    assigned_email: Optional[str] = None
+    notify_sme: bool = False
 
 
 class KBPromoteResponse(BaseModel):

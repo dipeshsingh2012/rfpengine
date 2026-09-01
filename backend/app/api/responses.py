@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
@@ -14,9 +14,11 @@ from app.models.schemas import (
     WorkspaceResponse,
 )
 from app.services.postgres_service import PostgresService
+from app.services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/workspaces", tags=["Workspaces & Reviews"])
+email_service = EmailService()
 
 
 def _map_review_item(q) -> QuestionReviewItem:
@@ -79,6 +81,7 @@ async def update_question_review(
     workspace_id: str,
     question_index: int,
     payload: QuestionReviewUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db_session),
 ) -> QuestionReviewItem:
     review = await PostgresService.update_question_review(
@@ -91,6 +94,34 @@ async def update_question_review(
     )
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question review not found")
+
+    # 1. Trigger SME Review Request if assigned
+    if payload.notify_sme and payload.assigned_email:
+        background_tasks.add_task(
+            email_service.send_sme_review_request,
+            recipient_email=payload.assigned_email,
+            workspace_title=getattr(review.workspace, "title", "RFP Questionnaire") if getattr(review, "workspace", None) else "RFP Questionnaire",
+            question_text=review.question_text,
+            draft_preview=review.final_answer or review.suggested_answer or "",
+            category=review.assigned_role or "Compliance",
+            workspace_id=workspace_id,
+            question_index=question_index,
+        )
+
+    # 2. Check if all questions are approved -> Trigger completion digest
+    if payload.review_status == "approved":
+        workspace = await PostgresService.get_workspace(db, workspace_id)
+        if workspace and workspace.reviews:
+            all_approved = all(r.review_status == "approved" for r in workspace.reviews)
+            if all_approved:
+                owner_email = "lead@rfpengine.net"
+                background_tasks.add_task(
+                    email_service.send_proposal_completion_digest,
+                    recipient_email=owner_email,
+                    workspace_title=workspace.title,
+                    total_questions=len(workspace.reviews),
+                    workspace_id=workspace_id,
+                )
 
     return _map_review_item(review)
 
