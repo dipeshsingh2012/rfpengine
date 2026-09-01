@@ -38,6 +38,7 @@ async def upload_parser_file(
         )
 
     # 2. Prevent DoS via Memory Exhaustion (Check file size)
+    # Note: file.size is available in FastAPI/Starlette for UploadFile
     if file.size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
