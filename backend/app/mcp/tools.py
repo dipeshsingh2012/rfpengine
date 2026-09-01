@@ -205,8 +205,9 @@ class MCPTools:
                         score=rice_dict.get("score", 40.0)
                     )
                 )
-                from app.core.db import AsyncSessionLocal
-                async with AsyncSessionLocal() as session:
+                from app.core.db import get_session_factory
+                session_factory = get_session_factory()
+                async with session_factory() as session:
                     created = await PostgresService.create_roadmap_initiative(session, create_model)
                     return {"status": "success", "action": "created", "item_id": created.id, "title": created.title}
             except Exception as exc:
@@ -217,8 +218,9 @@ class MCPTools:
                 return {"status": "error", "message": "Missing 'item_id' or 'payload'"}
             try:
                 update_model = RoadmapInitiativeUpdate(**payload)
-                from app.core.db import AsyncSessionLocal
-                async with AsyncSessionLocal() as session:
+                from app.core.db import get_session_factory
+                session_factory = get_session_factory()
+                async with session_factory() as session:
                     updated = await PostgresService.update_roadmap_initiative(session, item_id, update_model)
                     if updated:
                         return {"status": "success", "action": "updated", "item_id": updated.id, "stage": updated.stage}
