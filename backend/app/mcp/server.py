@@ -1,9 +1,19 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import sys
 from typing import Any, Dict, Optional
 from app.mcp.tools import MCPTools
 
+logger = logging.getLogger("rfpengine.mcp.server")
+
+
 class MCPServer:
     """
-    Orchestrates MCP JSON-RPC requests and routes them to the appropriate tools.
+    Model Context Protocol (MCP) JSON-RPC 2.0 Server.
+    Provides standard tools/list and tools/call over stdio and SSE transports.
     """
     def __init__(self):
         self.tools = MCPTools()
@@ -22,35 +32,83 @@ class MCPServer:
 
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Processes a single JSON-RPC request.
+        Processes a single JSON-RPC 2.0 request.
         """
         method = request.get("method")
         params = request.get("params", {})
         request_id = request.get("id")
 
         try:
-            if method == "tools/call":
-                result = await self._call_tool(params.get("name"), params.get("arguments"))
-                return {"jsonrpc": "2.0", "id": request_id, "result": self._serialize_result(result)}
-            
+            if method == "initialize":
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "protocolVersion": "2024-11-05",
+                        "serverInfo": {"name": "rfpengine-mcp", "version": "0.2.0"},
+                        "capabilities": {"tools": {}}
+                    }
+                }
+
+            elif method == "ping":
+                return {"jsonrpc": "2.0", "id": request_id, "result": {}}
+
             elif method == "tools/list":
                 return {
                     "jsonrpc": "2.0", 
                     "id": request_id, 
                     "result": {
                         "tools": [
-                            {"name": "search_knowledge_base", "description": "Hybrid search over KB"},
-                            {"name": "manage_roadmap", "description": "Roadmap board management"},
-                            {"name": "get_cloud_diagnostics", "description": "Cloud health checks"}
+                            {
+                                "name": "search_knowledge_base",
+                                "description": "Hybrid vector and keyword search across RFPEngine compliance whitepapers and proposals.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "query": {"type": "string", "description": "The search query or RFP question."},
+                                        "limit": {"type": "integer", "default": 5, "description": "Maximum number of results to return."}
+                                    },
+                                    "required": ["query"]
+                                }
+                            },
+                            {
+                                "name": "manage_roadmap",
+                                "description": "Query product backlog, inspect Gherkin criteria, or transition KanBan stages.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "action": {"type": "string", "enum": ["list", "get", "create", "update"], "description": "Action to perform on the roadmap."},
+                                        "item_id": {"type": "string", "description": "Initiative ID (required for 'get' and 'update')."},
+                                        "payload": {"type": "object", "description": "Initiative payload for create or update."}
+                                    },
+                                    "required": ["action"]
+                                }
+                            },
+                            {
+                                "name": "get_cloud_diagnostics",
+                                "description": "Check real-time health, connection pool status, and database latencies.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "service_name": {"type": "string", "default": "all", "description": "Target service to inspect."}
+                                    }
+                                }
+                            }
                         ]
                     }
                 }
-            
+
+            elif method == "tools/call":
+                name = params.get("name")
+                args = params.get("arguments") or {}
+                result = await self._call_tool(name, args)
+                return {"jsonrpc": "2.0", "id": request_id, "result": self._serialize_result(result)}
+
             else:
                 return {
                     "jsonrpc": "2.0", 
                     "id": request_id, 
-                    "error": {"code": -32601, "message": "Method not found"}
+                    "error": {"code": -32601, "message": f"Method '{method}' not found"}
                 }
 
         except Exception as e:
@@ -69,13 +127,45 @@ class MCPServer:
             )
         elif name == "manage_roadmap":
             return await self.tools.manage_roadmap(
-                action=args.get("action", ""),
+                action=args.get("action", "list"),
                 item_id=args.get("item_id"),
                 payload=args.get("payload")
             )
         elif name == "get_cloud_diagnostics":
             return await self.tools.get_cloud_diagnostics(
-                service_name=args.get("service_name", "default")
+                service_name=args.get("service_name", "all")
             )
         else:
             raise ValueError(f"Unknown tool: {name}")
+
+
+async def run_stdio_server():
+    """
+    Runs the MCP server over standard input / output (stdio) for IDEs (Antigravity, Cursor, Claude Code).
+    """
+    server = MCPServer()
+    loop = asyncio.get_running_loop()
+    reader = asyncio.StreamReader()
+    protocol = asyncio.StreamReaderProtocol(reader)
+    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+
+    while True:
+        line = await reader.readline()
+        if not line:
+            break
+        text_line = line.decode("utf-8").strip()
+        if not text_line:
+            continue
+        try:
+            req = json.loads(text_line)
+            res = await server.handle_request(req)
+            sys.stdout.write(json.dumps(res) + "\n")
+            sys.stdout.flush()
+        except Exception as exc:
+            err_res = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": f"Parse error: {exc}"}}
+            sys.stdout.write(json.dumps(err_res) + "\n")
+            sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_stdio_server())
