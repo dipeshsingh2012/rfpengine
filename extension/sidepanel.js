@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = 'https://rfpengine-api-714049712844.us-central1.run.app';
+const DEFAULT_API_URL = 'https://rfpengine-api-fwwnzie4dq-uc.a.run.app';
 let API_URL = DEFAULT_API_URL;
 
 if (typeof chrome !== 'undefined' && chrome.storage?.local) {

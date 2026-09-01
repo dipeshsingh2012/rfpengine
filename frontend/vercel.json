@@ -5,11 +5,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://rfpengine-api-714049712844.us-central1.run.app/api/:path*"
+      "destination": "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://rfpengine-api-714049712844.us-central1.run.app/health"
+      "destination": "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/health"
     },
     {
       "source": "/(.*)",

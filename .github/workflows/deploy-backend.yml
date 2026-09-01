@@ -25,7 +25,7 @@ env:
   GAR_REPOSITORY: rfpengine-repo
   SERVICE_NAME: rfpengine-api
   IMAGE_NAME: us-central1-docker.pkg.dev/rfpengine/rfpengine-repo/rfpengine-api
-  PROD_HEALTH_URL: https://rfpengine-api-714049712844.us-central1.run.app/health
+  PROD_HEALTH_URL: https://rfpengine-api-fwwnzie4dq-uc.a.run.app/health
 
 jobs:
   # 1. Automated Test Suite & Validation

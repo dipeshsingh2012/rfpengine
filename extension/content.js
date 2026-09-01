@@ -1,6 +1,6 @@
 // RFPEngine Content Script — Form Scanner, Auto-Filler & In-Page Injection Overlay
 
-const PROD_API_ENDPOINT = 'https://rfpengine-api-714049712844.us-central1.run.app/api/v1/search';
+const PROD_API_ENDPOINT = 'https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api/v1/search';
 
 let cachedHandoff = formHandoff();
 
