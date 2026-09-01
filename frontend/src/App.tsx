@@ -33,7 +33,6 @@ import {
   CheckCircle,
   TrendingUp,
 } from "lucide-react";
-import { RoadmapPage } from "./RoadmapPage";
 
 type Source = {
   id: string;
@@ -888,16 +887,6 @@ function App() {
   ).length;
   const isAllApproved = allCurrentQuestions.length > 0 && approvedCount === allCurrentQuestions.length;
 
-  if (route === "/roadmap" || route.startsWith("/roadmap")) {
-    return (
-      <RoadmapPage
-        onNavigateBack={() => navigate(`/response/workspace/${responseId || "demo"}`)}
-        showToast={showToast}
-        apiBaseUrl={apiBaseUrl}
-      />
-    );
-  }
-
   if (route.startsWith("/review/")) {
     return (
       <div className="import-page">
@@ -1058,7 +1047,10 @@ function App() {
           {backendEnv === "prod" || backendEnv === "production" ? "PROD CLOUD" : "LOCAL DEV"}
         </div>
         <div className="topbar-spacer" />
-        <button
+        <a
+          href="https://rfpengine.aroadmap.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
           className="outline-button"
           style={{
             padding: "6px 12px",
@@ -1070,12 +1062,12 @@ function App() {
             borderColor: "#c7d2fe",
             color: "var(--blue)",
             fontWeight: 700,
+            textDecoration: "none",
           }}
-          onClick={() => navigate("/roadmap")}
-          title="Product Discovery & RICE Roadmap"
+          title="Open live strategy & PRD roadmap on aroadmap.dev"
         >
-          <TrendingUp size={14} /> 🗺️ Product Roadmap
-        </button>
+          <TrendingUp size={14} /> 🗺️ Roadmap (aroadmap.dev)
+        </a>
         <button className="icon-button" title="Open notifications">
           <AlertCircle size={18} />
         </button>
@@ -1113,9 +1105,12 @@ function App() {
             >
               <Zap size={17} /> KB Playground
             </button>
-            <button
-              className={`nav-item ${route === "/roadmap" ? "active" : ""}`}
-              onClick={() => navigate("/roadmap")}
+            <a
+              href="https://rfpengine.aroadmap.dev/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nav-item"
+              style={{ textDecoration: "none" }}
             >
               <TrendingUp size={17} /> Product Roadmap
               <span
@@ -1129,9 +1124,9 @@ function App() {
                   fontSize: "9px",
                 }}
               >
-                LIVE
+                LIVE ↗
               </span>
-            </button>
+            </a>
             <button className="nav-item">
               <History size={17} /> Activity
             </button>
