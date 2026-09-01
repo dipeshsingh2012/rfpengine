@@ -26,3 +26,5 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0018](0018-enterprise-testing-strategy-and-automated-verification-matrix.md) | Enterprise Testing Strategy and Automated Verification Matrix | Accepted | 2026-08-30 |
 | [0019](0019-closed-loop-ai-feedback-architecture.md) | Closed-Loop AI Feedback Architecture: Golden Q&A Promotion, Edit Drift Analytics, and In-Context Exemplar Learning | Accepted | 2026-08-30 |
 | [0020](0020-autonomous-5-agent-sdlc-governance.md) | Autonomous 5-Agent SDLC Governance & Branching Architecture | Accepted | 2026-08-30 |
+| [0021](0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md) | Multi-Tenant B2B Authentication Architecture via Google Cloud Identity Platform and Dual-Track SSO | Accepted | 2026-09-01 |
+| [0022](0022-model-context-protocol-mcp-integration-for-ide-and-chat.md) | Model Context Protocol (MCP) Integration for IDEs, Chat Assistants, and Autonomous Fleet Swarms | Accepted | 2026-09-01 |

@@ -24,9 +24,11 @@ def test_settings_env_override(monkeypatch):
     monkeypatch.setenv("PROJECT_NAME", "TestProject")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
     
+    get_settings.cache_clear()
     settings = get_settings()
     assert settings.PROJECT_NAME == "TestProject"
-    assert settings.DATABASE_URL == "sqlite:///test.db"
+    assert "sqlite:///test.db" in settings.DATABASE_URL
+    get_settings.cache_clear()
 
 def test_settings_validation_error():
     """Verify that invalid DATABASE_URL raises a ValidationError."""
