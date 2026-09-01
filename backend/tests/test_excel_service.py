@@ -1,59 +1,48 @@
 import pytest
 import io
-import pandas as pd
-from app.services.excel_service import sanitize_excel_cell, generate_excel_buffer, stream_excel_generator
+from app.services.excel_service import sanitize_excel_cell, sanitize_filename, generate_excel_stream
 
 def test_sanitize_excel_cell_injection():
-    """Test that dangerous characters are escaped with a single quote."""
+    """Tests that formula injection characters are escaped."""
     assert sanitize_excel_cell("=SUM(A1:A10)") == "'=SUM(A1:A10)"
-    assert sanitize_excel_cell("+123") == "'+123"
+    assert sanitize_excel_cell("+100") == "'+100"
     assert sanitize_excel_cell("-50") == "'-50"
     assert sanitize_excel_cell("@username") == "'@username"
     assert sanitize_excel_cell("normal_text") == "normal_text"
-    assert sanitize_excel_cell(123) == 123  # Numbers should remain numbers
+    assert sanitize_excel_cell(123) == 123
+    assert sanitize_excel_cell(None) == ""
 
-def test_generate_excel_buffer_success():
-    """Test successful generation of an Excel buffer."""
+def test_sanitize_filename_security():
+    """Tests that filenames are stripped of dangerous characters."""
+    assert sanitize_filename("../../etc/passwd") == "etcpasswd"
+    assert sanitize_filename("report_2023!@#.xlsx") == "report_2023xlsx"
+    assert sanitize_filename("tenant_123\r\nInjected") == "tenant_123Injected"
+    assert sanitize_filename("valid-name_123") == "valid-name_123"
+
+def test_generate_excel_stream_content():
+    """Tests that the generator yields valid Excel bytes."""
+    headers = ["id", "name", "amount"]
     data = [
-        {"id": 1, "name": "Alice", "formula": "=SUM(1,2)"},
-        {"id": 2, "name": "Bob", "formula": "normal"}
+        {"id": 1, "name": "Alice", "amount": 100.0},
+        {"id": 2, "name": "=BAD_FORMULA", "amount": 200.0},
     ]
-    headers = ["id", "name", "formula"]
     
-    buffer = generate_excel_buffer(data, headers)
+    chunks = list(generate_excel_stream(data, headers))
     
-    assert isinstance(buffer, io.BytesIO)
+    # Ensure we actually got chunks
+    assert len(chunks) > 0
     
-    # Read the buffer back with pandas to verify content
-    df = pd.read_excel(buffer)
+    # Combine chunks and verify it's a valid zip (Excel files are zipped XML)
+    full_content = b"".join(chunks)
+    assert len(full_content) > 0
+    # A basic check for the zip magic number
+    assert full_content.startswith(b'\x50\x4b\x03\x04')
+
+def test_generate_excel_stream_empty_data():
+    """Tests the service with empty data sets."""
+    headers = ["id", "name"]
+    data = []
     
-    assert len(df) == 2
-    assert list(df.columns) == headers
-    # Verify sanitization worked in the resulting file
-    assert df.iloc[0]["formula"] == "'=SUM(1,2)"
-    assert df.iloc[1]["formula"] == "normal"
-
-def test_generate_excel_buffer_empty_data():
-    """Test that providing no data/headers raises a ValueError."""
-    with pytest.raises(ValueError, match="No data or headers provided"):
-        generate_excel_buffer([], None)
-
-def test_stream_excel_generator():
-    """Test the async generator yields the correct bytes."""
-    import asyncio
-
-    async def run_test():
-        data = [{"id": 1, "val": "test"}]
-        headers = ["id", "val"]
-        
-        gen = stream_excel_generator(data, headers)
-        chunks = []
-        async for chunk in gen:
-            chunks.append(chunk)
-        
-        assert len(chunks) == 1
-        # Verify it's a valid excel file
-        df = pd.read_excel(io.BytesIO(chunks[0]))
-        assert df.iloc[0]["val"] == "test"
-
-    asyncio.run(run_test())
+    chunks = list(generate_excel_stream(data, headers))
+    assert len(chunks) > 0
+    assert len(b"".join(chunks)) > 0

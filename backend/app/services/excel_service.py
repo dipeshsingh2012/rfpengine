@@ -1,18 +1,17 @@
 import io
 import re
-from typing import Any, Dict, List, Union, Optional, AsyncGenerator, Iterator
-import pandas as pd
+from typing import Any, Dict, List, Iterator
+from openpyxl import Workbook
 
 def sanitize_excel_cell(value: Any) -> Any:
     """
-    Sanitize cell content to prevent Excel Formula Injection (CSV Injection).
-    If a value starts with dangerous characters, prepend a single quote.
+    Prevents Excel Formula Injection by prepending a single quote 
+    to values that start with dangerous characters.
     """
     if value is None:
         return ""
     
     val_str = str(value).strip()
-    # Dangerous characters that trigger formula execution in Excel/Google Sheets
     dangerous_chars = ('=', '+', '-', '@', '\t', '\r')
     
     if val_str.startswith(dangerous_chars):
@@ -20,48 +19,40 @@ def sanitize_excel_cell(value: Any) -> Any:
     
     return value
 
-def generate_excel_buffer(data: List[Dict[str, Any]], headers: Optional[List[str]] = None) -> io.BytesIO:
+def sanitize_filename(part: str) -> str:
     """
-    Converts a list of dictionaries into an Excel file stored in a BytesIO buffer.
+    Strictly sanitizes filename parts to prevent path traversal 
+    and header injection attacks.
+    """
+    # Remove any character that isn't alphanumeric, underscore, or hyphen
+    return re.sub(r"[^a-zA-Z0-9_-]", "", str(part).strip())
+
+def generate_excel_stream(data: List[Dict[str, Any]], headers: List[str], chunk_size: int = 8192) -> Iterator[bytes]:
+    """
+    Generates an Excel file in memory and yields it in chunks for 
+    memory-efficient streaming via FastAPI StreamingResponse.
+    """
+    wb = Workbook()
+    ws = wb.active
     
-    Args:
-        data: List of dictionaries representing rows.
-        headers: Optional list of column names. If None, keys from the first dict are used.
-        
-    Returns:
-        io.BytesIO: A buffer containing the Excel file (xlsx format).
-    """
-    if not data and not headers:
-        raise ValueError("No data or headers provided for Excel generation.")
-
-    # Create DataFrame
-    df = pd.DataFrame(data)
-
-    # Reorder columns if headers are provided
-    if headers:
-        # Ensure all requested headers exist in the dataframe, fill missing with None
-        for h in headers:
-            if h not in df.columns:
-                df[h] = None
-        df = df[headers]
-
-    # Apply sanitization to all object (string) columns to prevent formula injection
-    for col in df.select_dtypes(include=['object']).columns:
-        df[col] = df[col].apply(sanitize_excel_cell)
-
-    # Write to buffer
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    # Write Headers
+    ws.append(headers)
     
-    output.seek(0)
-    return output
-
-async def stream_excel_generator(data: List[Dict[str, Any]], headers: List[str]) -> AsyncGenerator[bytes, None]:
-    """
-    Async generator that yields the entire Excel buffer. 
-    Note: Excel is a zipped format, so it cannot be easily streamed row-by-row 
-    like CSV; we yield the full buffer to satisfy the AsyncGenerator interface.
-    """
-    buffer = generate_excel_buffer(data, headers)
-    yield buffer.getvalue()
+    # Write Data Rows
+    for row_dict in data:
+        sanitized_row = [sanitize_excel_cell(row_dict.get(h, "")) for h in headers]
+        ws.append(sanitized_row)
+    
+    # Save to buffer
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    # Yield chunks of the buffer
+    while True:
+        chunk = buffer.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+    
+    buffer.close()
