@@ -35,14 +35,9 @@ interface RoadmapPageProps {
   apiBaseUrl?: string;
 }
 
-const CLOUD_RUN_PROD_API = "https://rfpengine-api-714049712844.us-central1.run.app/api";
-
 function resolveApiBase(): string {
   const envUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
   if (!envUrl || envUrl === "/api") {
-    if (typeof window !== "undefined" && window.location.hostname && !window.location.hostname.includes("localhost") && window.location.hostname !== "127.0.0.1") {
-      return CLOUD_RUN_PROD_API;
-    }
     return "/api";
   }
   if (!envUrl.startsWith("/") && !envUrl.endsWith("/api")) {
