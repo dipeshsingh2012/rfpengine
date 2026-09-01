@@ -303,6 +303,76 @@ class MCPTools:
             "note": "Initiative saved to PostgreSQL Roadmap. Fleet dispatch sent to GitHub Actions (zero issues created)." if dispatched else f"Initiative saved to PostgreSQL Roadmap. ({dispatch_error})"
         }
 
+    async def approve_and_start_development(
+        self,
+        item_id: str,
+        feedback: Optional[str] = None,
+        tenant_id: str = "default",
+        repo: str = "dipeshsingh2012/rfqengine"
+    ) -> Dict[str, Any]:
+        """
+        Human Review Sign-off Gate: Approves a PM specification and transitions it to 'development'.
+        Dispatches 'mcp_start_dev' to GitHub Actions to trigger dev-agent, QA, and PR creation.
+        """
+        # Step 1: Update initiative stage to development in PostgreSQL
+        update_res = await self.manage_roadmap(
+            action="update",
+            item_id=item_id,
+            payload={"stage": "development"},
+            tenant_id=tenant_id
+        )
+
+        # Step 2: Fetch initiative details
+        init_data = await self.manage_roadmap(action="get", item_id=item_id, tenant_id=tenant_id)
+        title = init_data.get("title", "Approved Initiative") if isinstance(init_data, dict) else "Approved Initiative"
+
+        # Step 3: Dispatch to GitHub repository_dispatch
+        github_token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        dispatched = False
+        dispatch_error = None
+
+        if github_token:
+            try:
+                import httpx
+                headers = {
+                    "Authorization": f"Bearer {github_token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                }
+                payload = {
+                    "event_type": "mcp_start_dev",
+                    "client_payload": {
+                        "title": title,
+                        "initiative_id": item_id,
+                        "feedback": feedback or "",
+                        "tenant_id": tenant_id,
+                    }
+                }
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(
+                        f"https://api.github.com/repos/{repo}/dispatches",
+                        headers=headers,
+                        json=payload,
+                        timeout=10.0,
+                    )
+                    if resp.status_code == 204:
+                        dispatched = True
+                    else:
+                        dispatch_error = f"GitHub API responded with status {resp.status_code}: {resp.text}"
+            except Exception as exc:
+                dispatch_error = str(exc)
+        else:
+            dispatch_error = "GITHUB_TOKEN not configured in local environment; status updated in PostgreSQL."
+
+        return {
+            "status": "success" if dispatched else "updated_locally",
+            "initiative_id": item_id,
+            "title": title,
+            "stage": "development",
+            "dev_agent_dispatched": dispatched,
+            "note": "Specification approved. Dev-agent dispatched to branch, write code, and open PR!" if dispatched else f"Specification approved in PostgreSQL. ({dispatch_error})"
+        }
+
     async def get_cloud_diagnostics(self, service_name: str = "all") -> DiagnosticReport:
         """
         Executes live health checks and connection latency measurements.

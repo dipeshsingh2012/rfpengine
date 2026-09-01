@@ -78,6 +78,27 @@ async def test_mcp_trigger_pm_initiative():
     assert res["result"]["stage"] == "discovery"
 
 @pytest.mark.asyncio
+async def test_mcp_approve_and_start_development():
+    server = MCPServer()
+    req = {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "tools/call",
+        "params": {
+            "name": "approve_and_start_development",
+            "arguments": {
+                "item_id": "custom-55be298a",
+                "feedback": "Approved. Proceed with implementation."
+            }
+        }
+    }
+    res = await server.handle_request(req)
+    assert res["jsonrpc"] == "2.0"
+    assert res["id"] == 6
+    assert res["result"]["stage"] == "development"
+    assert res["result"]["initiative_id"] == "custom-55be298a"
+
+@pytest.mark.asyncio
 async def test_mcp_unknown_method():
     server = MCPServer()
     req = {"jsonrpc": "2.0", "id": 4, "method": "unknown/method", "params": {}}

@@ -23,7 +23,7 @@ on:
   pull_request_review_comment:
     types: [created, edited]
   repository_dispatch:
-    types: [mcp_initiative, fleet_trigger]
+    types: [mcp_initiative, mcp_start_dev, fleet_trigger]
   workflow_dispatch:
 
 permissions:

@@ -106,6 +106,18 @@ class MCPServer:
                                     },
                                     "required": ["title", "prompt"]
                                 }
+                            },
+                            {
+                                "name": "approve_and_start_development",
+                                "description": "Human Sign-Off Gate: Approves a PM specification, transitions it to 'development', and launches dev-agent to cut branch and open PR.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "item_id": {"type": "string", "description": "Initiative ID to approve."},
+                                        "feedback": {"type": "string", "description": "Optional engineer or PM feedback for dev-agent."}
+                                    },
+                                    "required": ["item_id"]
+                                }
                             }
                         ]
                     }
@@ -149,6 +161,11 @@ class MCPServer:
                 title=args.get("title", "New Feature"),
                 prompt=args.get("prompt", ""),
                 category=args.get("category", "core")
+            )
+        elif name == "approve_and_start_development":
+            return await self.tools.approve_and_start_development(
+                item_id=args.get("item_id", ""),
+                feedback=args.get("feedback")
             )
         elif name == "get_cloud_diagnostics":
             return await self.tools.get_cloud_diagnostics(
