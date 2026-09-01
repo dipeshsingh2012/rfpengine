@@ -10,6 +10,7 @@ from app.api.knowledge_base import router as kb_router
 from app.api.responses import router as responses_router
 from app.api.search import router as search_router
 from app.api.v1.roadmap import router as roadmap_router
+from app.api.v1.endpoints.mcp import router as mcp_router
 from app.core.config import get_settings
 from app.core.db import Base, close_db_connection, get_engine
 import app.models.db_models  # noqa: F401
@@ -111,6 +112,7 @@ def create_application() -> FastAPI:
     app.include_router(kb_router)
     app.include_router(responses_router)
     app.include_router(roadmap_router, prefix="/api/v1")
+    app.include_router(mcp_router, prefix="/api/v1")
 
     return app
 

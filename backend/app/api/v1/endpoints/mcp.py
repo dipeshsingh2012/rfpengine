@@ -1,3 +1,4 @@
+from typing import Dict
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import asyncio
@@ -42,14 +43,16 @@ async def mcp_messages(
 ):
     """
     Receives JSON-RPC messages from the client via HTTP POST.
+    Supports both direct HTTP response and asynchronous SSE delivery.
     """
-    if x_tenant_id not in connections:
-        raise HTTPException(status_code=404, detail="SSE connection not established")
-
     body = await request.json()
     response = await mcp_server.handle_request(body)
     
-    # Push the response back through the SSE queue
-    await connections[x_tenant_id].put(json.dumps(response))
-    
-    return {"status": "accepted"}
+    # Push to SSE queue if active stream exists
+    if x_tenant_id in connections:
+        try:
+            await connections[x_tenant_id].put(json.dumps(response))
+        except Exception:
+            pass
+            
+    return response

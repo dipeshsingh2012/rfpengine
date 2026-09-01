@@ -8,6 +8,18 @@ class MCPServer:
     def __init__(self):
         self.tools = MCPTools()
 
+    @staticmethod
+    def _serialize_result(val: Any) -> Any:
+        if isinstance(val, list):
+            return [MCPServer._serialize_result(item) for item in val]
+        if isinstance(val, dict):
+            return {k: MCPServer._serialize_result(v) for k, v in val.items()}
+        if hasattr(val, "model_dump"):
+            return val.model_dump()
+        if hasattr(val, "dict"):
+            return val.dict()
+        return val
+
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processes a single JSON-RPC request.
@@ -19,7 +31,7 @@ class MCPServer:
         try:
             if method == "tools/call":
                 result = await self._call_tool(params.get("name"), params.get("arguments"))
-                return {"jsonrpc": "2.0", "id": request_id, "result": result}
+                return {"jsonrpc": "2.0", "id": request_id, "result": self._serialize_result(result)}
             
             elif method == "tools/list":
                 return {
