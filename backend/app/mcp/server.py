@@ -132,7 +132,26 @@ class MCPServer:
                 name = params.get("name")
                 args = params.get("arguments") or {}
                 result = await self._call_tool(name, args)
-                return {"jsonrpc": "2.0", "id": request_id, "result": self._serialize_result(result)}
+                serialized = self._serialize_result(result)
+                if isinstance(serialized, dict):
+                    if "content" not in serialized:
+                        serialized["content"] = [{"type": "text", "text": json.dumps(serialized, indent=2)}]
+                    if "isError" not in serialized:
+                        serialized["isError"] = False
+                    result_payload = serialized
+                elif isinstance(serialized, list):
+                    result_payload = {
+                        "content": [{"type": "text", "text": json.dumps(serialized, indent=2)}],
+                        "isError": False,
+                        "items": serialized,
+                        "total": len(serialized)
+                    }
+                else:
+                    result_payload = {
+                        "content": [{"type": "text", "text": str(serialized)}],
+                        "isError": False
+                    }
+                return {"jsonrpc": "2.0", "id": request_id, "result": result_payload}
 
             else:
                 return {
