@@ -30,13 +30,18 @@ class MCPServer:
             return val.dict()
         return val
 
-    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_request(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Processes a single JSON-RPC 2.0 request.
+        Processes a single JSON-RPC 2.0 request or notification.
         """
         method = request.get("method")
-        params = request.get("params", {})
+        params = request.get("params") or {}
         request_id = request.get("id")
+
+        # JSON-RPC 2.0: Notifications do not have an 'id' and MUST NOT receive a response.
+        if request_id is None or (method and (method.startswith("notifications/") or method == "initialized")):
+            logger.debug("Received notification '%s', suppressing response.", method)
+            return None
 
         try:
             if method == "initialize":
@@ -195,8 +200,9 @@ async def run_stdio_server():
         try:
             req = json.loads(text_line)
             res = await server.handle_request(req)
-            sys.stdout.write(json.dumps(res) + "\n")
-            sys.stdout.flush()
+            if res is not None:
+                sys.stdout.write(json.dumps(res) + "\n")
+                sys.stdout.flush()
         except Exception as exc:
             err_res = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": f"Parse error: {exc}"}}
             sys.stdout.write(json.dumps(err_res) + "\n")

@@ -103,5 +103,56 @@ async def test_mcp_unknown_method():
     server = MCPServer()
     req = {"jsonrpc": "2.0", "id": 4, "method": "unknown/method", "params": {}}
     res = await server.handle_request(req)
+    assert res is not None
     assert "error" in res
     assert res["error"]["code"] == -32601
+
+@pytest.mark.asyncio
+async def test_mcp_notifications_suppression():
+    server = MCPServer()
+    # Initialized notification
+    res = await server.handle_request({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    assert res is None
+
+    # Cancelled notification
+    res2 = await server.handle_request({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 1}})
+    assert res2 is None
+
+    # Generic notification (no id)
+    res3 = await server.handle_request({"jsonrpc": "2.0", "method": "initialized"})
+    assert res3 is None
+
+@pytest.mark.asyncio
+async def test_mcp_full_handshake_lifecycle():
+    server = MCPServer()
+    # 1. initialize
+    init_res = await server.handle_request({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        }
+    })
+    assert init_res["id"] == 1
+    assert "serverInfo" in init_res["result"]
+
+    # 2. notifications/initialized (must not return response)
+    notif_res = await server.handle_request({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+    })
+    assert notif_res is None
+
+    # 3. tools/list
+    tools_res = await server.handle_request({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+    })
+    assert tools_res["id"] == 2
+    assert "tools" in tools_res["result"]
+    assert len(tools_res["result"]["tools"]) > 0

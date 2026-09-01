@@ -28,7 +28,7 @@ DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
         "target_persona": "Evaluator / Enterprise Admin",
         "quarter": "Q2 2026",
         "summary": "Dual-track multi-tenant authentication powered by Google Cloud Identity Platform (GCIP) with frictionless 1-click Google Sign-In demo sandboxes and enterprise SAML 2.0 / Okta / Azure AD SSO.",
-        "problem_statement": "Prospects and evaluators need instant 1-click access to test RFQEngine without complex IT setup, while Fortune 500 enterprise buyers require strict corporate SAML/OIDC SSO.",
+        "problem_statement": "Prospects and evaluators need instant 1-click access to test RFPEngine without complex IT setup, while Fortune 500 enterprise buyers require strict corporate SAML/OIDC SSO.",
         "user_story": "As an Evaluator, I want to click 'Sign in with Google' and immediately land in an isolated demo workspace pre-seeded with sample compliance documents so that I can evaluate the AI in under 5 seconds.",
         "success_metrics": [
             "< 3s 1-click Google Sign-in to live demo workspace",

@@ -255,11 +255,11 @@ ELASTICSEARCH_URL=http://localhost:9200
 # For Elastic Cloud (supply API key):
 # ELASTICSEARCH_URL=https://my-deployment.es.us-central1.gcp.elastic.cloud:443
 # ELASTICSEARCH_API_KEY=your_elastic_api_key
-ELASTICSEARCH_INDEX=rfq_knowledge_base
+ELASTICSEARCH_INDEX=rfp_knowledge_base
 
 # Pinecone Serverless Configuration
 PINECONE_API_KEY=pcsk_...
-PINECONE_INDEX=rfq-knowledge-base
+PINECONE_INDEX=rfp-knowledge-base
 PINECONE_CLOUD=aws
 PINECONE_REGION=us-east-1
 PINECONE_DIMENSION=768

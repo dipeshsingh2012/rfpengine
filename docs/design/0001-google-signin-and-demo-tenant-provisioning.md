@@ -10,7 +10,7 @@
 ## 1. Problem Statement & Goals
 
 ### The Challenge
-To evaluate **RFQEngine**, prospective users and evaluators currently require pre-configured test credentials and an existing tenant context. For enterprise sales demos and product trials, evaluators expect an **instant, 1-click onboarding experience** without configuring SAML metadata or corporate SSO.
+To evaluate **RFPEngine**, prospective users and evaluators currently require pre-configured test credentials and an existing tenant context. For enterprise sales demos and product trials, evaluators expect an **instant, 1-click onboarding experience** without configuring SAML metadata or corporate SSO.
 
 ### Objectives
 1. **1-Click Google Sign-In**: Allow any evaluator with a Google account to authenticate via Google OAuth2 / OIDC.
@@ -47,7 +47,7 @@ sequenceDiagram
     end
 
     API-->>App: 200 OK { access_token, user_id, tenant_id, role, is_demo }
-    App->>User: Renders workspace populated with sample RFQ knowledge base
+    App->>User: Renders workspace populated with sample RFP knowledge base
 ```
 
 ---

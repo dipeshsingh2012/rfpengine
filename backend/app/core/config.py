@@ -63,12 +63,12 @@ class Settings(BaseSettings):
     # Elasticsearch / Elastic Cloud Settings
     elasticsearch_url: str = "http://localhost:9200"
     elasticsearch_api_key: Optional[str] = None
-    elasticsearch_index: str = "rfq_knowledge_base"
+    elasticsearch_index: str = "rfp_knowledge_base"
     elasticsearch_verify_certs: bool = True
 
     # Pinecone Serverless Settings
     pinecone_api_key: Optional[str] = None
-    pinecone_index: str = "rfq-knowledge-base"
+    pinecone_index: str = "rfp-knowledge-base"
     pinecone_cloud: str = "aws"
     pinecone_region: str = "us-east-1"
     pinecone_dimension: int = 768

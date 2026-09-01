@@ -8,11 +8,11 @@ database_url     = "postgresql://neondb_owner:your_password@ep-rapid-truth-...ne
 
 # Elastic Cloud Settings
 elasticsearch_url     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
-elasticsearch_index   = "rfq_knowledge_base"
+elasticsearch_index   = "rfp_knowledge_base"
 elasticsearch_api_key = ""
 
 # Pinecone Serverless Settings
-pinecone_index        = "rfq-knowledge-base"
+pinecone_index        = "rfp-knowledge-base"
 pinecone_cloud        = "aws"
 pinecone_region       = "us-east-1"
 pinecone_api_key      = ""

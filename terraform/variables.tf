@@ -66,13 +66,13 @@ variable "elasticsearch_url" {
 variable "elasticsearch_index" {
   type        = string
   description = "Elasticsearch index name"
-  default     = "rfq_knowledge_base"
+  default     = "rfp_knowledge_base"
 }
 
 variable "pinecone_index" {
   type        = string
   description = "Pinecone vector index name"
-  default     = "rfq-knowledge-base"
+  default     = "rfp-knowledge-base"
 }
 
 variable "pinecone_cloud" {

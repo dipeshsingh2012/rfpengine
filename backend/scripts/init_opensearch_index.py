@@ -5,7 +5,7 @@ import os
 from opensearchpy import OpenSearch
 
 
-INDEX_NAME = "rfq_knowledge_base"
+INDEX_NAME = "rfp_knowledge_base"
 
 INDEX_BODY = {
     "settings": {

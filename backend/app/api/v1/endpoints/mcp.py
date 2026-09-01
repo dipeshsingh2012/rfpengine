@@ -48,11 +48,11 @@ async def mcp_messages(
     body = await request.json()
     response = await mcp_server.handle_request(body)
     
-    # Push to SSE queue if active stream exists
-    if x_tenant_id in connections:
+    # Push to SSE queue if active stream exists and response is produced
+    if response is not None and x_tenant_id in connections:
         try:
             await connections[x_tenant_id].put(json.dumps(response))
         except Exception:
             pass
             
-    return response
+    return response or {"status": "accepted"}
