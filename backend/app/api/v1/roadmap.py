@@ -17,6 +17,12 @@ router = APIRouter(prefix="/roadmap", tags=["Product Roadmap & Discovery"])
 
 
 def _to_response(model) -> RoadmapInitiativeResponse:
+    reach = max(1, min(100, model.rice_reach or 50))
+    impact = max(1, min(5, model.rice_impact or 3))
+    confidence = max(10, min(100, model.rice_confidence or 80))
+    effort = max(1, min(20, model.rice_effort or 3))
+    score = model.rice_score or round((reach * impact * confidence) / (effort * 100), 1)
+
     return RoadmapInitiativeResponse(
         id=model.id,
         tenant_id=model.tenant_id,
@@ -33,11 +39,11 @@ def _to_response(model) -> RoadmapInitiativeResponse:
         acceptance_criteria=model.acceptance_criteria or [],
         technical_architecture=model.technical_architecture or "",
         rice=RICEScoreSchema(
-            reach=model.rice_reach,
-            impact=model.rice_impact,
-            confidence=model.rice_confidence,
-            effort=model.rice_effort,
-            score=model.rice_score,
+            reach=reach,
+            impact=impact,
+            confidence=confidence,
+            effort=effort,
+            score=score,
         ),
         upvotes=model.upvotes or 0,
         tags=model.tags or [],

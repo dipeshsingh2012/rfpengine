@@ -198,7 +198,7 @@ class HealthResponse(BaseModel):
 
 class RICEScoreSchema(BaseModel):
     reach: int = Field(default=50, ge=1, le=100)
-    impact: int = Field(default=3, ge=1, le=4)
+    impact: int = Field(default=3, ge=1, le=5)
     confidence: int = Field(default=80, ge=10, le=100)
     effort: int = Field(default=3, ge=1, le=20)
     score: float = 40.0
