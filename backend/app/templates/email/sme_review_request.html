@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Action Required: SME Review Request</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 24px; color: #ffffff; text-align: left; }
+    .header h1 { margin: 0 0 6px 0; font-size: 20px; font-weight: 600; }
+    .header p { margin: 0; font-size: 14px; opacity: 0.9; }
+    .content { padding: 28px 24px; }
+    .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; margin-bottom: 12px; }
+    .question-box { background: #f1f5f9; border-left: 4px solid #3b82f6; padding: 16px; border-radius: 6px; margin: 16px 0; }
+    .question-title { font-weight: 600; font-size: 15px; color: #0f172a; margin-bottom: 6px; }
+    .draft-preview { font-size: 14px; color: #475569; font-style: italic; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 8px; margin-top: 20px; text-align: center; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; text-align: center; font-size: 12px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🛡️ SME Compliance Review Request</h1>
+      <p>Workspace: <strong>{{ workspace_title }}</strong></p>
+    </div>
+    <div class="content">
+      <span class="badge">{{ category }}</span>
+      <p>Hello <strong>{{ recipient_name or 'Subject Matter Expert' }}</strong>,</p>
+      <p>A new compliance question has been assigned to your queue for verification:</p>
+      
+      <div class="question-box">
+        <div class="question-title">"{{ question_text }}"</div>
+        <div class="draft-preview">AI Baseline Draft: {{ draft_preview }}</div>
+      </div>
+      
+      <p>Please review the proposed response and approve or edit it using your 1-click magic link below:</p>
+      
+      <div style="text-align: center;">
+        <a href="{{ magic_link_url }}" class="btn" target="_blank">⚡ Review & Approve (1-Click)</a>
+      </div>
+    </div>
+    <div class="footer">
+      Sent securely by RFPEngine Enterprise Governance. Link expires in 48 hours.
+    </div>
+  </div>
+</body>
+</html>

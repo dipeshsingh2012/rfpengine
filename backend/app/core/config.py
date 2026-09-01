@@ -84,6 +84,19 @@ class Settings(BaseSettings):
             return self.pinecone_namespace
         return "prod" if self.is_production else "local"
 
+    # Transactional Email Settings
+    email_provider: str = "mock"  # "resend", "sendgrid", "smtp", "mock"
+    resend_api_key: Optional[str] = None
+    sendgrid_api_key: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: bool = True
+    email_from_address: str = "notifications@rfpengine.net"
+    email_from_name: str = "RFPEngine Assistant"
+    app_base_url: str = "https://rfpengine.net"
+
     # CORS Settings
     cors_origins: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000,https://www.rfpengine.net,https://rfpengine.net"
     CORS_ORIGINS: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000,https://www.rfpengine.net,https://rfpengine.net"
