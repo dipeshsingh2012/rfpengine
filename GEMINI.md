@@ -1,7 +1,7 @@
 # RFPEngine Agent Guidelines & aroadmap.dev MCP Tool Routing
 
 ## Autonomous SDLC & MCP Architecture
-This repository integrates with the `aroadmap` Model Context Protocol (MCP) server (`https://aroadmap.dev/api/mcp` / `rfqengine.aroadmap.dev`).
+This repository integrates with the `aroadmap` Model Context Protocol (MCP) server (`https://aroadmap.dev/api/mcp` / `rfpengine.aroadmap.dev`).
 When interacting with the user in natural language, automatically invoke the appropriate MCP tool (`call_mcp_tool` with server `rfpengine` or `aroadmap`):
 
 ### 1. Pillar 1: Initiative & Opportunity Creation -> `create_initiative`
