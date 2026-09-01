@@ -48,8 +48,54 @@ class DiagnosticReport(BaseModel):
 class MCPTools:
     """
     Live Production Model Context Protocol Tools for RFPEngine.
-    Directly wired to PostgreSQL, Vector/Keyword KB, Cloud Diagnostics, and Fleet Dispatch.
+    Directly wired to PostgreSQL (Neon), Vector/Keyword KB, Cloud Diagnostics, and Fleet Dispatch.
     """
+
+    def __init__(self):
+        self._secrets_loaded = False
+
+    def _get_github_token(self) -> Optional[str]:
+        """Resolves GitHub token from environment or mcp_config.json dynamically."""
+        token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        if token:
+            return token
+        try:
+            import json
+            cfg_path = os.path.expanduser("~/.gemini/config/mcp_config.json")
+            if os.path.exists(cfg_path):
+                with open(cfg_path, "r") as f:
+                    cfg = json.load(f)
+                    token = cfg.get("mcpServers", {}).get("rfpengine", {}).get("env", {}).get("GITHUB_TOKEN")
+                    if token:
+                        os.environ["GITHUB_TOKEN"] = token
+                        return token
+        except Exception:
+            pass
+        return None
+
+    async def _ensure_cloud_secrets(self) -> None:
+        """
+        Ensures production database and service secrets from GCP Secret Manager
+        are loaded if running standalone without hardcoded environment variables.
+        """
+        if self._secrets_loaded:
+            return
+        self._secrets_loaded = True
+        try:
+            from app.core.config import get_settings
+            from app.services.gcp_secret_service import GCPSecretService
+            settings = get_settings()
+            if settings.gcp_secret_manager_enabled:
+                svc = GCPSecretService(settings)
+                if svc.is_configured():
+                    secrets = await svc.get_all_app_secrets()
+                    if secrets:
+                        settings.apply_gcp_secrets(secrets)
+                        from app.core.db import close_db_connection
+                        await close_db_connection()
+                        logger.info("MCP tools auto-loaded %d cloud secrets from GCP Secret Manager.", len(secrets))
+        except Exception as exc:
+            logger.debug("Cloud secret auto-load skipped or failed: %s", exc)
 
     async def search_knowledge_base(
         self, query: str, limit: int = 5, tenant_id: str = "default"
@@ -57,6 +103,7 @@ class MCPTools:
         """
         Performs hybrid / relational search over the RFPEngine knowledge base.
         """
+        await self._ensure_cloud_secrets()
         results: List[SearchResult] = []
         try:
             engine = get_engine()
@@ -108,6 +155,7 @@ class MCPTools:
         Live Roadmap management tool: query backlog, inspect Gherkin criteria, or transition stages.
         Actions: 'list', 'get', 'create', 'update'
         """
+        await self._ensure_cloud_secrets()
         action = action.lower()
         engine = get_engine()
 
@@ -153,19 +201,18 @@ class MCPTools:
             if not item_id:
                 return {"status": "error", "message": "Missing 'item_id' parameter"}
             try:
-                async with engine.connect() as conn:
-                    stmt = select(RoadmapInitiativeModel).where(RoadmapInitiativeModel.id == item_id)
-                    res = await conn.execute(stmt)
-                    item = res.scalars().first()
+                session_factory = get_session_factory()
+                async with session_factory() as session:
+                    item = await PostgresService.get_roadmap_initiative(session, item_id)
                     if item:
                         return {
                             "id": item.id,
                             "title": item.title,
-                            "stage": item.stage.upper(),
+                            "stage": (item.stage or "discovery").upper(),
                             "theme": item.theme,
-                            "problem_statement": item.problem_statement,
-                            "user_story": item.user_story,
-                            "acceptance_criteria": item.acceptance_criteria,
+                            "problem_statement": item.problem_statement or "",
+                            "user_story": item.user_story or "",
+                            "acceptance_criteria": item.acceptance_criteria or [],
                             "rice": {
                                 "reach": item.rice_reach,
                                 "impact": item.rice_impact,
@@ -256,7 +303,7 @@ class MCPTools:
         init_id = init_res.get("item_id", "mcp-initiative")
 
         # Step 2: Dispatch to GitHub repository_dispatch
-        github_token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        github_token = self._get_github_token()
         dispatched = False
         dispatch_error = None
 
@@ -327,7 +374,7 @@ class MCPTools:
         title = init_data.get("title", "Approved Initiative") if isinstance(init_data, dict) else "Approved Initiative"
 
         # Step 3: Dispatch to GitHub repository_dispatch
-        github_token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        github_token = self._get_github_token()
         dispatched = False
         dispatch_error = None
 
@@ -377,6 +424,7 @@ class MCPTools:
         """
         Executes live health checks and connection latency measurements.
         """
+        await self._ensure_cloud_secrets()
         start = time.perf_counter()
         db_status = "unknown"
         error_count = 0
