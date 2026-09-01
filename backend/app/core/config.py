@@ -67,8 +67,12 @@ class Settings(BaseSettings):
         return "prod" if self.is_production else "local"
 
     # CORS Settings
-    cors_origins: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000,https://www.rfpengine.net,https://rfpengine.net"
-    cors_origin_regex: str = r"chrome-extension://.*"
+    cors_origins: Union[str, List[str]] = (
+        "http://localhost:5173,http://localhost:3000,"
+        "https://www.rfqengine.net,https://rfqengine.net,"
+        "https://www.rfpengine.net,https://rfpengine.net"
+    )
+    cors_origin_regex: str = r"^(https://.*\.vercel\.app|https://.*\.rfqengine\.net|https://.*\.rfpengine\.net|chrome-extension://.*)$"
 
     def apply_gcp_secrets(self, secrets: Dict[str, Any]) -> None:
         """
