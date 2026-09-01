@@ -90,8 +90,72 @@ Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.
 - [ADR 0016: Relational Persistence for Product Roadmap and Discovery Backlog](docs/adr/0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md)
 - [ADR 0017: Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution](docs/adr/0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md)
 - [ADR 0018: Enterprise Testing Strategy and Automated Verification Matrix](docs/adr/0018-enterprise-testing-strategy-and-automated-verification-matrix.md)
+- [ADR 0019: Closed-Loop AI Feedback Architecture: Golden Q&A Promotion and Exemplar Learning](docs/adr/0019-closed-loop-ai-feedback-architecture.md)
+- [ADR 0020: Autonomous 5-Agent SDLC Governance & Branching Architecture](docs/adr/0020-autonomous-5-agent-sdlc-governance.md)
+- [ADR 0021: Multi-Tenant B2B Authentication via Google Cloud Identity Platform](docs/adr/0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md)
+- [ADR 0022: Model Context Protocol (MCP) Integration for IDEs and Chat Assistants](docs/adr/0022-model-context-protocol-mcp-integration-for-ide-and-chat.md)
 
 ---
+
+## 🔌 Model Context Protocol (MCP) Integration
+
+RFPEngine implements a production **Model Context Protocol (MCP)** server conforming to the JSON-RPC 2.0 open standard. It enables local IDE assistants (Antigravity, Cursor, Claude Code) and remote multi-agent swarms to directly interact with RFPEngine domain capabilities.
+
+### Available MCP Tools
+
+| Tool Name | Description | Key Arguments |
+| :--- | :--- | :--- |
+| **`search_knowledge_base`** | Performs hybrid vector and keyword search across verified compliance whitepapers. | `query` (str, required), `limit` (int, default=5) |
+| **`manage_roadmap`** | Queries live discovery backlog, retrieves Gherkin criteria, or transitions KanBan stages in PostgreSQL. | `action` (`"list"` \| `"get"` \| `"create"` \| `"update"`), `item_id` (str), `payload` (dict) |
+| **`get_cloud_diagnostics`** | Executes live latency checks and health reports across PostgreSQL, Cloud Run, and search indexes. | `service_name` (str, default=`"all"`) |
+
+### Dual Transport Modes
+
+1. **Local `stdio` Transport (For IDEs & CLIs)**:
+   * Communicates via standard input/output with sub-millisecond execution.
+   * Command: `python -m app.mcp.server`
+
+2. **Remote `SSE` Streaming Transport (For Cloud Run & Remote Agents)**:
+   * Persistent Server-Sent Events stream at `GET /api/v1/mcp/sse` (requires `X-Tenant-ID` header).
+   * JSON-RPC message ingestion at `POST /api/v1/mcp/messages`.
+
+### Connecting Your IDE (Antigravity / Cursor / Claude Code)
+
+Add the RFPEngine MCP server to your IDE configuration (`~/.gemini/antigravity/mcp_config.json` or `.vscode/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "rfpengine": {
+      "command": "/home/dipes/projects/RFQEngine/backend/.venv/bin/python",
+      "args": ["-m", "app.mcp.server"],
+      "cwd": "/home/dipes/projects/RFQEngine/backend",
+      "env": {
+        "PYTHONPATH": "/home/dipes/projects/RFQEngine/backend",
+        "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/rfpengine"
+      }
+    }
+  }
+}
+```
+
+### Quick CLI Testing
+
+```bash
+cd backend
+.venv/bin/python -c "
+import asyncio
+from app.mcp.server import MCPServer
+
+async def test():
+    server = MCPServer()
+    # Query live roadmap
+    res = await server.handle_request({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': 'manage_roadmap', 'arguments': {'action': 'list'}}})
+    print(f'Total Roadmap Items: {res[\"result\"][\"total\"]}')
+
+asyncio.run(test())
+"
+```
 
 ## Product Strategy & Discovery Roadmap (`/roadmap`)
 
@@ -513,10 +577,8 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │       ├── 0001-hybrid-retrieval-with-elasticsearch-and-pinecone.md
 │       ├── 0002-relational-persistence-with-postgresql.md
 │       ├── 0003-human-in-the-loop-governance-and-extension-safety.md
-│       ├── 0004-decoupled-seller-workspace-and-browser-extension.md
-│       ├── 0005-database-migrations-with-alembic.md
-│       ├── 0006-centralized-secrets-management-with-gcp-secret-manager.md
-│       └── 0007-knowledge-base-chunking-and-search-index-ingestion.md
+│       ├── 0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md
+│       └── 0022-model-context-protocol-mcp-integration-for-ide-and-chat.md
 ├── backend/
 │   ├── Dockerfile                  # Production container for Cloud Run
 │   ├── alembic/                    # Database migration versions
@@ -525,10 +587,14 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │   │   │   ├── health.py           # /health diagnostic endpoint
 │   │   │   ├── knowledge_base.py   # /api/v1/knowledge-base CRUD & /upload
 │   │   │   ├── responses.py        # /api/v1/workspaces persistence
-│   │   │   └── search.py           # /api/v1/search hybrid RRF retrieval
+│   │   │   ├── search.py           # /api/v1/search hybrid RRF retrieval
+│   │   │   └── endpoints/mcp.py    # /api/v1/mcp/sse and /messages routes
 │   │   ├── core/
 │   │   │   ├── config.py           # Settings and env validation
 │   │   │   └── db.py               # Async SQLAlchemy PostgreSQL connection
+│   │   ├── mcp/
+│   │   │   ├── server.py           # JSON-RPC 2.0 MCPServer & stdio listener
+│   │   │   └── tools.py            # Live MCP Tools (KB search, roadmap, diagnostics)
 │   │   ├── models/
 │   │   │   ├── db_models.py        # SQLAlchemy relational models
 │   │   │   └── schemas.py          # Pydantic request/response schemas
