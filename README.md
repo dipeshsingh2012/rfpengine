@@ -157,19 +157,19 @@ asyncio.run(test())
 "
 ```
 
-## Product Strategy & Discovery Roadmap (`/roadmap`)
+## Product Strategy & Discovery Roadmap (`https://rfpengine.aroadmap.dev`)
 
-RFPEngine includes an interactive **Product Strategy & Discovery Hub** directly accessible via `/roadmap`:
+RFPEngine includes an interactive **Product Strategy & Discovery Hub** live on its dedicated subdomain at [**https://rfpengine.aroadmap.dev/**](https://rfpengine.aroadmap.dev/):
 
 * **Multi-Stage Kanban Lifecycle**:
   * 🔍 **In Discovery**: Problem validation, user research & persona pain points.
   * 📐 **In Spec & Design**: PRD specifications, UX wireframing & technical architecture.
+  * ✅ **Approved & Ready**: Signed off by Lead, queued for autonomous agent dispatch.
   * 🏗️ **In Development**: Active engineering sprint execution.
-  * 🧪 **Beta & Testing**: Customer pilots with enterprise design partners.
   * 🚀 **Shipped & Live**: Production features active in Google Cloud Run and Chrome Web Store.
 * **RICE Prioritization Matrix**: Data-driven ranking calculated via `(Reach × Impact × Confidence) ÷ Effort = RICE Score`.
-* **Interactive Mini-PRD Drawer**: Slide-over product specifications featuring Customer Problem Statements, User Stories, Gherkin Acceptance Criteria, and Target KPIs.
-* **Community Upvoting & Discovery Submissions**: Stakeholders can upvote features and submit new feature requests into the backlog.
+* **Interactive Living PRD Drawer**: Slide-over product specifications featuring Customer Problem Statements, User Stories, Gherkin Acceptance Criteria, and Target KPIs.
+* **Community Upvoting & Discovery Submissions**: Stakeholders can upvote features and submit new opportunities directly into the backlog.
 
 ---
 
