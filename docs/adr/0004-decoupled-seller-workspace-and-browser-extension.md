@@ -23,8 +23,8 @@ We decouple the system into two complementary client experiences that share the 
    - Saves workspace state to PostgreSQL for team collaboration.
 2. **Manifest V3 Browser Extension (`extension/`)**:
    - Operates directly inside any buyer web page or third-party portal via a side-panel interface.
-   - [content.js](file:///home/dipes/projects/RFQEngine/extension/content.js): Scans DOM form elements (`textarea`, `input`, `contenteditable`) and maps questions from labels, ARIA attributes, nearby headings, and placeholders.
-   - [sidepanel.js](file:///home/dipes/projects/RFQEngine/extension/sidepanel.js): Queries `POST /api/v1/search` for each detected question, displays citations, requires seller approval, and dispatches DOM fill events directly into the form fields.
+   - [content.js](file:///home/dipes/projects/RFPEngine/extension/content.js): Scans DOM form elements (`textarea`, `input`, `contenteditable`) and maps questions from labels, ARIA attributes, nearby headings, and placeholders.
+   - [sidepanel.js](file:///home/dipes/projects/RFPEngine/extension/sidepanel.js): Queries `POST /api/v1/search` for each detected question, displays citations, requires seller approval, and dispatches DOM fill events directly into the form fields.
    - Features visual field highlighting on insertion.
 
 ## Consequences

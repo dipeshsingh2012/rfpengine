@@ -127,11 +127,11 @@ Add the RFPEngine MCP server to your IDE configuration (`~/.gemini/antigravity/m
 {
   "mcpServers": {
     "rfpengine": {
-      "command": "/home/dipes/projects/RFQEngine/backend/.venv/bin/python",
+      "command": "/home/dipes/projects/RFPEngine/backend/.venv/bin/python",
       "args": ["-m", "app.mcp.server"],
-      "cwd": "/home/dipes/projects/RFQEngine/backend",
+      "cwd": "/home/dipes/projects/RFPEngine/backend",
       "env": {
-        "PYTHONPATH": "/home/dipes/projects/RFQEngine/backend",
+        "PYTHONPATH": "/home/dipes/projects/RFPEngine/backend",
         "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/rfpengine"
       }
     }

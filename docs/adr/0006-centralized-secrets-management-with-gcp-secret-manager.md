@@ -23,10 +23,10 @@ While third-party solutions like HashiCorp Cloud Platform Vault impose significa
 We adopt **GCP Secret Manager** as the primary cloud secrets store:
 
 1. **Dual Access Architecture**:
-   - **Production (Cloud Run)**: Cloud Run resolves secrets natively at container startup via Secret Manager references in [`terraform/cloud_run.tf`](file:///home/dipes/projects/RFQEngine/terraform/cloud_run.tf), requiring zero custom SDK calls or boot latency.
-   - **Standalone / Local / VM**: [`GCPSecretService`](file:///home/dipes/projects/RFQEngine/backend/app/services/gcp_secret_service.py) uses the `google-cloud-secret-manager` Python SDK to retrieve or sync secrets when running outside Cloud Run.
+   - **Production (Cloud Run)**: Cloud Run resolves secrets natively at container startup via Secret Manager references in [`terraform/cloud_run.tf`](file:///home/dipes/projects/RFPEngine/terraform/cloud_run.tf), requiring zero custom SDK calls or boot latency.
+   - **Standalone / Local / VM**: [`GCPSecretService`](file:///home/dipes/projects/RFPEngine/backend/app/services/gcp_secret_service.py) uses the `google-cloud-secret-manager` Python SDK to retrieve or sync secrets when running outside Cloud Run.
 2. **Terraform Provisioning**:
-   - Complete Terraform module in [`terraform/`](file:///home/dipes/projects/RFQEngine/terraform/) managing:
+   - Complete Terraform module in [`terraform/`](file:///home/dipes/projects/RFPEngine/terraform/) managing:
      - Canonical Secret Manager secrets (`rfpengine-database-url`, `rfpengine-elasticsearch-api-key`, `rfpengine-pinecone-api-key`).
      - Dedicated least-privilege IAM service account (`rfpengine-backend-sa@rfpengine.iam.gserviceaccount.com`).
      - Secret accessor IAM role bindings (`roles/secretmanager.secretAccessor`).

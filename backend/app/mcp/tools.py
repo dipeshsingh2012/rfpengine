@@ -280,7 +280,7 @@ class MCPTools:
         prompt: str,
         category: Optional[str] = "core",
         tenant_id: str = "default",
-        repo: str = "dipeshsingh2012/rfqengine"
+        repo: str = "dipeshsingh2012/rfpengine"
     ) -> Dict[str, Any]:
         """
         Triggers the autonomous PM Agent and SDLC Fleet via GitHub repository_dispatch without creating a GitHub Issue.
@@ -355,7 +355,7 @@ class MCPTools:
         item_id: str,
         feedback: Optional[str] = None,
         tenant_id: str = "default",
-        repo: str = "dipeshsingh2012/rfqengine"
+        repo: str = "dipeshsingh2012/rfpengine"
     ) -> Dict[str, Any]:
         """
         Human Review Sign-off Gate: Approves a PM specification and transitions it to 'development'.
