@@ -230,6 +230,38 @@ export const INITIAL_ROADMAP_INITIATIVES: RoadmapInitiative[] = [
 
   // --- IN DEVELOPMENT ---
   {
+    id: "gcip-multi-tenant-auth-and-google-signin",
+    title: "Multi-Tenant GCIP Auth & 1-Click Google Sign-In Demo",
+    stage: "development",
+    theme: "Enterprise Governance",
+    priority: "P0 - Critical",
+    targetPersona: "Evaluator / Enterprise Admin",
+    quarter: "Q2 2026",
+    summary:
+      "Dual-track multi-tenant authentication powered by Google Cloud Identity Platform (GCIP) with frictionless 1-click Google Sign-In demo sandboxes and enterprise SAML 2.0 / Okta / Azure AD SSO.",
+    problemStatement:
+      "Prospects and evaluators need instant 1-click access to test RFQEngine without complex IT setup, while Fortune 500 enterprise buyers require strict corporate SAML/OIDC SSO.",
+    userStory:
+      "As an Evaluator, I want to click 'Sign in with Google' and immediately land in an isolated demo workspace pre-seeded with sample compliance documents so that I can evaluate the AI in under 5 seconds.",
+    successMetrics: [
+      "< 3s 1-click Google Sign-in to live demo workspace",
+      "Automatic provisioning of isolated demo tenant with pre-seeded SOC 2 documents",
+      "Zero-trust JWT verification via Google Public JWKS on FastAPI backend",
+      "Enterprise SAML 2.0 / Okta / Azure AD IdP federation capability",
+    ],
+    acceptanceCriteria: [
+      "Users can authenticate via Google OAuth2/OIDC and receive secure session JWT.",
+      "New demo users are automatically provisioned with pre-seeded compliance data in PostgreSQL.",
+      "API routes enforce tenant isolation and extract user roles from Google token claims.",
+      "Admin portal supports self-service SAML/OIDC IdP configuration via GCIP API.",
+    ],
+    technicalArchitecture:
+      "Google Cloud Identity Platform (GCIP) + FastAPI JWKS token verification + automated sandbox tenant seeder + multi-tenant PostgreSQL/vector isolation.",
+    rice: { reach: 95, impact: 5, confidence: 90, effort: 3, score: 142.5 },
+    upvotes: 128,
+    tags: ["Google Sign-In", "GCIP", "Multi-Tenant Auth", "Enterprise SSO", "Demo Sandbox"],
+  },
+  {
     id: "excel-sig-lite-parser",
     title: "Multi-Format Excel & SIG Lite / CAIQ Parser",
     stage: "development",

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # App & Environment Settings
     app_name: str = "RFPEngine API"
     app_version: str = "0.2.0"
-    env: str = "local"  # "local", "dev", "staging", "prod"
+    env: str = "dev"  # "dev", "staging", "prod", "test"
     debug: bool = False
 
     @property

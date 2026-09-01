@@ -20,11 +20,11 @@ import {
   GripVertical,
 } from "lucide-react";
 import {
-  INITIAL_ROADMAP_INITIATIVES,
   RoadmapInitiative,
   RoadmapStage,
   StrategicTheme,
   STAGE_CONFIG,
+  normalizeInitiative,
 } from "./roadmapData";
 
 type ViewMode = "kanban" | "rice" | "themes";
@@ -57,12 +57,13 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
     const saved = localStorage.getItem("rfpengine.roadmap.initiatives");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.map(normalizeInitiative) : [];
       } catch {
-        return INITIAL_ROADMAP_INITIATIVES;
+        return [];
       }
     }
-    return INITIAL_ROADMAP_INITIATIVES;
+    return [];
   });
 
   const [upvotedIds, setUpvotedIds] = useState<Set<string>>(() => {
@@ -106,10 +107,11 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
         setIsLoadingDb(true);
         const res = await fetch(`${resolvedBase}/v1/roadmap`);
         if (res.ok) {
-          const data: RoadmapInitiative[] = await res.json();
-          if (isMounted && Array.isArray(data) && data.length > 0) {
-            setInitiatives(data);
-            localStorage.setItem("rfpengine.roadmap.initiatives", JSON.stringify(data));
+          const data = await res.json();
+          if (isMounted && Array.isArray(data)) {
+            const normalized = data.map(normalizeInitiative);
+            setInitiatives(normalized);
+            localStorage.setItem("rfpengine.roadmap.initiatives", JSON.stringify(normalized));
           }
         }
       } catch (err) {
@@ -198,13 +200,23 @@ export const RoadmapPage: React.FC<RoadmapPageProps> = ({ onNavigateBack, showTo
 
   const handleResetToDefault = async () => {
     if (window.confirm("Reset all roadmap initiatives back to default backlog in database?")) {
-      setInitiatives(INITIAL_ROADMAP_INITIATIVES);
       localStorage.removeItem("rfpengine.roadmap.initiatives");
-      showToast("🔄 Roadmap restored to default product backlog.");
       try {
-        await fetch(`${resolvedBase}/v1/roadmap/reset`, { method: "POST" });
+        setIsLoadingDb(true);
+        const res = await fetch(`${resolvedBase}/v1/roadmap/reset`, { method: "POST" });
+        if (res.ok) {
+          const fetchRes = await fetch(`${resolvedBase}/v1/roadmap`);
+          if (fetchRes.ok) {
+            const data = await fetchRes.json();
+            setInitiatives(data);
+            localStorage.setItem("rfpengine.roadmap.initiatives", JSON.stringify(data));
+          }
+        }
+        showToast("🔄 Roadmap restored to default product backlog in database.");
       } catch (err) {
         console.warn("Failed to reset database roadmap:", err);
+      } finally {
+        setIsLoadingDb(false);
       }
     }
   };
