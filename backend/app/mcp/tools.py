@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from sqlalchemy import text, select
 
-from app.core.db import get_engine, get_db_session
+from app.core.db import get_engine, get_session_factory
 from app.models.db_models import KBEntry, RoadmapInitiativeModel
 from app.models.schemas import (
     RoadmapInitiativeCreate,
@@ -47,7 +48,7 @@ class DiagnosticReport(BaseModel):
 class MCPTools:
     """
     Live Production Model Context Protocol Tools for RFPEngine.
-    Directly wired to PostgreSQL, Vector/Keyword KB, and Cloud Diagnostics.
+    Directly wired to PostgreSQL, Vector/Keyword KB, Cloud Diagnostics, and Fleet Dispatch.
     """
 
     async def search_knowledge_base(
@@ -60,7 +61,6 @@ class MCPTools:
         try:
             engine = get_engine()
             async with engine.connect() as conn:
-                # Query knowledge base entries matching query
                 query_wildcard = f"%{query}%"
                 stmt = select(KBEntry).where(
                     (KBEntry.question.ilike(query_wildcard)) | 
@@ -79,7 +79,6 @@ class MCPTools:
         except Exception as exc:
             logger.warning("MCP search_knowledge_base DB lookup failed: %s", exc)
 
-        # If no DB records found yet or offline, return grounded fallback documentation
         if not results:
             results = [
                 SearchResult(
@@ -205,7 +204,6 @@ class MCPTools:
                         score=rice_dict.get("score", 40.0)
                     )
                 )
-                from app.core.db import get_session_factory
                 session_factory = get_session_factory()
                 async with session_factory() as session:
                     created = await PostgresService.create_roadmap_initiative(session, create_model)
@@ -218,7 +216,6 @@ class MCPTools:
                 return {"status": "error", "message": "Missing 'item_id' or 'payload'"}
             try:
                 update_model = RoadmapInitiativeUpdate(**payload)
-                from app.core.db import get_session_factory
                 session_factory = get_session_factory()
                 async with session_factory() as session:
                     updated = await PostgresService.update_roadmap_initiative(session, item_id, update_model)
@@ -229,6 +226,82 @@ class MCPTools:
             return {"status": "error", "message": f"Initiative '{item_id}' not found"}
 
         return {"status": "error", "message": f"Unknown action: '{action}'. Expected 'list', 'get', 'create', 'update'"}
+
+    async def trigger_pm_initiative(
+        self,
+        title: str,
+        prompt: str,
+        category: Optional[str] = "core",
+        tenant_id: str = "default",
+        repo: str = "dipeshsingh2012/rfqengine"
+    ) -> Dict[str, Any]:
+        """
+        Triggers the autonomous PM Agent and SDLC Fleet via GitHub repository_dispatch without creating a GitHub Issue.
+        1. Persists initiative to PostgreSQL roadmap in discovery stage.
+        2. Dispatches 'mcp_initiative' event to GitHub Actions to execute PM-Agent -> Dev-Agent PR.
+        """
+        # Step 1: Create initiative in PostgreSQL
+        init_res = await self.manage_roadmap(
+            action="create",
+            payload={
+                "title": title,
+                "stage": "discovery",
+                "theme": category.title() if category else "Core",
+                "priority": "P1 - High",
+                "problem_statement": prompt,
+                "summary": f"Autonomous initiative triggered via MCP: {title}",
+            },
+            tenant_id=tenant_id
+        )
+        init_id = init_res.get("item_id", "mcp-initiative")
+
+        # Step 2: Dispatch to GitHub repository_dispatch
+        github_token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        dispatched = False
+        dispatch_error = None
+
+        if github_token:
+            try:
+                import httpx
+                headers = {
+                    "Authorization": f"Bearer {github_token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                }
+                payload = {
+                    "event_type": "mcp_initiative",
+                    "client_payload": {
+                        "title": title,
+                        "prompt": prompt,
+                        "category": category,
+                        "initiative_id": init_id,
+                        "tenant_id": tenant_id,
+                    }
+                }
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(
+                        f"https://api.github.com/repos/{repo}/dispatches",
+                        headers=headers,
+                        json=payload,
+                        timeout=10.0,
+                    )
+                    if resp.status_code == 204:
+                        dispatched = True
+                    else:
+                        dispatch_error = f"GitHub API responded with status {resp.status_code}: {resp.text}"
+            except Exception as exc:
+                dispatch_error = str(exc)
+        else:
+            dispatch_error = "GITHUB_TOKEN not configured in local environment; initiative recorded in PostgreSQL."
+
+        return {
+            "status": "success" if dispatched else "recorded_locally",
+            "initiative_id": init_id,
+            "title": title,
+            "stage": "discovery",
+            "dispatched_to_fleet": dispatched,
+            "note": "Initiative saved to PostgreSQL Roadmap. Fleet dispatch sent to GitHub Actions (zero issues created)." if dispatched else f"Initiative saved to PostgreSQL Roadmap. ({dispatch_error})"
+        }
 
     async def get_cloud_diagnostics(self, service_name: str = "all") -> DiagnosticReport:
         """

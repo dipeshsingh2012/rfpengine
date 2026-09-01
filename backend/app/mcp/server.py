@@ -93,6 +93,19 @@ class MCPServer:
                                         "service_name": {"type": "string", "default": "all", "description": "Target service to inspect."}
                                     }
                                 }
+                            },
+                            {
+                                "name": "trigger_pm_initiative",
+                                "description": "Triggers the autonomous PM Agent and SDLC fleet via repository dispatch to spec, implement, and open a PR with ZERO GitHub Issue noise.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "title": {"type": "string", "description": "Feature initiative title."},
+                                        "prompt": {"type": "string", "description": "Detailed requirements, problem statement, or user story."},
+                                        "category": {"type": "string", "default": "core", "description": "Product theme or category."}
+                                    },
+                                    "required": ["title", "prompt"]
+                                }
                             }
                         ]
                     }
@@ -130,6 +143,12 @@ class MCPServer:
                 action=args.get("action", "list"),
                 item_id=args.get("item_id"),
                 payload=args.get("payload")
+            )
+        elif name == "trigger_pm_initiative":
+            return await self.tools.trigger_pm_initiative(
+                title=args.get("title", "New Feature"),
+                prompt=args.get("prompt", ""),
+                category=args.get("category", "core")
             )
         elif name == "get_cloud_diagnostics":
             return await self.tools.get_cloud_diagnostics(

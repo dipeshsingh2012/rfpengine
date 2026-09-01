@@ -2,6 +2,7 @@ name: Autonomous Agentic SDLC
 
 run-name: >-
   ${{
+    github.event_name == 'repository_dispatch' && format('⚡ MCP Initiative: {0}', github.event.client_payload.title) ||
     github.event_name == 'issue_comment' && format('💬 {0} on #{1} by @{2}', github.event.comment.body, github.event.issue.number, github.actor) ||
     github.event_name == 'pull_request_review_comment' && format('💬 PR Diff Comment: "{0}" by @{1}', github.event.comment.body, github.actor) ||
     github.event_name == 'pull_request_review' && format('💬 PR Review: "{0}" by @{1}', github.event.review.body, github.actor) ||
@@ -21,6 +22,9 @@ on:
     types: [submitted, edited]
   pull_request_review_comment:
     types: [created, edited]
+  repository_dispatch:
+    types: [mcp_initiative, fleet_trigger]
+  workflow_dispatch:
 
 permissions:
   contents: write

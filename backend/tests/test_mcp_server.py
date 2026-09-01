@@ -56,6 +56,28 @@ async def test_mcp_tools_call_diagnostics():
     assert "latency_ms" in res["result"]
 
 @pytest.mark.asyncio
+async def test_mcp_trigger_pm_initiative():
+    server = MCPServer()
+    req = {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {
+            "name": "trigger_pm_initiative",
+            "arguments": {
+                "title": "Automated Webhook Dispatch on Approval",
+                "prompt": "Dispatches webhook to external systems when RFP is signed off.",
+                "category": "integrations"
+            }
+        }
+    }
+    res = await server.handle_request(req)
+    assert res["jsonrpc"] == "2.0"
+    assert res["id"] == 5
+    assert "initiative_id" in res["result"]
+    assert res["result"]["stage"] == "discovery"
+
+@pytest.mark.asyncio
 async def test_mcp_unknown_method():
     server = MCPServer()
     req = {"jsonrpc": "2.0", "id": 4, "method": "unknown/method", "params": {}}
