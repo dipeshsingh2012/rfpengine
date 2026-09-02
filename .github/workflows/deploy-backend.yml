@@ -54,6 +54,8 @@ jobs:
           pip install -r requirements.txt pytest pytest-asyncio
 
       - name: Run Document Parser & Unit Tests
+        env:
+          PYTHONPATH: .
         run: |
           pytest tests/test_document_parser.py -v
 
