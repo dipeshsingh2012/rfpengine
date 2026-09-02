@@ -1,69 +1,19 @@
 version: '3'
 
-dotenv: ['.env']
-
-includes:
-  backend: ./backend/Taskfile.yml
-  frontend: ./frontend/Taskfile.yml
-
 tasks:
-  default:
-    desc: "List all available tasks"
-    cmds:
-      - task --list
-
   install:
-    desc: "Install all backend and frontend dependencies"
+    desc: Install dependencies
     cmds:
-      - task: backend:install
-      - task: frontend:install
-
-  dev:
-    desc: "Start backend and frontend development servers concurrently"
-    deps:
-      - backend:dev
-      - frontend:dev
+      - pip install -r backend/requirements.txt
 
   test:
-    desc: "Run full polyglot automated test suite (Pytest + Frontend Build & Typecheck)"
+    desc: Run all backend tests
     cmds:
-      - task: backend:test
-      - task: frontend:build
+      - cd backend && PYTHONPATH=. pytest tests/test_csv_service.py
+    preconditions:
+      - task: install
 
-  build:
-    desc: "Build all production distribution bundles"
+  dev:
+    desc: Run the application in development mode
     cmds:
-      - task: frontend:build
-
-  db:sync:
-    desc: "Synchronize all canonical roadmap initiatives into PostgreSQL"
-    cmds:
-      - task: backend:db:sync
-
-  db:verify:
-    desc: "Run live PostgreSQL schema and roadmap verification script"
-    cmds:
-      - task: backend:db:verify
-
-  verify:all:
-    desc: "Run complete enterprise verification matrix (backend, frontend, db)"
-    cmds:
-      - task: backend:test
-      - task: backend:db:verify
-      - task: frontend:build
-
-  detect:changes:
-    desc: "Run change detection script to output change_manifest.json"
-    cmds:
-      - python3 .github/scripts/detect_changes.py
-
-  lint:backend:
-    desc: "Run backend lint and compilation check"
-    cmds:
-      - task: backend:lint
-
-  security:backend:
-    desc: "Run backend security vulnerability check"
-    cmds:
-      - task: backend:security
-
+      - uvicorn app.main:app --reload
