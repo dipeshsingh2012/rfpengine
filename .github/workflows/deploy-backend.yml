@@ -32,6 +32,8 @@ jobs:
   test:
     name: Run Unit Tests & Validation
     runs-on: ubuntu-latest
+    outputs:
+      has_gcp_secret: ${{ steps.check_secret.outputs.has_secret }}
     defaults:
       run:
         working-directory: backend
@@ -55,11 +57,22 @@ jobs:
         run: |
           pytest tests/test_document_parser.py -v
 
+      - name: Check GCP Deployment Secret
+        id: check_secret
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -n "$GCP_SA_KEY" ]; then
+            echo "has_secret=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_secret=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # 2. Build, Push Docker Image & Deploy to Google Cloud Run
   deploy:
     name: Build & Deploy to Cloud Run
     needs: test
-    if: ${{ secrets.GCP_SA_KEY != '' }}
+    if: ${{ needs.test.outputs.has_gcp_secret == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
