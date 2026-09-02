@@ -1,11 +1,12 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from app.models.auth import UserInDB
 
-# Configuration (In production, these should be loaded from environment variables)
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-recovery-key-0987654321")
+# Configuration (In production, these come from env vars)
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-dev-key-change-me")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -24,18 +25,17 @@ class AuthService:
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.now(timezone.utc) + expires_delta
+            expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        
+            expire = datetime.utcnow() + timedelta(minutes=15)
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
 
     @staticmethod
-    def decode_token(token: str) -> Dict[str, Any]:
+    def decode_token(token: str) -> Optional[Dict[str, Any]]:
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             return payload
         except JWTError:
-            return {}
+            return None

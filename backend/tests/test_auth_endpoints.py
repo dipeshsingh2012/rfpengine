@@ -1,51 +1,56 @@
 import pytest
+from httpx import AsyncClient
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from app.api.v1.endpoints.auth import router
+from app.api.v1.endpoints.auth import router, MOCK_USER_DB
 
-# Setup a minimal FastAPI app for testing the router
+# Setup a minimal app for testing endpoints
 app = FastAPI()
-app.include_router(router, prefix="/auth")
+app.include_router(router)
 
-client = TestClient(app)
+@pytest.fixture(autouse=True)
+def clear_mock_db():
+    """Clears the mock database before every test."""
+    MOCK_USER_DB.clear()
 
-def test_login_success():
-    payload = {
-        "email": "admin@example.com",
-        "password": "password123"
-    }
-    response = client.post("/auth/login", json=payload)
-    
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
+@pytest.mark.asyncio
+async def test_register_and_login_success():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        tenant_id = "tenant_abc"
+        payload = {
+            "email": "user@example.com",
+            "password": "password123",
+            "full_name": "Test User"
+        }
+        headers = {"X-Tenant-ID": tenant_id}
 
-def test_login_failure_wrong_password():
-    payload = {
-        "email": "admin@example.com",
-        "password": "wrong_password"
-    }
-    response = client.post("/auth/login", json=payload)
-    
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Incorrect email or password"
+        # 1. Test Registration
+        reg_resp = await ac.post("/register", json=payload, headers=headers)
+        assert reg_resp.status_code == 200
+        assert "access_token" in reg_resp.json()
 
-def test_login_failure_nonexistent_user():
-    payload = {
-        "email": "nonexistent@example.com",
-        "password": "password123"
-    }
-    response = client.post("/auth/login", json=payload)
-    
-    assert response.status_code == 401
+        # 2. Test Login
+        login_resp = await ac.post("/login", json=payload, headers=headers)
+        assert login_resp.status_code == 200
+        assert login_resp.json()["access_token"] != ""
 
-def test_login_invalid_email_format():
-    payload = {
-        "email": "not-an-email",
-        "password": "password123"
-    }
-    response = client.post("/auth/login", json=payload)
-    
-    # Pydantic validation error returns 422 Unprocessable Entity
-    assert response.status_code == 422
+@pytest.mark.asyncio
+async def test_login_wrong_tenant():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        payload = {"email": "user@example.com", "password": "password123"}
+        
+        # Register with tenant A
+        await ac.post("/register", json=payload, headers={"X-Tenant-ID": "tenant_A"})
+        
+        # Attempt login with tenant B
+        login_resp = await ac.post("/login", json=payload, headers={"X-Tenant-ID": "tenant_B"})
+        assert login_resp.status_code == 401
+
+@pytest.mark.asyncio
+async def test_register_duplicate_email():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        payload = {"email": "dup@example.com", "password": "password123"}
+        headers = {"X-Tenant-ID": "tenant_1"}
+        
+        await ac.post("/register", json=payload, headers=headers)
+        dup_resp = await ac.post("/register", json=payload, headers=headers)
+        assert dup_resp.status_code == 400
