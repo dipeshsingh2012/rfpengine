@@ -1,34 +1,38 @@
-from typing import Optional
+from typing import Any, AsyncGenerator, Dict, Iterator, List, Optional
 from fastapi import APIRouter, Header, HTTPException, status
-from app.schemas.auth import GoogleAuthRequest, TokenResponse
-from app.services.auth_service import auth_service
+from app.schemas.auth import GoogleAuthRequest, Token
+from app.services.auth_service import authenticate_google_user, auth_service
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter()
 
 
-@router.post("/google", response_model=TokenResponse, status_code=status.HTTP_200_OK)
+@router.post("/google", response_model=Token, status_code=status.HTTP_200_OK)
 def google_sign_in(
-    payload: GoogleAuthRequest,
+    request: GoogleAuthRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
-):
+) -> Token:
     """
-    Authenticate user via Google Sign In ID Token.
-    Accepts tenant identifier from request body or 'X-Tenant-ID' header.
+    Authenticate user via Google OAuth ID Token and issue access token.
+    Enforces tenant context via X-Tenant-ID header or request body.
     """
-    effective_tenant_id = x_tenant_id or payload.tenant_id or "default"
+    effective_tenant = x_tenant_id or request.tenant_id or "default"
     try:
-        auth_result = auth_service.authenticate_google_user(
-            id_token=payload.id_token,
-            tenant_id=effective_tenant_id,
+        result = auth_service.authenticate_google(
+            id_token=request.id_token,
+            tenant_id=effective_tenant,
         )
-        return auth_result
+        return Token(**result)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Authentication processing error: {str(e)}",
-        )
+        ) from e
+
+
+@router.post("/login/google", response_model=Token, status_code=status.HTTP_200_OK)
+def login_google_alias(
+    request: GoogleAuthRequest,
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+) -> Token:
+    """Alias route for google sign-in."""
+    return google_sign_in(request=request, x_tenant_id=x_tenant_id)
