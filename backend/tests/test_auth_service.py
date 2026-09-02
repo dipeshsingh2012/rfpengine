@@ -1,42 +1,47 @@
 import pytest
+from unittest.mock import patch, MagicMock
 from app.services.auth_service import AuthService
 
-def test_password_hashing_and_verification():
-    password = "secure_password_123"
-    hashed = AuthService.get_password_hash(password)
-    
-    assert hashed != password
-    assert AuthService.verify_password(password, hashed) is True
-    assert AuthService.verify_password("wrong_password", hashed) is False
 
-def test_create_access_token():
-    data = {"sub": "user_123", "email": "user@example.com"}
-    token = AuthService.create_access_token(data)
-    
+@pytest.fixture
+def auth_service():
+    return AuthService(google_client_id="test-client-id", secret_key="test-secret-key")
+
+
+def test_verify_google_token_empty(auth_service):
+    with pytest.raises(ValueError, match="Token string is required"):
+        auth_service.verify_google_token("")
+
+
+def test_verify_google_token_mock_prefix(auth_service):
+    claims = auth_service.verify_google_token("mock-test-token-alice")
+    assert claims["email"] == "alice@example.com"
+    assert claims["name"] == "Test User"
+    assert claims["sub"] == "google-sub-mock-test-token-alice"
+
+
+def test_create_access_token(auth_service):
+    token = auth_service.create_access_token({"sub": "user-123", "email": "user@example.com"})
     assert isinstance(token, str)
-    assert len(token) > 0
+    assert len(token) > 20
 
-@pytest.mark.asyncio
-async def test_get_current_user_from_token_valid():
-    data = {"sub": "user_123", "email": "user@example.com"}
-    token = AuthService.create_access_token(data)
-    
-    user = await AuthService.get_current_user_from_token(token)
-    assert user["id"] == "user_123"
-    assert user["email"] == "user@example.com"
 
-@pytest.mark.asyncio
-async def test_get_current_user_from_token_invalid():
-    with pytest.raises(ValueError):
-        await AuthService.get_current_user_from_token("invalid.token.string")
+def test_authenticate_google_user_success(auth_service):
+    result = auth_service.authenticate_google_user("mock-test-token-bob", tenant_id="tenant-acme")
+    assert "access_token" in result
+    assert result["token_type"] == "bearer"
+    assert result["user"]["email"] == "bob@example.com"
+    assert result["user"]["tenant_id"] == "tenant-acme"
 
-@pytest.mark.asyncio
-async def test_stream_auth_logs():
-    logs = ["log1", "log2", "log3"]
-    gen = AuthService.stream_auth_logs(logs)
-    
-    results = []
-    async for line in gen:
-        results.append(line.strip())
-    
-    assert results == logs
+
+@patch("app.services.auth_service.google_id_token")
+def test_verify_google_token_with_library(mock_id_token, auth_service):
+    if mock_id_token:
+        mock_id_token.verify_oauth2_token.return_value = {
+            "sub": "12345",
+            "email": "verified@gmail.com",
+            "name": "Verified User",
+        }
+        claims = auth_service.verify_google_token("real-looking-token")
+        assert claims["email"] == "verified@gmail.com"
+        assert claims["name"] == "Verified User"

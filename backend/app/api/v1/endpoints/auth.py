@@ -1,36 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
-from typing import Dict, Any
-from app.services.auth_service import AuthService
+from typing import Optional
+from fastapi import APIRouter, Header, HTTPException, status
+from app.schemas.auth import GoogleAuthRequest, TokenResponse
+from app.services.auth_service import auth_service
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-
-@router.post("/login", response_model=TokenResponse)
-async def login(login_data: LoginRequest):
-    # Mock user validation logic
-    # In a real app, you would fetch the user from the DB here
-    mock_hashed_password = AuthService.get_password_hash("password123")
-    mock_email = "test@example.com"
-
-    if login_data.email != mock_email:
+@router.post("/google", response_model=TokenResponse, status_code=status.HTTP_200_OK)
+def google_sign_in(
+    payload: GoogleAuthRequest,
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """
+    Authenticate user via Google Sign In ID Token.
+    Accepts tenant identifier from request body or 'X-Tenant-ID' header.
+    """
+    effective_tenant_id = x_tenant_id or payload.tenant_id or "default"
+    try:
+        auth_result = auth_service.authenticate_google_user(
+            id_token=payload.id_token,
+            tenant_id=effective_tenant_id,
+        )
+        return auth_result
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail=str(e),
         )
-
-    if not AuthService.verify_password(login_data.password, mock_hashed_password):
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication processing error: {str(e)}",
         )
-
-    access_token = AuthService.create_access_token(data={"sub": mock_email, "email": mock_email})
-    return {"access_token": access_token, "token_type": "bearer"}

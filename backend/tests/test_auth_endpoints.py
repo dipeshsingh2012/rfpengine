@@ -1,46 +1,42 @@
 import pytest
-from httpx import AsyncClient
 from fastapi import FastAPI
-from app.api.v1.endpoints.auth import router
+from fastapi.testclient import TestClient
+from app.api.v1.endpoints.auth import router as auth_router
 
-# Create a minimal app instance for testing the router in isolation
-# This prevents collection errors if the main app is not fully configured
-app = FastAPI()
-app.include_router(router, prefix="/auth")
 
-@pytest.mark.asyncio
-async def test_login_success():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        # Using the mock credentials defined in the endpoint
-        payload = {
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        response = await ac.post("/auth/login", json=payload)
-    
+@pytest.fixture
+def client():
+    app = FastAPI()
+    app.include_router(auth_router)
+    return TestClient(app)
+
+
+def test_google_sign_in_success(client):
+    response = client.post(
+        "/auth/google",
+        json={"id_token": "mock-test-token-charlie"},
+        headers={"X-Tenant-ID": "tenant-test"},
+    )
     assert response.status_code == 200
-    assert "access_token" in response.json()
-    assert response.json()["token_type"] == "bearer"
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["user"]["email"] == "charlie@example.com"
+    assert data["user"]["tenant_id"] == "tenant-test"
 
-@pytest.mark.asyncio
-async def test_login_failure_wrong_password():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {
-            "email": "test@example.com",
-            "password": "wrongpassword"
-        }
-        response = await ac.post("/auth/login", json=payload)
-    
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Incorrect email or password"
 
-@pytest.mark.asyncio
-async def test_login_failure_wrong_email():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {
-            "email": "notfound@example.com",
-            "password": "password123"
-        }
-        response = await ac.post("/auth/login", json=payload)
-    
+def test_google_sign_in_missing_id_token(client):
+    response = client.post(
+        "/auth/google",
+        json={},
+    )
+    assert response.status_code == 422
+
+
+def test_google_sign_in_invalid_token(client):
+    response = client.post(
+        "/auth/google",
+        json={"id_token": "invalid_jwt_format_token"},
+    )
     assert response.status_code == 401
+    assert "Invalid" in response.json()["detail"] or "Failed" in response.json()["detail"]
