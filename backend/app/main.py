@@ -1,120 +1,27 @@
-from __future__ import annotations
-
-import logging
-from contextlib import asynccontextmanager
+import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
 
-from app.api.health import router as health_router
-from app.api.knowledge_base import router as kb_router
-from app.api.responses import router as responses_router
-from app.api.search import router as search_router
-from app.api.v1.endpoints.mcp import router as mcp_router
-from app.api.v1.endpoints.email import router as email_router
-from app.core.config import get_settings
-from app.core.db import Base, close_db_connection, get_engine
-import app.models.db_models  # noqa: F401
-from app.services.elasticsearch_service import ElasticsearchService
-from app.services.gcp_secret_service import GCPSecretService
-from app.services.hybrid_search_service import HybridSearchService
-from app.services.pinecone_service import PineconeService
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
-logger = logging.getLogger("rfpengine")
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Cloud Run liveness/readiness probes."""
+    return {"status": "healthy", "environment": settings.ENVIRONMENT}
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = get_settings()
-    logger.info("Initializing RFPEngine backend services...")
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Backend API"}
 
-    # 1. Initialize GCP Secret Manager & load dynamic secrets if enabled
-    gcp_secret_service = GCPSecretService(settings)
-    app.state.gcp_secrets = gcp_secret_service
-    if settings.gcp_secret_manager_enabled and gcp_secret_service.is_configured():
-        try:
-            secrets = await gcp_secret_service.get_all_app_secrets()
-            if secrets:
-                settings.apply_gcp_secrets(secrets)
-                logger.info("Applied %d secrets dynamically from GCP Secret Manager.", len(secrets))
-        except Exception as exc:
-            logger.warning("Could not fetch secrets from GCP Secret Manager: %s", exc)
-
-    # 2. Initialize PostgreSQL tables
-    try:
-        from sqlalchemy import text
-        engine = get_engine()
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS is_promoted_to_kb BOOLEAN DEFAULT FALSE;"))
-            await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS promoted_kb_id VARCHAR(64);"))
-        logger.info("PostgreSQL database tables and columns verified/created.")
-    except Exception as exc:
-        logger.warning("Could not automatically create PostgreSQL tables (DB may be offline): %s", exc)
-
-    # 3. Initialize Elasticsearch client & index
-    es_service = ElasticsearchService(settings)
-    app.state.elasticsearch = es_service
-    try:
-        await es_service.ensure_index_exists()
-    except Exception as exc:
-        logger.warning("Elasticsearch index initialization deferred: %s", exc)
-
-    # 4. Initialize Pinecone client & index
-    pinecone_service = PineconeService(settings)
-    app.state.pinecone = pinecone_service
-    if pinecone_service.is_configured():
-        try:
-            await pinecone_service.ensure_index_exists()
-        except Exception as exc:
-            logger.warning("Pinecone index initialization deferred: %s", exc)
-
-    # 5. Initialize Hybrid Search Service (orchestrator)
-    hybrid_search = HybridSearchService(
-        settings=settings,
-        es_service=es_service,
-        pinecone_service=pinecone_service,
+if __name__ == "__main__":
+    # This block allows running the app directly via `python app/main.py`
+    # It respects the PORT and HOST settings required by Cloud Run.
+    uvicorn.run(
+        "app.main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.ENVIRONMENT == "development",
     )
-    app.state.hybrid_search = hybrid_search
-
-    logger.info("RFPEngine API initialized successfully.")
-    yield
-
-    # Shutdown / Cleanup
-    logger.info("Shutting down services...")
-    await es_service.close()
-    await close_db_connection()
-    logger.info("Services shut down.")
-
-
-def create_application() -> FastAPI:
-    settings = get_settings()
-    app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
-        lifespan=lifespan,
-    )
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_origin_regex=settings.cors_origin_regex,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    app.include_router(health_router)
-    app.include_router(search_router)
-    app.include_router(kb_router)
-    app.include_router(responses_router)
-    app.include_router(mcp_router, prefix="/api/v1")
-    app.include_router(email_router, prefix="/api/v1")
-
-    return app
-
-
-app = create_application()
