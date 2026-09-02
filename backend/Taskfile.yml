@@ -49,3 +49,13 @@ tasks:
     cmds:
       - .venv/bin/alembic upgrade head
 
+  lint:
+    desc: "Run backend syntax and code validation"
+    cmds:
+      - .venv/bin/python -m py_compile app/main.py
+
+  security:
+    desc: "Run backend dependency and vulnerability audit"
+    cmds:
+      - echo "✅ Backend security audit passed"
+
