@@ -1,19 +1,9 @@
 version: '3'
 
 tasks:
-  install:
-    desc: Install dependencies
-    cmds:
-      - pip install -r backend/requirements.txt
-
   test:
     desc: Run all backend tests
+    dir: backend
     cmds:
-      - cd backend && PYTHONPATH=. pytest tests/test_csv_service.py
-    preconditions:
-      - task: install
-
-  dev:
-    desc: Run the application in development mode
-    cmds:
-      - uvicorn app.main:app --reload
+      - pip install -r requirements.txt
+      - PYTHONPATH=. pytest tests/test_csv_service.py

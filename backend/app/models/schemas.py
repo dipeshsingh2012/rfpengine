@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -12,6 +12,7 @@ class TokenData(BaseModel):
 class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
+    tenant_id: str  # CRITICAL: Enforced in schema
 
 class UserCreate(UserBase):
     pass
@@ -23,22 +24,18 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
-class SearchRequest(BaseModel):
-    query: str
-
-class Source(BaseModel):
-    url: str
-    title: Optional[str] = None
-    
-    def sync_legacy_fields(self):
-        pass
-
-class SearchResponse(BaseModel):
-    results: List[Source]
-
 class KBEntryBase(BaseModel):
     title: str
     content: str
+    tenant_id: str  # CRITICAL: Enforced in schema
 
-    def sync_passage_and_qa(self):
-        pass
+class KBEntryCreate(KBEntryBase):
+    user_id: Optional[int] = None
+
+class KBEntryResponse(KBEntryBase):
+    id: int
+    user_id: Optional[int]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -1,1 +1,1 @@
-# Initializes the tests package
+# Makes backend/tests a Python package

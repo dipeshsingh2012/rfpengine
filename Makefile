@@ -1,7 +1,3 @@
-.PHONY: test install
-
-install:
-	pip install -r backend/requirements.txt
-
+# Alternative to 'task' to run tests via 'make test'
 test:
-	cd backend && PYTHONPATH=. pytest tests/
+	cd backend && PYTHONPATH=. pytest tests

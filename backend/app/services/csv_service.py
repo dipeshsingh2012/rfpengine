@@ -26,7 +26,7 @@ def sanitize_filename_part(part: str) -> str:
 def generate_csv_chunks(rows: List[Dict[str, Any]], headers: List[str]) -> Iterator[str]:
     """
     Memory-efficient streaming generator that yields CSV rows incrementally.
-    Uses a buffer to avoid loading massive strings into memory.
+    Uses a reusable buffer to minimize memory allocation during large exports.
     """
     output = io.StringIO()
     writer = csv.writer(output)
