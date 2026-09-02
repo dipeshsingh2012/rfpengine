@@ -1,5 +1,8 @@
 # RFPEngine
 
+[![Autonomous SDLC: Agentic Fleet](https://img.shields.io/badge/Autonomous%20SDLC-Agentic%20Fleet%20v1-blueviolet?logo=github)](https://github.com/marketplace/actions/agentic-fleet-autonomous-5-agent-sdlc)
+[![CI Test Suite](https://github.com/dipeshsingh2012/rfpengine/actions/workflows/ci.yml/badge.svg)](https://github.com/dipeshsingh2012/rfpengine/actions)
+
 **RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Elasticsearch** for BM25 keyword matching and **Pinecone Serverless** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages cloud secrets via **GCP Secret Manager**, drafts grounded responses with **Google Cloud Vertex AI** (`gemini-2.5-flash` & `text-embedding-004`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
 
 ---
