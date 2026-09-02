@@ -17,7 +17,8 @@ def test_database_url_default():
     """Verify DATABASE_URL is present and has a default value."""
     settings = get_settings()
     assert hasattr(settings, "DATABASE_URL")
-    assert "postgresql://" in settings.DATABASE_URL
+    assert settings.DATABASE_URL is not None
+    assert settings.DATABASE_URL.startswith(("postgresql://", "postgresql+asyncpg://"))
 
 def test_settings_env_override(monkeypatch):
     """Verify that environment variables can override default settings."""

@@ -15,7 +15,7 @@ if str(backend_dir) not in sys.path:
 
 from app.core.config import get_settings, Settings
 from app.core.db import normalize_database_url
-from app.main import app
+from app.main import app as fastapi_app
 from app.models.schemas import SearchRequest, SearchResponse, Source
 
 
@@ -56,11 +56,12 @@ def settings() -> Settings:
 @pytest.fixture(autouse=True)
 def init_app_state_mocks():
     """Ensures app.state has mock search services attached during tests."""
-    if not hasattr(app.state, "hybrid_search") or app.state.hybrid_search is None:
-        app.state.hybrid_search = MockHybridSearchService()
+    if not hasattr(fastapi_app.state, "hybrid_search") or fastapi_app.state.hybrid_search is None:
+        fastapi_app.state.hybrid_search = MockHybridSearchService()
 
 
-from sqlalchemy import text
+from app.core.db import Base
+import app.models.db_models  # Ensure all models are registered on Base.metadata
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -72,8 +73,9 @@ async def db_session() -> AsyncSession:
     normalized_url = normalize_database_url(app_settings.effective_database_url)
     engine = create_async_engine(normalized_url, poolclass=NullPool)
 
-    # Ensure schema migrations are applied
+    # Ensure all tables exist in test database
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
         await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS is_promoted_to_kb BOOLEAN DEFAULT FALSE;"))
         await conn.execute(text("ALTER TABLE question_reviews ADD COLUMN IF NOT EXISTS promoted_kb_id VARCHAR(64);"))
 
