@@ -2,7 +2,6 @@ name: Autonomous Agentic SDLC
 
 run-name: >-
   ${{
-    github.event_name == 'repository_dispatch' && format('⚡ MCP Initiative: {0}', github.event.client_payload.title) ||
     github.event_name == 'issue_comment' && format('💬 {0} on #{1} by @{2}', github.event.comment.body, github.event.issue.number, github.actor) ||
     github.event_name == 'pull_request_review_comment' && format('💬 PR Diff Comment: "{0}" by @{1}', github.event.comment.body, github.actor) ||
     github.event_name == 'pull_request_review' && format('💬 PR Review: "{0}" by @{1}', github.event.review.body, github.actor) ||
@@ -22,8 +21,9 @@ on:
     types: [submitted, edited]
   pull_request_review_comment:
     types: [created, edited]
-  repository_dispatch:
-    types: [mcp_initiative, mcp_start_dev, fleet_trigger]
+  # TODO: Re-enable after resolving MCP logic overlap
+  # repository_dispatch:
+  #   types: [mcp_initiative, mcp_start_dev, fleet_trigger]
   workflow_dispatch:
 
 permissions:
@@ -70,3 +70,6 @@ jobs:
         with:
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # TODO: Re-enable MCP initiative flags after resolving overlap
+          # skip-mcp-initiative: ${{ github.event_name == 'issues' }}
+          # trigger-source: ${{ github.event_name }}
