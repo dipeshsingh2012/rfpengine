@@ -52,3 +52,18 @@ tasks:
       - task: backend:db:verify
       - task: frontend:build
 
+  detect:changes:
+    desc: "Run change detection script to output change_manifest.json"
+    cmds:
+      - python3 .github/scripts/detect_changes.py
+
+  lint:backend:
+    desc: "Run backend lint and compilation check"
+    cmds:
+      - task: backend:lint
+
+  security:backend:
+    desc: "Run backend security vulnerability check"
+    cmds:
+      - task: backend:security
+
