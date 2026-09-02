@@ -1,0 +1,41 @@
+name: Validate Agentic SDLC Workflow
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/agentic-sdlc.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-workflow:
+    name: Validate Workflow Structure & Triggers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Validate YAML syntax
+        run: |
+          python3 << 'EOF'
+          import yaml
+          with open('.github/workflows/agentic-sdlc.yml', 'r') as f:
+              workflow = yaml.safe_load(f)
+          assert 'jobs' in workflow
+          assert 'agentic-orchestrator' in workflow.get('jobs', {})
+          print("✅ PASS: Workflow YAML structure is valid")
+          EOF
+      - name: Verify MCP is commented out
+        run: |
+          if grep -q "^  repository_dispatch:" .github/workflows/agentic-sdlc.yml; then
+              echo "❌ FAIL: repository_dispatch is active"
+              exit 1
+          fi
+          echo "✅ PASS: MCP trigger is commented out"
+      - name: Verify issue triggers active
+        run: |
+          if ! grep -q "^  issues:" .github/workflows/agentic-sdlc.yml; then
+              echo "❌ FAIL: issues trigger missing"
+              exit 1
+          fi
+          echo "✅ PASS: Issue triggers active"
