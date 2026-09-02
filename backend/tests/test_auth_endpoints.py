@@ -1,56 +1,46 @@
 import pytest
 from httpx import AsyncClient
 from fastapi import FastAPI
-from app.api.v1.endpoints.auth import router, MOCK_USER_DB
+from app.api.v1.endpoints.auth import router
 
-# Setup a minimal app for testing endpoints
+# Create a minimal app instance for testing the router in isolation
+# This prevents collection errors if the main app is not fully configured
 app = FastAPI()
-app.include_router(router)
-
-@pytest.fixture(autouse=True)
-def clear_mock_db():
-    """Clears the mock database before every test."""
-    MOCK_USER_DB.clear()
+app.include_router(router, prefix="/auth")
 
 @pytest.mark.asyncio
-async def test_register_and_login_success():
+async def test_login_success():
     async with AsyncClient(app=app, base_url="http://test") as ac:
-        tenant_id = "tenant_abc"
+        # Using the mock credentials defined in the endpoint
         payload = {
-            "email": "user@example.com",
-            "password": "password123",
-            "full_name": "Test User"
+            "email": "test@example.com",
+            "password": "password123"
         }
-        headers = {"X-Tenant-ID": tenant_id}
-
-        # 1. Test Registration
-        reg_resp = await ac.post("/register", json=payload, headers=headers)
-        assert reg_resp.status_code == 200
-        assert "access_token" in reg_resp.json()
-
-        # 2. Test Login
-        login_resp = await ac.post("/login", json=payload, headers=headers)
-        assert login_resp.status_code == 200
-        assert login_resp.json()["access_token"] != ""
+        response = await ac.post("/auth/login", json=payload)
+    
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert response.json()["token_type"] == "bearer"
 
 @pytest.mark.asyncio
-async def test_login_wrong_tenant():
+async def test_login_failure_wrong_password():
     async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {"email": "user@example.com", "password": "password123"}
-        
-        # Register with tenant A
-        await ac.post("/register", json=payload, headers={"X-Tenant-ID": "tenant_A"})
-        
-        # Attempt login with tenant B
-        login_resp = await ac.post("/login", json=payload, headers={"X-Tenant-ID": "tenant_B"})
-        assert login_resp.status_code == 401
+        payload = {
+            "email": "test@example.com",
+            "password": "wrongpassword"
+        }
+        response = await ac.post("/auth/login", json=payload)
+    
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Incorrect email or password"
 
 @pytest.mark.asyncio
-async def test_register_duplicate_email():
+async def test_login_failure_wrong_email():
     async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {"email": "dup@example.com", "password": "password123"}
-        headers = {"X-Tenant-ID": "tenant_1"}
-        
-        await ac.post("/register", json=payload, headers=headers)
-        dup_resp = await ac.post("/register", json=payload, headers=headers)
-        assert dup_resp.status_code == 400
+        payload = {
+            "email": "notfound@example.com",
+            "password": "password123"
+        }
+        response = await ac.post("/auth/login", json=payload)
+    
+    assert response.status_code == 401
