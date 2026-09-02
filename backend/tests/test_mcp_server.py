@@ -1,32 +1,41 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from typing import Any, Dict
+from app.services.mcp_service import mcp_service
 
 @pytest.mark.asyncio
 async def test_mcp_tools_call_roadmap():
-    """Test that MCP tool calls return the expected 'result' key."""
-    mock_response = {
-        "content": [{"type": "text", "text": "Roadmap updated"}],
-        "result": "success"  # Ensure 'result' key exists to prevent KeyError
-    }
+    """Tests the roadmap calling capability."""
+    roadmap_id = "roadmap_001"
+    context = {"user_role": "admin"}
     
-    with patch("app.services.mcp_service.call_tool", new_callable=AsyncMock) as mock_call:
-        mock_call.return_value = mock_response
-        # Simulate the logic that accesses response['result']
-        response = await mock_call("update_roadmap", {"data": "..."})
-        assert response["result"] == "success"
+    result = await mcp_service.call_roadmap(roadmap_id, context)
+    
+    assert result["roadmap_id"] == roadmap_id
+    assert "milestones" in result
+    assert isinstance(result["milestones"], list)
 
 @pytest.mark.asyncio
 async def test_mcp_trigger_pm_initiative():
-    mock_response = {"result": "initiative_started"}
-    with patch("app.services.mcp_service.call_tool", new_callable=AsyncMock) as mock_call:
-        mock_call.return_value = mock_response
-        response = await mock_call("trigger_initiative", {"id": "123"})
-        assert response["result"] == "initiative_started"
+    """Tests triggering a new PM initiative."""
+    name = "AI Integration"
+    priority = "high"
+    
+    result = await mcp_service.trigger_pm_initiative(name, priority)
+    
+    assert result["name"] == name
+    assert result["priority"] == priority
+    assert result["status"] == "triggered"
+    assert "initiative_id" in result
 
 @pytest.mark.asyncio
 async def test_mcp_approve_and_start_development():
-    mock_response = {"result": "dev_started"}
-    with patch("app.services.mcp_service.call_tool", new_callable=AsyncMock) as mock_call:
-        mock_call.return_value = mock_response
-        response = await mock_call("start_dev", {"task_id": "abc"})
-        assert response["result"] == "dev_started"
+    """Tests the transition to development state."""
+    task_id = "task_99"
+    approver = "user_dev_01"
+    
+    result = await mcp_service.approve_and_start_development(task_id, approver)
+    
+    assert result["task_id"] == task_id
+    assert result["status"] == "in_development"
+    assert result["started_by"] == approver
+    assert result["branch_name"].startswith("feat/task-")

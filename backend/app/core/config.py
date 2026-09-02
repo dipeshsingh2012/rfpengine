@@ -5,10 +5,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """
     Application settings managed via environment variables.
-    Defaults are provided to prevent ValidationError during pytest collection.
+    Defaults are provided to prevent ValidationError during pytest collection,
+    while maintaining strict typing for Cloud Run deployment and configuration.
     """
     # GCP Configuration
-    # We provide a default value so that 'settings = Settings()' doesn't crash in CI/Local tests
     GCP_PROJECT_ID: str = Field(default="test-project-id")
     GCP_REGION: str = Field(default="us-central1")
 
@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "RFP Engine"
     
+    # Cloud Run / Deployment Settings
+    PORT: int = Field(default=8080)
+    HOST: str = Field(default="0.0.0.0")
+    ENVIRONMENT: str = Field(default="development")
+
     # Security
     SECRET_KEY: str = Field(default="super-secret-dev-key-change-in-production")
 
@@ -28,8 +33,6 @@ class Settings(BaseSettings):
         extra="ignore"  # Ignore extra env vars to prevent validation errors
     )
 
-# Module-level instantiation
-# This is safe now because all fields have defaults or are optional
 settings = Settings()
 
 def get_settings() -> Settings:

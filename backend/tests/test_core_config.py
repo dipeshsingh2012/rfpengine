@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 from app.core.config import Settings
 from app.core.constants import PROJECT_NAME
 
@@ -7,7 +8,7 @@ def test_project_name_exists():
     assert PROJECT_NAME == "RFP Engine"
 
 def test_settings_validation_error():
-    from pydantic import ValidationError
+    """Verify that providing an invalid type for a typed field (like PORT) raises a ValidationError."""
     with pytest.raises(ValidationError):
-        # Invalid type for port
-        Settings(gcp_project_id="test", port="not-an-int")
+        # PORT is typed as int; passing a string should trigger validation failure
+        Settings(GCP_PROJECT_ID="test", PORT="not-an-int")

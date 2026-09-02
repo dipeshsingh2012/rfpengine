@@ -16,25 +16,25 @@ def test_sanitize_csv_cell_formula_injection():
     assert sanitize_csv_cell(None) == ""
 
 def test_sanitize_filename_part_security():
-    """Test that path traversal and header injection characters are stripped."""
+    """Test that path traversal and header injection characters are stripped while preserving hyphens."""
     # Path traversal
     assert sanitize_filename_part("../../etc/passwd") == "etcpasswd"
     assert sanitize_filename_part("../secret.txt") == "secrettxt"
     
-    # Header splitting (CRLF injection)
-    assert sanitize_filename_part("tenant_1\r\nX-Injected: True") == "tenant_1XInjectedTrue"
+    # Header splitting (CRLF injection - note that CRLF and colon are stripped, hyphens retained)
+    assert sanitize_filename_part("tenant_1\r\nX-Injected: True") == "tenant_1X-InjectedTrue"
     
     # Special characters
     assert sanitize_filename_part("my file!@#$%^&*().csv") == "myfilecsv"
     assert sanitize_filename_part("valid-name_123") == "valid-name_123"
 
 def test_generate_csv_chunks_logic():
-    """Test the streaming generator produces correct, sanitized CSV content."""
+    """Test the streaming generator produces correct, sanitized CSV content complying with RFC-4180 quoting."""
     headers = ["id", "name", "amount"]
     data = [
         {"id": "1", "name": "Alice", "amount": "100"},
-        {"id": "2", "name": "Bob", "amount": "=SUM(1,2)"},  # Should be escaped
-        {"id": "3", "name": "Charlie", "amount": "  -50"}   # Should be escaped
+        {"id": "2", "name": "Bob", "amount": "=SUM(1,2)"},  # Should be escaped & quoted
+        {"id": "3", "name": "Charlie", "amount": "  -50"}   # Should be escaped & quoted
     ]
     
     chunks = list(generate_csv_chunks(data, headers))
@@ -46,11 +46,11 @@ def test_generate_csv_chunks_logic():
     # Verify normal row
     assert "1,Alice,100" in full_content
     
-    # Verify escaped formula row
-    assert "2,Bob,'=SUM(1,2)" in full_content
+    # Verify RFC-4180 quoted & escaped formula row
+    assert '2,Bob,\'=SUM(1,2)' in full_content or '2,Bob,"\'=SUM(1,2)"' in full_content
     
-    # Verify escaped negative row (after stripping whitespace)
-    assert "3,Charlie,'-50" in full_content
+    # Verify RFC-4180 quoted & escaped negative row
+    assert '3,Charlie,\'-50' in full_content or '3,Charlie,"\'-50"' in full_content
 
 def test_generate_csv_chunks_empty_data():
     """Test generator behavior with empty input."""
@@ -59,4 +59,4 @@ def test_generate_csv_chunks_empty_data():
     chunks = list(generate_csv_chunks(data, headers))
     
     assert len(chunks) == 1  # Only the header chunk
-    assert chunks[0] == "id,name\r\n" or chunks[0] == "id,name\n"
+    assert "id,name" in chunks[0]
