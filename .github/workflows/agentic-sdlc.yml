@@ -59,8 +59,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Checkout Central Agent Fleet
+        uses: actions/checkout@v4
+        with:
+          repository: dipeshsingh2012/agentic-fleet
+          path: .agentic-fleet
+
       - name: Run Agentic Fleet Action
-        uses: dipeshsingh2012/agentic-fleet@v1
+        uses: ./.agentic-fleet
         with:
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # TODO: Re-enable MCP initiative flags after resolving overlap
+          # skip-mcp-initiative: ${{ github.event_name == 'issues' }}
+          # trigger-source: ${{ github.event_name }}
