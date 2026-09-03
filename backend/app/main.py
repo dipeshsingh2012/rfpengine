@@ -1,16 +1,10 @@
 from fastapi import FastAPI
-from backend.app.api.v1.endpoints import auth
-from backend.app.models import db_models
+from app.api.v1.endpoints.export import router as export_router
 
-app = FastAPI(title="Autonomous Agentic Fleet API")
+app = FastAPI(title="Secure Export API")
 
-# Include routers
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(export_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
-
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the Agentic Fleet API"}
+    return {"status": "ok"}

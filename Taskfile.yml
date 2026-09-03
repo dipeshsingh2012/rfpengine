@@ -3,6 +3,10 @@ version: '3'
 tasks:
   test:
     desc: Run all backend tests using pytest
-    dir: backend
     cmds:
-      - export PYTHONPATH=$PYTHONPATH:. && pytest tests/
+      - cd backend && pytest
+
+  dev:
+    desc: Run the development server
+    cmds:
+      - cd backend && uvicorn app.main:app --reload

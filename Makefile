@@ -1,3 +1,6 @@
-# Alternative to 'task' to run tests via 'make test'
+.PHONY: test
+
+# Run tests using pytest. 
+# We set PYTHONPATH=backend so that 'from app...' imports work correctly.
 test:
-	cd backend && PYTHONPATH=. pytest tests
+	PYTHONPATH=backend pytest backend/tests
