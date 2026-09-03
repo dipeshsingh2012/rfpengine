@@ -5,12 +5,12 @@ from typing import Any, Dict, Iterator, List
 
 def sanitize_csv_cell(value: Any) -> str:
     """
-    Strip whitespace and escape formula injection characters to prevent 
-    CSV Injection (Formula Injection) attacks.
+    Strip whitespace and escape formula injection characters.
+    Prepends a single quote to prevent Excel/Sheets from executing formulas.
     """
     val_str = str(value) if value is not None else ""
     cleaned = val_str.strip()
-    # Characters that trigger formula execution in Excel/Google Sheets
+    # Characters that trigger formula execution in spreadsheet software
     dangerous_chars = ('=', '+', '-', '@', '\t', '\r')
     if cleaned.startswith(dangerous_chars):
         return f"'{val_str}"
@@ -18,15 +18,15 @@ def sanitize_csv_cell(value: Any) -> str:
 
 def sanitize_filename_part(part: str) -> str:
     """
-    Strictly sanitize filename parts against path traversal and header splitting.
-    Only allows alphanumeric, underscores, and hyphens.
+    Strictly sanitize filename part against path traversal and header splitting.
+    Removes any character that isn't alphanumeric, underscore, or hyphen.
     """
     return re.sub(r"[^a-zA-Z0-9_-]", "", str(part).strip())
 
 def generate_csv_chunks(rows: List[Dict[str, Any]], headers: List[str]) -> Iterator[str]:
     """
     Memory-efficient streaming generator that yields CSV rows incrementally.
-    Uses a reusable buffer to minimize memory allocation during large exports.
+    This prevents high memory usage when processing large datasets.
     """
     output = io.StringIO()
     writer = csv.writer(output)

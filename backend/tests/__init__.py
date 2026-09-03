@@ -1,1 +1,1 @@
-# Makes backend/tests a Python package
+# Makes backend/tests a package

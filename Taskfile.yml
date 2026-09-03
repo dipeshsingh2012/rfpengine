@@ -2,8 +2,7 @@ version: '3'
 
 tasks:
   test:
-    desc: Run all backend tests
+    desc: Run all backend tests using pytest
     dir: backend
     cmds:
-      - pip install -r requirements.txt
-      - PYTHONPATH=. pytest tests/test_csv_service.py
+      - export PYTHONPATH=$PYTHONPATH:. && pytest tests/
