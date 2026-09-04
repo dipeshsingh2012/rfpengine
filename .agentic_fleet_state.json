@@ -1,0 +1,32 @@
+{
+  "prs": {
+    "dipeshsingh2012/rfpengine#15": {
+      "pr_number": 15,
+      "repo": "dipeshsingh2012/rfpengine",
+      "current_stage": "dev-agent:toggled_development",
+      "remediations_count": 0,
+      "is_blocked": false,
+      "blocked_reason": null,
+      "runs": [
+        {
+          "agent": "dev-agent",
+          "action": "toggled_development",
+          "verdict": null,
+          "input_tokens": 2276,
+          "output_tokens": 8582,
+          "estimated_cost_usd": 0.0054906,
+          "timestamp": 1788550383.9703405
+        }
+      ],
+      "total_tokens": 10858,
+      "total_cost_usd": 0.0054906,
+      "created_at": 1788550383.9703355,
+      "updated_at": 1788550383.9703898
+    }
+  },
+  "issues": {},
+  "telemetry": {
+    "total_runs": 1,
+    "total_cost_usd": 0.0054906
+  }
+}

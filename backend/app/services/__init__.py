@@ -1,3 +1,1 @@
-from . import mcp_service
-
-__all__ = ["mcp_service"]
+# Makes backend/app/services a package
