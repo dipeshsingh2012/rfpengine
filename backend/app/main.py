@@ -1,10 +1,14 @@
 from fastapi import FastAPI
-from app.api.v1.endpoints.export import router as export_router
+from app.api.v1.router import api_router
 
-app = FastAPI(title="Data Export API")
+app = FastAPI(title="Agentic Fleet Backend")
 
-app.include_router(export_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "healthy"}
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Backend API"}

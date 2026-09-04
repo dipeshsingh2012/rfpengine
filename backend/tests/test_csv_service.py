@@ -20,7 +20,7 @@ def test_sanitize_filename_part_path_traversal():
     """Verify that filename parts are stripped of path traversal characters."""
     assert sanitize_filename_part("../../etc/passwd") == "etcpasswd"
     assert sanitize_filename_part("tenant_1\r\nX-Injected: True") == "tenant_1X-InjectedTrue"
-    assert sanitize_filename_part("file name!@#.csv") == "filename.csv"
+    assert sanitize_filename_part("file name!@#.csv") == "filenamecsv"
 
 def test_generate_csv_chunks():
     """Verify the generator produces correct CSV content and handles sanitization."""

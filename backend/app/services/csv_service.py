@@ -13,7 +13,7 @@ def sanitize_csv_cell(value: Any) -> str:
     # Characters that trigger formula execution in Excel/Google Sheets
     dangerous_chars = ('=', '+', '-', '@', '\t', '\r')
     if cleaned.startswith(dangerous_chars):
-        return f"'{val_str}"
+        return f"'{cleaned}"
     return val_str
 
 def sanitize_filename_part(part: str) -> str:
