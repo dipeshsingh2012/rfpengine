@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Header, HTTPException, status
-from app.schemas.fleet import FleetHandoffVerifyRequest, FleetHandoffVerifyResponse
-from app.services.fleet_service import FleetHandoffService
+from backend.app.schemas.fleet import FleetHandoffVerifyRequest, FleetHandoffVerifyResponse
+from backend.app.services.fleet_service import FleetHandoffService
 
 router = APIRouter()
 fleet_service = FleetHandoffService()

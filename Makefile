@@ -1,5 +1,6 @@
-# Fallback for environments where 'task' is not installed
 .PHONY: test
 
+# Fixes the 'task: not found' error by providing a standard Makefile entry point
+# Sets PYTHONPATH to backend so that 'from app...' imports work correctly in tests
 test:
-	cd backend && PYTHONPATH=. pytest tests/test_csv_service.py
+	PYTHONPATH=backend pytest backend/tests/

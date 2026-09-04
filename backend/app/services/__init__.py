@@ -1,1 +1,1 @@
-# Makes backend/app/services a Python package
+# Initializes the services package
