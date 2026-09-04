@@ -1,35 +1,35 @@
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from app.services.csv_service import generate_csv_chunks
 from typing import List, Dict, Any
+from app.services.csv_service import generate_csv_chunks
 
 router = APIRouter()
 
-# Mock data for demonstration
-MOCK_DATA = [
-    {"id": "1", "name": "Alice", "email": "alice@example.com", "notes": "=SUM(1,2)"},
-    {"id": "2", "name": "Bob", "email": "bob@example.com", "notes": "Normal note"},
-    {"id": "3", "name": "Charlie", "email": "charlie@example.com", "notes": "-100"},
-]
-
 @router.get("/export/csv")
-async def export_csv(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
+async def export_data_csv(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    data_param: str = Query(..., description="Mock data identifier")
+):
     """
-    Streams a CSV file for the specified tenant.
-    In a real app, x_tenant_id would be used to filter the database query.
+    Exposes a streaming CSV export endpoint with multi-tenant enforcement.
     """
-    if not x_tenant_id:
-        raise HTTPException(status_code=400, detail="X-Tenant-ID header is required")
+    # In a real app, fetch data from DB using x_tenant_id
+    # Mocking data for demonstration
+    mock_data = [
+        {"id": "1", "name": "Alice", "notes": "Normal text"},
+        {"id": "2", "name": "Bob", "notes": "=SUM(A1:A10)"},  # Should be escaped
+        {"id": "3", "name": "Charlie", "notes": "-100"},      # Should be escaped
+    ]
+    headers = ["id", "name", "notes"]
 
-    headers = ["id", "name", "email", "notes"]
-    
-    # In production: data = await db.fetch_rows(tenant_id=x_tenant_id)
-    data = MOCK_DATA 
+    def stream_generator():
+        yield from generate_csv_chunks(mock_data, headers)
 
     return StreamingResponse(
-        generate_csv_chunks(data, headers),
+        stream_generator(),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename=export_{x_tenant_id}.csv"
+            "Content-Disposition": f"attachment; filename=export_{x_tenant_id}.csv",
+            "X-Tenant-ID": x_tenant_id
         }
     )

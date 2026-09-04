@@ -5,13 +5,13 @@ from typing import Any, Dict, Iterator, List
 
 def sanitize_csv_cell(value: Any) -> str:
     """
-    Strip whitespace and escape formula injection characters to prevent CSV Injection.
-    Prepends a single quote if the cell starts with dangerous characters.
+    Strip whitespace and escape formula injection characters to prevent 
+    CSV Injection (Formula Injection) attacks in spreadsheet software.
     """
     val_str = str(value) if value is not None else ""
     cleaned = val_str.strip()
     
-    # Characters that trigger formula execution in Excel/Google Sheets/LibreOffice
+    # Characters that can trigger formula execution in Excel, Google Sheets, etc.
     dangerous_chars = ('=', '+', '-', '@', '\t', '\r')
     
     if cleaned.startswith(dangerous_chars):
@@ -20,8 +20,8 @@ def sanitize_csv_cell(value: Any) -> str:
 
 def sanitize_filename_part(part: str) -> str:
     """
-    Strictly sanitize filename part against path traversal and header splitting.
-    Only allows alphanumeric, underscores, and hyphens.
+    Strictly sanitize filename parts against path traversal, 
+    null bytes, and header injection.
     """
     # Remove any character that isn't alphanumeric, underscore, or hyphen
     return re.sub(r"[^a-zA-Z0-9_-]", "", str(part).strip())
@@ -29,26 +29,27 @@ def sanitize_filename_part(part: str) -> str:
 def generate_csv_chunks(rows: List[Dict[str, Any]], headers: List[str]) -> Iterator[str]:
     """
     Memory-efficient streaming generator that yields CSV rows incrementally.
-    Uses io.StringIO to buffer individual rows to avoid massive memory spikes.
+    This prevents high memory consumption when exporting large datasets.
     """
-    # 1. Yield the header row first
     output = io.StringIO()
     writer = csv.writer(output)
+    
+    # 1. Write the header row
     writer.writerow(headers)
     yield output.getvalue()
     
-    # Reset buffer for next row
+    # Reset buffer for the next row
     output.seek(0)
     output.truncate(0)
-
-    # 2. Yield data rows
+    
+    # 2. Write data rows
     for row in rows:
-        # Sanitize each cell in the row to prevent injection
+        # Sanitize every cell in the row before writing
         sanitized_row = [sanitize_csv_cell(row.get(h, "")) for h in headers]
         writer.writerow(sanitized_row)
         
         yield output.getvalue()
         
-        # Reset buffer for next row to keep memory footprint low
+        # Reset buffer for the next row to keep memory footprint low
         output.seek(0)
         output.truncate(0)

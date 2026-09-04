@@ -22,11 +22,34 @@
       "total_cost_usd": 0.0054906,
       "created_at": 1788550383.9703355,
       "updated_at": 1788550383.9703898
+    },
+    "dipeshsingh2012/rfpengine#16": {
+      "pr_number": 16,
+      "repo": "dipeshsingh2012/rfpengine",
+      "current_stage": "dev-agent:remediated_pr",
+      "remediations_count": 1,
+      "is_blocked": false,
+      "blocked_reason": null,
+      "runs": [
+        {
+          "agent": "dev-agent",
+          "action": "remediated_pr",
+          "verdict": null,
+          "input_tokens": 12521,
+          "output_tokens": 7922,
+          "estimated_cost_usd": 0.006631349999999999,
+          "timestamp": 1788550998.722177
+        }
+      ],
+      "total_tokens": 20443,
+      "total_cost_usd": 0.006631349999999999,
+      "created_at": 1788550998.7221713,
+      "updated_at": 1788550998.7222052
     }
   },
   "issues": {},
   "telemetry": {
-    "total_runs": 1,
-    "total_cost_usd": 0.0054906
+    "total_runs": 2,
+    "total_cost_usd": 0.01212195
   }
 }

@@ -4,4 +4,9 @@ tasks:
   test:
     desc: Run all backend tests
     cmds:
-      - cd backend && PYTHONPATH=. pytest tests
+      - pytest backend/tests
+
+  dev:
+    desc: Run the development server
+    cmds:
+      - uvicorn backend.app.main:app --reload
