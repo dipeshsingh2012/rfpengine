@@ -1,52 +1,46 @@
-from fastapi import APIRouter, Header, HTTPException, status, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from typing import List, Dict, Any
-from app.services.csv_service import generate_csv_chunks, fetch_data_for_tenant, sanitize_filename_part
+from typing import List, Optional
+from app.services.csv_service import generate_csv_chunks, sanitize_filename_part
 
 router = APIRouter()
 
-@router.get("/export/csv", response_class=StreamingResponse)
-async def export_csv(
-    resource_id: str = Query("res_101", description="The ID of the resource to export"),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID")
+# Mock data source for demonstration
+MOCK_DB = {
+    "tenant_1": [
+        {"id": "1", "name": "Alice", "email": "alice@example.com", "note": "=SUM(1,2)"},
+        {"id": "2", "name": "Bob", "email": "bob@example.com", "note": "Normal note"},
+    ],
+    "tenant_2": [
+        {"id": "101", "name": "Charlie", "email": "charlie@example.com", "note": "@danger"},
+    ]
+}
+
+@router.get("/export/csv")
+async def export_tenant_data(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    filename: Optional[str] = Query("export", description="Base name for the CSV file")
 ):
     """
-    Streams a CSV file for the specified tenant with strict multi-tenant isolation,
-    header validation, and injection safeguards.
+    Exports tenant-specific data to CSV using a memory-efficient stream.
+    Enforces strict tenant isolation via X-Tenant-ID header.
     """
-    if not x_tenant_id or not x_tenant_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Missing or invalid X-Tenant-ID header"
-        )
+    # 1. Tenant Isolation
+    data = MOCK_DB.get(x_tenant_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Tenant data not found")
 
-    # Sanitize tenant ID and resource ID to prevent injection/traversal
-    sanitized_tenant_id = sanitize_filename_part(x_tenant_id)
-    sanitized_resource_id = sanitize_filename_part(resource_id)
-
-    if not sanitized_tenant_id or not sanitized_resource_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tenant ID or Resource ID contains prohibited characters"
-        )
-
-    # Securely fetch data bound strictly to the validated tenant_id
-    data = fetch_data_for_tenant(sanitized_tenant_id, sanitized_resource_id)
+    # 2. Filename Sanitization
+    safe_filename = f"{sanitize_filename_part(filename)}_{sanitize_filename_part(x_tenant_id)}.csv"
     
-    if not data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="No data found for the provided resource ID within this tenant context"
-        )
-
-    headers = list(data[0].keys())
-    generator = generate_csv_chunks(data, headers)
+    # 3. Define Headers
+    headers = ["id", "name", "email", "note"]
     
+    # 4. Stream Response
     return StreamingResponse(
-        generator, 
+        generate_csv_chunks(data, headers),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename=export_{sanitized_tenant_id}.csv",
-            "X-Tenant-ID": sanitized_tenant_id
+            "Content-Disposition": f"attachment; filename={safe_filename}"
         }
     )

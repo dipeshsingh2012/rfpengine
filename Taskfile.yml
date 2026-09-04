@@ -4,4 +4,10 @@ tasks:
   test:
     desc: Run all backend tests using pytest
     cmds:
-      - cd backend && PYTHONPATH=. pytest
+      - cd backend && pytest tests
+    silent: false
+
+  install:
+    desc: Install dependencies
+    cmds:
+      - pip install -r backend/requirements.txt
