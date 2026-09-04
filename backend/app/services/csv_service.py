@@ -10,22 +10,26 @@ def sanitize_csv_cell(value: Any) -> str:
     """
     val_str = str(value) if value is not None else ""
     cleaned = val_str.strip()
+    
     # Characters that trigger formula execution in Excel/Google Sheets
     dangerous_chars = ('=', '+', '-', '@', '\t', '\r')
+    
     if cleaned.startswith(dangerous_chars):
         return f"'{val_str}"
     return val_str
 
 def sanitize_filename_part(part: str) -> str:
     """
-    Strictly sanitize filename parts against path traversal and header splitting.
+    Strictly sanitize filename parts against path traversal and 
+    header splitting/injection.
     """
+    # Remove any character that isn't alphanumeric, underscore, or hyphen
     return re.sub(r"[^a-zA-Z0-9_-]", "", str(part).strip())
 
 def generate_csv_chunks(rows: List[Dict[str, Any]], headers: List[str]) -> Iterator[str]:
     """
     Memory-efficient streaming generator that yields CSV rows incrementally.
-    Useful for large datasets to prevent OOM (Out of Memory) errors.
+    This prevents high memory consumption when processing large datasets.
     """
     output = io.StringIO()
     writer = csv.writer(output)
@@ -33,13 +37,18 @@ def generate_csv_chunks(rows: List[Dict[str, Any]], headers: List[str]) -> Itera
     # Write Header
     writer.writerow(headers)
     yield output.getvalue()
+    
+    # Reset buffer for rows
     output.seek(0)
     output.truncate(0)
     
-    # Write Rows
     for row in rows:
+        # Sanitize each cell in the row before writing
         sanitized_row = [sanitize_csv_cell(row.get(h, "")) for h in headers]
         writer.writerow(sanitized_row)
+        
         yield output.getvalue()
+        
+        # Reset buffer for next row to keep memory footprint low
         output.seek(0)
         output.truncate(0)

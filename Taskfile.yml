@@ -3,7 +3,5 @@ version: '3'
 tasks:
   test:
     desc: Run all backend tests using pytest
-    dir: backend
     cmds:
-      - pip install -r requirements.txt
-      - pytest
+      - cd backend && PYTHONPATH=. pytest

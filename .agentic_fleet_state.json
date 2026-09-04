@@ -1,28 +1,5 @@
 {
   "prs": {
-    "dipeshsingh2012/rfpengine#15": {
-      "pr_number": 15,
-      "repo": "dipeshsingh2012/rfpengine",
-      "current_stage": "dev-agent:toggled_development",
-      "remediations_count": 0,
-      "is_blocked": false,
-      "blocked_reason": null,
-      "runs": [
-        {
-          "agent": "dev-agent",
-          "action": "toggled_development",
-          "verdict": null,
-          "input_tokens": 2276,
-          "output_tokens": 8582,
-          "estimated_cost_usd": 0.0054906,
-          "timestamp": 1788550383.9703405
-        }
-      ],
-      "total_tokens": 10858,
-      "total_cost_usd": 0.0054906,
-      "created_at": 1788550383.9703355,
-      "updated_at": 1788550383.9703898
-    },
     "dipeshsingh2012/rfpengine#16": {
       "pr_number": 16,
       "repo": "dipeshsingh2012/rfpengine",
@@ -35,21 +12,21 @@
           "agent": "dev-agent",
           "action": "remediated_pr",
           "verdict": null,
-          "input_tokens": 12521,
-          "output_tokens": 7922,
-          "estimated_cost_usd": 0.006631349999999999,
-          "timestamp": 1788550998.722177
+          "input_tokens": 17132,
+          "output_tokens": 7283,
+          "estimated_cost_usd": 0.0069396,
+          "timestamp": 1788552136.0287735
         }
       ],
-      "total_tokens": 20443,
-      "total_cost_usd": 0.006631349999999999,
-      "created_at": 1788550998.7221713,
-      "updated_at": 1788550998.7222052
+      "total_tokens": 24415,
+      "total_cost_usd": 0.0069396,
+      "created_at": 1788552136.0287673,
+      "updated_at": 1788552136.0288162
     }
   },
   "issues": {},
   "telemetry": {
-    "total_runs": 2,
-    "total_cost_usd": 0.01212195
+    "total_runs": 1,
+    "total_cost_usd": 0.0069396
   }
 }
