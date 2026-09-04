@@ -1,1 +1,1 @@
-# Initializes the services package
+# Makes backend/app/services a package

@@ -2,9 +2,9 @@ version: '3'
 
 tasks:
   test:
-    desc: Run all backend tests using pytest
+    desc: Run all backend tests
     cmds:
-      - cd backend && pytest tests
+      - export PYTHONPATH=$PYTHONPATH:$(pwd)/backend && pytest backend/tests
     silent: false
 
   install:

@@ -1,1 +1,1 @@
-# Initializes the app package
+# Makes backend/app a package

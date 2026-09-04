@@ -4,7 +4,7 @@
       "pr_number": 16,
       "repo": "dipeshsingh2012/rfpengine",
       "current_stage": "dev-agent:remediated_pr",
-      "remediations_count": 2,
+      "remediations_count": 3,
       "is_blocked": false,
       "blocked_reason": null,
       "runs": [
@@ -25,17 +25,26 @@
           "output_tokens": 8404,
           "estimated_cost_usd": 0.0076735499999999995,
           "timestamp": 1788552582.82064
+        },
+        {
+          "agent": "dev-agent",
+          "action": "remediated_pr",
+          "verdict": null,
+          "input_tokens": 18353,
+          "output_tokens": 8622,
+          "estimated_cost_usd": 0.00792615,
+          "timestamp": 1788553874.9773154
         }
       ],
-      "total_tokens": 50360,
-      "total_cost_usd": 0.014613149999999998,
+      "total_tokens": 77335,
+      "total_cost_usd": 0.022539299999999998,
       "created_at": 1788552136.0287673,
-      "updated_at": 1788552582.82067
+      "updated_at": 1788553874.9773529
     }
   },
   "issues": {},
   "telemetry": {
-    "total_runs": 2,
-    "total_cost_usd": 0.014613149999999998
+    "total_runs": 3,
+    "total_cost_usd": 0.022539299999999998
   }
 }

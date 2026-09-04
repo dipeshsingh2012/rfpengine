@@ -1,40 +1,37 @@
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any
 from app.services.csv_service import generate_csv_chunks
 
 router = APIRouter()
 
+# Mock data for demonstration purposes
+MOCK_DATA = [
+    {"id": "1", "name": "Alice", "email": "alice@example.com", "notes": "=SUM(A1:A2)"},
+    {"id": "2", "name": "Bob", "email": "bob@example.com", "notes": "Normal note"},
+    {"id": "3", "name": "Charlie", "email": "charlie@example.com", "notes": "+12345"},
+]
+
 @router.get("/export/csv")
-async def export_data_csv(
+async def export_csv(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    data_param: str = "default"
+    fields: List[str] = Query(default=["id", "name", "email", "notes"])
 ):
     """
-    Exposes a streaming CSV export endpoint. 
+    Streams a CSV file of user data. 
     Enforces multi-tenancy via X-Tenant-ID.
     """
-    # Mock data retrieval - In production, this would query the DB using x_tenant_id
-    mock_data = [
-        {"id": "1", "name": "Alice", "balance": "1000", "note": "=SUM(A1:A2)"},
-        {"id": "2", "name": "Bob", "balance": "-50", "note": "+100"},
-        {"id": "3", "name": "Charlie", "balance": "0", "note": "@admin"},
-    ]
-    
-    # Ensure data is scoped to tenant (Simulated)
+    # In a real app, you would filter MOCK_DATA by x_tenant_id here
     if not x_tenant_id:
-        raise HTTPException(status_code=400, detail="Missing Tenant ID")
-
-    headers = ["id", "name", "balance", "note"]
+        raise HTTPException(status_code=400, detail="X-Tenant-ID header is required")
 
     def stream_generator():
-        yield from generate_csv_chunks(mock_data, headers)
+        yield from generate_csv_chunks(MOCK_DATA, fields)
 
     return StreamingResponse(
         stream_generator(),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename=export_{x_tenant_id}.csv",
-            "X-Tenant-ID": x_tenant_id
+            "Content-Disposition": f"attachment; filename=export_{x_tenant_id}.csv"
         }
     )
