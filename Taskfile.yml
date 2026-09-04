@@ -2,11 +2,8 @@ version: '3'
 
 tasks:
   test:
-    desc: Run all backend tests
+    desc: Run all backend tests using pytest
+    dir: backend
     cmds:
-      - pytest backend/tests
-
-  dev:
-    desc: Run the development server
-    cmds:
-      - uvicorn backend.app.main:app --reload
+      - pip install -r requirements.txt
+      - pytest

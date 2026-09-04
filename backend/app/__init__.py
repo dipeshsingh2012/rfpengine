@@ -1,1 +1,1 @@
-# Makes backend/app a package
+# Makes backend/app a Python package

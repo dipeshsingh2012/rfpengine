@@ -1,7 +1,5 @@
-.PHONY: test install
-
-install:
-	pip install -r backend/requirements.txt
+# Fallback for environments where 'task' is not installed
+.PHONY: test
 
 test:
-	cd backend && pytest
+	cd backend && PYTHONPATH=. pytest tests/test_csv_service.py
