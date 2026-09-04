@@ -5,14 +5,18 @@ from app.services.csv_service import generate_csv_chunks, sanitize_filename_part
 
 router = APIRouter()
 
-# Mock data source for demonstration
+# Mock multi-tenant data source
 MOCK_DB = {
+    "tenant_123": [
+        {"id": "1", "name": "Alice", "email": "alice@example.com", "notes": "=SUM(1,2)"},
+        {"id": "2", "name": "Bob", "email": "bob@example.com", "notes": "-100"},
+    ],
     "tenant_1": [
-        {"id": "1", "name": "Alice", "email": "alice@example.com", "note": "=SUM(1,2)"},
-        {"id": "2", "name": "Bob", "email": "bob@example.com", "note": "Normal note"},
+        {"id": "1", "name": "Alice", "email": "alice@example.com", "notes": "=SUM(1,2)"},
+        {"id": "2", "name": "Bob", "email": "bob@example.com", "notes": "Normal note"},
     ],
     "tenant_2": [
-        {"id": "101", "name": "Charlie", "email": "charlie@example.com", "note": "@danger"},
+        {"id": "101", "name": "Charlie", "email": "charlie@example.com", "notes": "@danger"},
     ]
 }
 
@@ -31,16 +35,19 @@ async def export_tenant_data(
         raise HTTPException(status_code=404, detail="Tenant data not found")
 
     # 2. Filename Sanitization
-    safe_filename = f"{sanitize_filename_part(filename)}_{sanitize_filename_part(x_tenant_id)}.csv"
+    safe_tenant_id = sanitize_filename_part(x_tenant_id)
+    safe_filename = f"export_{safe_tenant_id}.csv"
     
-    # 3. Define Headers
-    headers = ["id", "name", "email", "note"]
+    # 3. Define Headers from tenant data
+    headers = list(data[0].keys())
     
     # 4. Stream Response
     return StreamingResponse(
         generate_csv_chunks(data, headers),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename={safe_filename}"
+            "Content-Disposition": f"attachment; filename={safe_filename}",
+            "Content-Type": "text/csv",
+            "X-Tenant-ID": safe_tenant_id
         }
     )

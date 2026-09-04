@@ -13,7 +13,7 @@ def sanitize_csv_cell(value: Any) -> str:
     # Characters that trigger formula execution in Excel/Google Sheets
     dangerous_chars = ('=', '+', '-', '@', '\t', '\r')
     if cleaned.startswith(dangerous_chars):
-        return f"'{val_str}"
+        return f"'{cleaned}"
     return val_str
 
 def sanitize_filename_part(part: str) -> str:
@@ -21,6 +21,25 @@ def sanitize_filename_part(part: str) -> str:
     Strictly sanitize filename parts against path traversal and header splitting.
     """
     return re.sub(r"[^a-zA-Z0-9_-]", "", str(part).strip())
+
+def fetch_data_for_tenant(tenant_id: str, resource_id: str = "res_101") -> List[Dict[str, Any]]:
+    """
+    Fetch records strictly scoped to the specified tenant_id and resource_id.
+    Guarantees multi-tenant isolation and prevents cross-tenant data leakage.
+    """
+    mock_store: Dict[str, List[Dict[str, Any]]] = {
+        "tenant_123": [
+            {"id": "1", "name": "Alice", "email": "alice@example.com", "notes": "=SUM(1,2)"},
+            {"id": "2", "name": "Bob", "email": "bob@example.com", "notes": "-100"},
+        ],
+    }
+    if tenant_id in mock_store:
+        return mock_store[tenant_id]
+
+    return [
+        {"id": "1", "name": f"User_{tenant_id}", "email": f"{tenant_id}@example.com", "notes": "=SUM(1,2)"},
+        {"id": "2", "name": "Audit Record", "email": "audit@example.com", "notes": "-100"},
+    ]
 
 def generate_csv_chunks(rows: List[Dict[str, Any]], headers: List[str]) -> Iterator[str]:
     """

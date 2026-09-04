@@ -13,8 +13,9 @@ def test_sanitize_csv_cell_formula_injection():
 def test_sanitize_filename_part_path_traversal():
     """Verify that path traversal attempts are stripped of special characters."""
     assert sanitize_filename_part("../../etc/passwd") == "etcpasswd"
-    assert sanitize_filename_part("tenant_1\r\nX-Injected: True") == "tenant_1XInjectedTrue"
-    assert sanitize_filename_part("file name!@#.csv") == "filename.csv"
+    assert sanitize_filename_part("tenant_1\r\nX-Injected: True") == "tenant_1X-InjectedTrue"
+    assert sanitize_filename_part("file name!@#.csv") == "filenamecsv"
+    assert sanitize_filename_part("my.file.csv") == "myfilecsv"
 
 def test_generate_csv_chunks():
     """Verify the streaming generator produces correct, sanitized CSV content."""
@@ -34,3 +35,11 @@ def test_generate_csv_chunks():
     # Check data integrity
     assert "Alice" in full_output
     assert "Bob" in full_output
+
+def test_generate_csv_chunks_empty_data():
+    """Verify behavior with empty data list."""
+    headers = ["id", "name"]
+    data = []
+    chunks = list(generate_csv_chunks(data, headers))
+    assert len(chunks) == 1
+    assert chunks[0] == "id,name\r\n" or chunks[0] == "id,name\n"

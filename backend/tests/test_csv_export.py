@@ -18,7 +18,7 @@ def test_export_csv_success():
     """Test the full streaming endpoint with correct headers."""
     response = client.get("/export/csv", headers={"X-Tenant-ID": "tenant_123"})
     assert response.status_code == 200
-    assert response.headers["content-type"] == "text/csv"
+    assert response.headers["content-type"].startswith("text/csv")
     assert "attachment; filename=export_tenant_123.csv" in response.headers["content-disposition"]
     
     # Verify content and escaping
