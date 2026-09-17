@@ -32,6 +32,11 @@ import {
   MessageSquare,
   CheckCircle,
   TrendingUp,
+  Building2,
+  Cpu,
+  ShieldCheck,
+  Save,
+  Sliders,
 } from "lucide-react";
 
 type Source = {
@@ -58,6 +63,43 @@ type KBItem = {
   metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
+};
+
+type WorkspaceSettings = {
+  tenant_id: string;
+  company_name: string;
+  industry: string;
+  admin_email: string;
+  company_context: string;
+  default_model: string;
+  default_top_k: number;
+  response_tone: string;
+  disclaimer: string;
+  auto_promote_golden_qa: boolean;
+  sme_roles_config: {
+    security_sme_email: string;
+    legal_reviewer_email: string;
+    final_approver_email: string;
+    [key: string]: any;
+  };
+};
+
+const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
+  tenant_id: "acme-corp",
+  company_name: "Acme Corporation",
+  industry: "Enterprise Cloud & SaaS",
+  admin_email: "security-team@acme.corp",
+  company_context: "Acme Corporation is an enterprise security and workflow platform specializing in SOC 2 Type II, ISO 27001, and FedRAMP certified deployments.",
+  default_model: "gemini-2.5-flash",
+  default_top_k: 5,
+  response_tone: "concise",
+  disclaimer: "CONFIDENTIAL: The responses provided herein contain proprietary information intended solely for the recipient's evaluation.",
+  auto_promote_golden_qa: true,
+  sme_roles_config: {
+    security_sme_email: "security-sme@acme.corp",
+    legal_reviewer_email: "legal-review@acme.corp",
+    final_approver_email: "vp-compliance@acme.corp",
+  },
 };
 
 type SourceMode = "url" | "upload" | "extension";
@@ -261,7 +303,7 @@ interface ActivityLogItem {
   action: string;
   details: string;
   timestamp: string;
-  type: "approval" | "generation" | "kb" | "import" | "review";
+  type: "approval" | "generation" | "kb" | "import" | "review" | "settings" | "export";
 }
 
 const DEFAULT_ACTIVITY_LOGS: ActivityLogItem[] = [
@@ -461,6 +503,82 @@ function App() {
       }
     }
     fetchRecentHistory();
+  }, [activeApiBase, tenantId]);
+
+  // Workspace Settings State
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"profile" | "ai" | "governance" | "data">("profile");
+  const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSaveNotice, setSettingsSaveNotice] = useState<string | null>(null);
+
+  async function fetchWorkspaceSettings() {
+    try {
+      const res = await fetch(`${activeApiBase}/v1/responses/workspace/settings?tenant_id=${tenantId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaceSettings((prev) => ({
+          ...prev,
+          ...data,
+          sme_roles_config: { ...prev.sme_roles_config, ...(data.sme_roles_config || {}) },
+        }));
+      }
+    } catch (e) {
+      console.warn("Could not fetch workspace settings:", e);
+    }
+  }
+
+  async function saveWorkspaceSettings(updates?: Partial<WorkspaceSettings>) {
+    setIsSavingSettings(true);
+    setSettingsSaveNotice(null);
+    try {
+      const payload = updates ? { ...workspaceSettings, ...updates } : workspaceSettings;
+      const res = await fetch(`${activeApiBase}/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setWorkspaceSettings((prev) => ({
+          ...prev,
+          ...saved,
+          sme_roles_config: { ...prev.sme_roles_config, ...(saved.sme_roles_config || {}) },
+        }));
+        setSettingsSaveNotice("Settings saved successfully to PostgreSQL");
+        logActivity("Updated Workspace Settings", `Updated configuration for tenant ${tenantId}`, "settings");
+        setTimeout(() => setSettingsSaveNotice(null), 3500);
+      } else {
+        setSettingsSaveNotice("Failed to save settings to server");
+      }
+    } catch (e: any) {
+      setSettingsSaveNotice(`Error: ${e.message || "Failed to save"}`);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
+  function exportWorkspaceData() {
+    const exportBundle = {
+      tenant_id: tenantId,
+      exported_at: new Date().toISOString(),
+      workspace_settings: workspaceSettings,
+      recent_rfps: recentRFPs,
+      knowledge_base_records_count: kbEntries.length,
+      knowledge_base_entries: kbEntries,
+    };
+    const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rfpengine-${tenantId}-workspace-export.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    logActivity("Exported Workspace Data", `Downloaded JSON archive for ${tenantId}`, "export");
+  }
+
+  useEffect(() => {
+    fetchWorkspaceSettings();
   }, [activeApiBase, tenantId]);
 
   // Knowledge Base State
@@ -1343,8 +1461,13 @@ function App() {
         <div className="brand-name">
           RFP<span>Engine</span>
         </div>
-        <div className="workspace-switcher">
-          <span className="workspace-dot" /> Acme Corporation{" "}
+        <div
+          className="workspace-switcher"
+          onClick={() => setShowSettingsModal(true)}
+          style={{ cursor: "pointer" }}
+          title="Open Workspace Settings"
+        >
+          <span className="workspace-dot" /> {workspaceSettings.company_name || "Acme Corporation"}{" "}
           <ChevronDown size={15} />
         </div>
         <div
@@ -1542,7 +1665,13 @@ function App() {
           })}
         </div>
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setNotice("Workspace settings are coming soon") }>
+          <button
+            className={`nav-item ${showSettingsModal ? "active" : ""}`}
+            onClick={() => {
+              setShowSettingsModal(true);
+              setMobileNavOpen(false);
+            }}
+          >
             <Settings size={17} /> Workspace settings
           </button>
           <div
@@ -2664,6 +2793,486 @@ function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Workspace Settings Modal */}
+      {showSettingsModal && (
+        <div className="kb-modal-backdrop" onClick={() => setShowSettingsModal(false)}>
+          <div className="settings-modal-container" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="settings-modal-header">
+              <div className="settings-header-title">
+                <Settings size={20} color="var(--navy)" />
+                <h2 style={{ margin: 0 }}>Workspace Settings</h2>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setShowSettingsModal(false)}
+                aria-label="Close settings modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="settings-tabs-nav">
+              <button
+                className={`settings-tab-item ${settingsTab === "profile" ? "active" : ""}`}
+                onClick={() => setSettingsTab("profile")}
+              >
+                <Building2 size={14} /> Profile & Identity
+              </button>
+              <button
+                className={`settings-tab-item ${settingsTab === "ai" ? "active" : ""}`}
+                onClick={() => setSettingsTab("ai")}
+              >
+                <Cpu size={14} /> AI & Model Tuning
+              </button>
+              <button
+                className={`settings-tab-item ${settingsTab === "governance" ? "active" : ""}`}
+                onClick={() => setSettingsTab("governance")}
+              >
+                <ShieldCheck size={14} /> SME Governance
+              </button>
+              <button
+                className={`settings-tab-item ${settingsTab === "data" ? "active" : ""}`}
+                onClick={() => setSettingsTab("data")}
+              >
+                <Database size={14} /> Data & Export
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="settings-modal-content">
+              {/* TAB 1: Profile & Identity */}
+              {settingsTab === "profile" && (
+                <>
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <Building2 size={16} color="var(--blue)" /> Organization Identity
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Configure baseline tenant profile information and administrator contact details.
+                      </p>
+                    </div>
+
+                    <div className="settings-grid-2">
+                      <div className="settings-field">
+                        <label>Company Name</label>
+                        <input
+                          type="text"
+                          value={workspaceSettings.company_name}
+                          onChange={(e) =>
+                            setWorkspaceSettings({ ...workspaceSettings, company_name: e.target.value })
+                          }
+                          placeholder="e.g. Acme Corporation"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label>Industry / Vertical</label>
+                        <input
+                          type="text"
+                          value={workspaceSettings.industry}
+                          onChange={(e) =>
+                            setWorkspaceSettings({ ...workspaceSettings, industry: e.target.value })
+                          }
+                          placeholder="e.g. Enterprise Cloud & SaaS"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="settings-grid-2">
+                      <div className="settings-field">
+                        <label>Tenant ID (Immutable)</label>
+                        <input
+                          type="text"
+                          value={workspaceSettings.tenant_id}
+                          disabled
+                          style={{ opacity: 0.7, cursor: "not-allowed", background: "#f1f5f9" }}
+                        />
+                        <span className="settings-field-hint">Tenant isolation scope for PostgreSQL and vector collections</span>
+                      </div>
+                      <div className="settings-field">
+                        <label>Admin Notification Email</label>
+                        <input
+                          type="email"
+                          value={workspaceSettings.admin_email}
+                          onChange={(e) =>
+                            setWorkspaceSettings({ ...workspaceSettings, admin_email: e.target.value })
+                          }
+                          placeholder="e.g. admin@company.com"
+                        />
+                        <span className="settings-field-hint">Primary recipient for compliance alerts and export notifications</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <FileText size={16} color="var(--navy)" /> Company Context & Grounding Facts
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Provide background on security certifications (SOC 2 Type II, ISO 27001), infrastructure hosting, data privacy commitments, and standard product terminology. This context grounds every answer formulation.
+                      </p>
+                    </div>
+
+                    <div className="settings-field">
+                      <textarea
+                        rows={4}
+                        value={workspaceSettings.company_context}
+                        onChange={(e) =>
+                          setWorkspaceSettings({ ...workspaceSettings, company_context: e.target.value })
+                        }
+                        placeholder="e.g. Acme Corp provides an enterprise AI platform hosted in AWS us-east-1 and eu-central-1. All customer data is encrypted at rest (AES-256) and in transit (TLS 1.3). We hold SOC 2 Type II, ISO 27001, and HIPAA compliance certifications."
+                      />
+                      <span className="settings-field-hint">
+                        Injected into system instructions for high-fidelity compliance grounding.
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* TAB 2: AI & Model Tuning */}
+              {settingsTab === "ai" && (
+                <>
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <Cpu size={16} color="var(--blue)" /> Model Selection & Generation
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Select the primary LLM engine for response generation and customize response formatting.
+                      </p>
+                    </div>
+
+                    <div className="settings-grid-2">
+                      <div className="settings-field">
+                        <label>Default AI Model</label>
+                        <select
+                          value={workspaceSettings.default_model}
+                          onChange={(e) =>
+                            setWorkspaceSettings({ ...workspaceSettings, default_model: e.target.value })
+                          }
+                        >
+                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Fast & Accurate)</option>
+                          <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning & Analysis)</option>
+                          <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
+                        </select>
+                        <span className="settings-field-hint">
+                          Gemini 2.5 Flash is tuned for sub-second RAG generation with high factual precision.
+                        </span>
+                      </div>
+
+                      <div className="settings-field">
+                        <label>Response Tone</label>
+                        <select
+                          value={workspaceSettings.response_tone}
+                          onChange={(e) =>
+                            setWorkspaceSettings({ ...workspaceSettings, response_tone: e.target.value })
+                          }
+                        >
+                          <option value="concise">Concise & Direct (Audit / RFP Style)</option>
+                          <option value="detailed">Comprehensive & Detailed</option>
+                          <option value="technical">Technical & Architecture-focused</option>
+                          <option value="executive">Executive & Commercial</option>
+                        </select>
+                        <span className="settings-field-hint">
+                          Governs sentence brevity and factual density in generated answers.
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="settings-field" style={{ marginTop: "8px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <label style={{ margin: 0 }}>
+                          Top-K Retrieved Context Chunks: <span style={{ color: "var(--blue)", fontWeight: 700 }}>{workspaceSettings.default_top_k}</span>
+                        </label>
+                        <span style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "'DM Mono', monospace" }}>
+                          Range: 3 – 10 passages
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={3}
+                        max={10}
+                        step={1}
+                        value={workspaceSettings.default_top_k}
+                        onChange={(e) =>
+                          setWorkspaceSettings({
+                            ...workspaceSettings,
+                            default_top_k: parseInt(e.target.value, 10) || 5,
+                          })
+                        }
+                        style={{ padding: 0, marginTop: "6px" }}
+                      />
+                      <span className="settings-field-hint">
+                        Number of high-similarity vector chunks retrieved from ChromaDB/PostgreSQL during synthesis.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <Sliders size={16} color="var(--navy)" /> Default Legal Disclaimer
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Standard legal confidentiality statement appended to exported RFP response packages.
+                      </p>
+                    </div>
+
+                    <div className="settings-field">
+                      <textarea
+                        rows={3}
+                        value={workspaceSettings.disclaimer}
+                        onChange={(e) =>
+                          setWorkspaceSettings({ ...workspaceSettings, disclaimer: e.target.value })
+                        }
+                        placeholder="CONFIDENTIAL: The information provided herein is proprietary..."
+                      />
+                      <span className="settings-field-hint">
+                        Included in exported Word, Excel, and JSON questionnaire deliverables.
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* TAB 3: SME Governance */}
+              {settingsTab === "governance" && (
+                <>
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <ShieldCheck size={16} color="var(--blue)" /> SME Reviewer Routing
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Configure default Subject Matter Expert email routing for section triage and multi-stage compliance approvals.
+                      </p>
+                    </div>
+
+                    <div className="settings-grid-2">
+                      <div className="settings-field">
+                        <label>Security & Infrastructure SME</label>
+                        <input
+                          type="email"
+                          value={workspaceSettings.sme_roles_config?.security_sme_email || ""}
+                          onChange={(e) =>
+                            setWorkspaceSettings({
+                              ...workspaceSettings,
+                              sme_roles_config: {
+                                ...workspaceSettings.sme_roles_config,
+                                security_sme_email: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="e.g. infosec@company.com"
+                        />
+                        <span className="settings-field-hint">Routes questions tagged #Security or #Infra</span>
+                      </div>
+
+                      <div className="settings-field">
+                        <label>Legal & Compliance SME</label>
+                        <input
+                          type="email"
+                          value={workspaceSettings.sme_roles_config?.legal_reviewer_email || ""}
+                          onChange={(e) =>
+                            setWorkspaceSettings({
+                              ...workspaceSettings,
+                              sme_roles_config: {
+                                ...workspaceSettings.sme_roles_config,
+                                legal_reviewer_email: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="e.g. legal-review@company.com"
+                        />
+                        <span className="settings-field-hint">Routes questions tagged #Legal or #Compliance</span>
+                      </div>
+                    </div>
+
+                    <div className="settings-field">
+                      <label>Final Authority Approver</label>
+                      <input
+                        type="email"
+                        value={workspaceSettings.sme_roles_config?.final_approver_email || ""}
+                        onChange={(e) =>
+                          setWorkspaceSettings({
+                            ...workspaceSettings,
+                            sme_roles_config: {
+                              ...workspaceSettings.sme_roles_config,
+                              final_approver_email: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="e.g. vp-compliance@company.com"
+                      />
+                      <span className="settings-field-hint">Authorizes final release lock before export</span>
+                    </div>
+                  </div>
+
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <Sparkles size={16} color="#d97706" /> Continuous Learning & Golden Q&A
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Control how finalized answers flow back into the company knowledge graph.
+                      </p>
+                    </div>
+
+                    <div className="settings-toggle-box">
+                      <div className="settings-toggle-info">
+                        <strong>Auto-promote 100% Approved Responses to Knowledge Base</strong>
+                        <small>
+                          When active, answers given full 5-star or verified human approval automatically index into the tenant's vector collection for future RFPs.
+                        </small>
+                      </div>
+                      <label className="settings-switch">
+                        <input
+                          type="checkbox"
+                          checked={workspaceSettings.auto_promote_golden_qa}
+                          onChange={(e) =>
+                            setWorkspaceSettings({
+                              ...workspaceSettings,
+                              auto_promote_golden_qa: e.target.checked,
+                            })
+                          }
+                        />
+                        <span className="settings-slider-thumb" />
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* TAB 4: Data & Export */}
+              {settingsTab === "data" && (
+                <>
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <Database size={16} color="var(--blue)" /> Workspace Snapshot & Metrics
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Overview of tenant-partitioned storage resources and records in PostgreSQL.
+                      </p>
+                    </div>
+
+                    <div className="activity-stats-bar" style={{ display: "flex", gap: "12px", margin: "4px 0" }}>
+                      <div style={{ flex: 1, background: "#f8fafc", padding: "12px 14px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                        <span className="eyebrow" style={{ color: "var(--muted)" }}>Tenant ID</span>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", fontFamily: "'DM Mono', monospace" }}>
+                          {workspaceSettings.tenant_id}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, background: "#f0fdf4", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                        <span className="eyebrow" style={{ color: "#166534" }}>Indexed KB Records</span>
+                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>
+                          {kbEntries.length || kbStats.totalRecords || 0}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, background: "#eff6ff", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bfdbfe" }}>
+                        <span className="eyebrow" style={{ color: "#1e40af" }}>Recent Questionnaires</span>
+                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#1d4ed8" }}>
+                          {recentRFPs.length}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="settings-group-card">
+                    <div>
+                      <div className="settings-group-title">
+                        <Download size={16} color="var(--navy)" /> Tenant Data Portability
+                      </div>
+                      <p className="settings-group-subtitle">
+                        Download a complete JSON archive of this workspace, including configuration, recent questionnaire outputs, and indexed knowledge base pairs.
+                      </p>
+                    </div>
+
+                    <div>
+                      <button
+                        className="secondary-button"
+                        onClick={exportWorkspaceData}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                      >
+                        <Download size={15} /> Download Workspace Archive (.json)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="settings-group-card danger-zone">
+                    <div>
+                      <div className="settings-group-title" style={{ color: "#b91c1c" }}>
+                        <AlertCircle size={16} color="#b91c1c" /> Reset Workspace Configuration
+                      </div>
+                      <p className="settings-group-subtitle" style={{ color: "#7f1d1d" }}>
+                        Restore default system settings for tone, model, and SME assignments. This does not erase indexed knowledge base entries.
+                      </p>
+                    </div>
+
+                    <div>
+                      <button
+                        className="secondary-button"
+                        style={{ color: "#b91c1c", borderColor: "#fca5a5", background: "#fff" }}
+                        onClick={() =>
+                          setWorkspaceSettings({
+                            ...DEFAULT_WORKSPACE_SETTINGS,
+                            tenant_id: tenantId,
+                          })
+                        }
+                      >
+                        Reset to Defaults
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="settings-modal-footer">
+              <div className="settings-footer-status">
+                {settingsSaveNotice ? (
+                  <span
+                    style={{
+                      color:
+                        settingsSaveNotice.includes("Error") || settingsSaveNotice.includes("Failed")
+                          ? "#b91c1c"
+                          : "#15803d",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {settingsSaveNotice}
+                  </span>
+                ) : (
+                  <span>Tenant: {tenantId} • PostgreSQL Connected</span>
+                )}
+              </div>
+              <div className="settings-footer-actions">
+                <button
+                  className="secondary-button"
+                  onClick={() => setShowSettingsModal(false)}
+                >
+                  Close
+                </button>
+                <button
+                  className="primary-button"
+                  onClick={() => saveWorkspaceSettings()}
+                  disabled={isSavingSettings}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                >
+                  <Save size={14} />
+                  {isSavingSettings ? "Saving..." : "Save Settings"}
+                </button>
               </div>
             </div>
           </div>

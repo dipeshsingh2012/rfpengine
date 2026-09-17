@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
-from app.models.schemas import AuditLogCreate, AuditLogItem, WorkspaceCreate
+from app.models.schemas import (
+    AuditLogCreate,
+    AuditLogItem,
+    WorkspaceCreate,
+    WorkspaceSettingsSchema,
+    WorkspaceSettingsUpdate,
+)
 from app.services.postgres_service import PostgresService
 
 logger = logging.getLogger(__name__)
@@ -149,6 +155,33 @@ async def create_audit_log_entry(
     except Exception as e:
         logger.error("Failed to save audit log: %s", e)
         raise HTTPException(status_code=500, detail="Audit log storage failed")
+
+
+@router.get("/workspace/settings", response_model=WorkspaceSettingsSchema)
+async def get_workspace_settings(
+    tenant_id: Optional[str] = None,
+    x_tenant_id: Optional[str] = Header(default=None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> WorkspaceSettingsSchema:
+    """Retrieves multi-tenant workspace settings and LLM context."""
+    resolved_tenant = tenant_id or x_tenant_id or "acme-corp"
+    settings = await PostgresService.get_workspace_settings(db, tenant_id=resolved_tenant)
+    return WorkspaceSettingsSchema.model_validate(settings)
+
+
+@router.put("/workspace/settings", response_model=WorkspaceSettingsSchema)
+async def update_workspace_settings(
+    payload: WorkspaceSettingsUpdate,
+    tenant_id: Optional[str] = None,
+    x_tenant_id: Optional[str] = Header(default=None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> WorkspaceSettingsSchema:
+    """Updates multi-tenant workspace settings, AI model choices, and SME routing."""
+    resolved_tenant = tenant_id or x_tenant_id or "acme-corp"
+    updated = await PostgresService.update_workspace_settings(
+        db, tenant_id=resolved_tenant, update_data=payload
+    )
+    return WorkspaceSettingsSchema.model_validate(updated)
 
 
 

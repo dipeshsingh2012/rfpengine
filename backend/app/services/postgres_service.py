@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.db_models import AuditLogModel, KBEntry, QuestionReview, ResponseWorkspace, RoadmapInitiativeModel
+from app.models.db_models import AuditLogModel, KBEntry, QuestionReview, ResponseWorkspace, RoadmapInitiativeModel, WorkspaceSettingsModel
 from app.models.schemas import (
     KBEntryBase,
     KBEntryCreate,
@@ -16,6 +16,7 @@ from app.models.schemas import (
     WorkspaceCreate,
     RoadmapInitiativeCreate,
     RoadmapInitiativeUpdate,
+    WorkspaceSettingsUpdate,
 )
 
 DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
@@ -868,5 +869,38 @@ class PostgresService:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def get_workspace_settings(
+        session: AsyncSession,
+        tenant_id: str,
+    ) -> WorkspaceSettingsModel:
+        stmt = select(WorkspaceSettingsModel).where(WorkspaceSettingsModel.tenant_id == tenant_id)
+        res = await session.execute(stmt)
+        settings = res.scalar_one_or_none()
+        if not settings:
+            settings = WorkspaceSettingsModel(
+                tenant_id=tenant_id,
+                company_name="Acme Corporation" if tenant_id == "acme-corp" else tenant_id.replace("-", " ").title(),
+            )
+            session.add(settings)
+            await session.commit()
+            await session.refresh(settings)
+        return settings
+
+    @staticmethod
+    async def update_workspace_settings(
+        session: AsyncSession,
+        tenant_id: str,
+        update_data: WorkspaceSettingsUpdate,
+    ) -> WorkspaceSettingsModel:
+        settings = await PostgresService.get_workspace_settings(session, tenant_id)
+        data = update_data.model_dump(exclude_unset=True)
+        for key, value in data.items():
+            if hasattr(settings, key) and value is not None:
+                setattr(settings, key, value)
+        await session.commit()
+        await session.refresh(settings)
+        return settings
 
 

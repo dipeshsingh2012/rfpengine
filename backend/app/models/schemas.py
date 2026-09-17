@@ -277,3 +277,36 @@ class AuditLogItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- Workspace Settings Schemas ---
+
+class WorkspaceSettingsUpdate(BaseModel):
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    admin_email: Optional[str] = None
+    company_context: Optional[str] = None
+    default_model: Optional[str] = None
+    default_top_k: Optional[int] = None
+    response_tone: Optional[str] = None
+    disclaimer: Optional[str] = None
+    auto_promote_golden_qa: Optional[bool] = None
+    sme_roles_config: Optional[Dict[str, Any]] = None
+
+
+class WorkspaceSettingsSchema(BaseModel):
+    tenant_id: str
+    company_name: str
+    industry: str
+    admin_email: str
+    company_context: str
+    default_model: str
+    default_top_k: int
+    response_tone: str
+    disclaimer: str
+    auto_promote_golden_qa: bool
+    sme_roles_config: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+

@@ -153,4 +153,26 @@ class AuditLogModel(Base):
     )
 
 
+class WorkspaceSettingsModel(Base):
+    __tablename__ = "workspace_settings"
+
+    tenant_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    company_name: Mapped[str] = mapped_column(String(128), default="Acme Corporation")
+    industry: Mapped[str] = mapped_column(String(128), default="Enterprise Cloud & SaaS")
+    admin_email: Mapped[str] = mapped_column(String(128), default="security-team@acme.corp")
+    company_context: Mapped[str] = mapped_column(Text, default="Acme Corporation is an enterprise security and workflow platform specializing in SOC 2 Type II, ISO 27001, and FedRAMP certified deployments.")
+    default_model: Mapped[str] = mapped_column(String(64), default="gemini-2.5-flash")
+    default_top_k: Mapped[int] = mapped_column(Integer, default=5)
+    response_tone: Mapped[str] = mapped_column(String(64), default="concise")
+    disclaimer: Mapped[str] = mapped_column(Text, default="CONFIDENTIAL: The responses provided herein contain proprietary information intended solely for the recipient's evaluation.")
+    auto_promote_golden_qa: Mapped[bool] = mapped_column(Boolean, default=True)
+    sme_roles_config: Mapped[Dict[str, Any]] = mapped_column(JSON, default=lambda: {
+        "security_sme_email": "security-sme@acme.corp",
+        "legal_reviewer_email": "legal-review@acme.corp",
+        "final_approver_email": "vp-compliance@acme.corp",
+    })
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 
