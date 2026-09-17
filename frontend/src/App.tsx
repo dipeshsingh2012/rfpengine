@@ -946,17 +946,17 @@ function App() {
     return (
       <div className="import-page">
         <header className="import-header">
-          <div className="brand-mark">
+          <div className="brand-mark" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
             <span>R</span>
           </div>
-          <div className="brand-name">
+          <div className="brand-name" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
             RFP<span>Engine</span>
           </div>
           <span className="import-header-label">Response assistant</span>
         </header>
         <main className="import-main">
           <p className="breadcrumb">
-            Responses <span>/</span> New response
+            <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}>Responses</span> <span>/</span> New response
           </p>
           <h1>Review your questionnaire</h1>
           <section className="import-source panel">
@@ -1324,7 +1324,7 @@ function App() {
             <div className="page-heading">
               <div>
                 <p className="breadcrumb">
-                  Responses <span>/</span> Northstar security review
+                  <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}>Responses</span> <span>/</span> <span style={{ cursor: "pointer" }} onClick={() => openImport(responseId || "demo")}>Review questionnaire</span>
                 </p>
                 <h1>Response workspace</h1>
                 <p className="subtitle">
