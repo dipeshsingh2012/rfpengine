@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -565,6 +565,42 @@ class PostgresService:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def get_kb_stats(
+        session: AsyncSession,
+        tenant_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Aggregates live Knowledge Base statistics for a tenant:
+        - total_records: count of indexed entries
+        - total_sources: number of unique source files/documents
+        - categories_count: count of distinct categories
+        """
+        count_stmt = select(func.count(KBEntry.id)).where(KBEntry.tenant_id == tenant_id)
+        count_res = await session.execute(count_stmt)
+        total_records = count_res.scalar() or 0
+
+        source_stmt = select(KBEntry.metadata_json).where(KBEntry.tenant_id == tenant_id)
+        source_res = await session.execute(source_stmt)
+        sources = set()
+        for meta in source_res.scalars():
+            if isinstance(meta, dict):
+                src = meta.get("source_file") or meta.get("filename") or meta.get("source")
+                if src:
+                    sources.add(src)
+
+        cat_stmt = select(func.count(func.distinct(KBEntry.category))).where(KBEntry.tenant_id == tenant_id)
+        cat_res = await session.execute(cat_stmt)
+        cat_count = cat_res.scalar() or 0
+
+        return {
+            "tenant_id": tenant_id,
+            "total_records": total_records,
+            "total_sources": len(sources),
+            "categories_count": cat_count,
+            "sync_status": "synced" if total_records > 0 else "ready",
+        }
 
     @staticmethod
     async def update_kb_entry(

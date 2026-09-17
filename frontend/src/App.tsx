@@ -467,6 +467,17 @@ function App() {
   const [showKBModal, setShowKBModal] = useState(false);
   const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
   const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
+  const [kbStats, setKbStats] = useState<{
+    totalRecords: number;
+    totalSources: number;
+    categoriesCount: number;
+    syncStatus: string;
+  }>({
+    totalRecords: 0,
+    totalSources: 0,
+    categoriesCount: 0,
+    syncStatus: "ready",
+  });
   const [isFetchingKB, setIsFetchingKB] = useState(false);
   const [isUploadingKB, setIsUploadingKB] = useState(false);
   const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
@@ -509,6 +520,23 @@ function App() {
     }
   }
 
+  async function fetchKBStats() {
+    try {
+      const res = await fetch(`${activeApiBase}/v1/knowledge-base/stats?tenant_id=${tenantId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setKbStats({
+          totalRecords: data.total_records ?? 0,
+          totalSources: data.total_sources ?? 0,
+          categoriesCount: data.categories_count ?? 0,
+          syncStatus: data.sync_status ?? "ready",
+        });
+      }
+    } catch (e) {
+      console.warn("Could not fetch KB stats:", e);
+    }
+  }
+
   async function fetchKBEntries() {
     setIsFetchingKB(true);
     try {
@@ -528,11 +556,13 @@ function App() {
 
   useEffect(() => {
     fetchKBEntries();
+    fetchKBStats();
   }, [tenantId, activeApiBase]);
 
   useEffect(() => {
     if (showKBModal) {
       fetchKBEntries();
+      fetchKBStats();
     }
   }, [showKBModal, activeApiBase]);
 
@@ -553,6 +583,7 @@ function App() {
         const countMsg = data.records_created ? ` (${data.records_created} passages indexed)` : "";
         setKbUploadMsg({ text: `Successfully uploaded "${file.name}"${countMsg}.` });
         fetchKBEntries();
+        fetchKBStats();
       } else {
         const err = await res.json().catch(() => ({ detail: "Upload failed" }));
         setKbUploadMsg({ text: err.detail || "Failed to upload file", isError: true });
@@ -574,6 +605,7 @@ function App() {
     try {
       await fetch(`${activeApiBase}/v1/knowledge-base/${id}`, { method: "DELETE" });
       setKbEntries((prev) => prev.filter((item) => item.id !== id));
+      fetchKBStats();
     } catch (e) {
       console.warn("Failed to delete entry:", e);
     }
@@ -1290,6 +1322,11 @@ function App() {
 
   const activeResponseId = responseIdFromPath(route) || reviewIdFromPath(route) || responseId || "demo";
 
+  const kbTotalRecords = kbStats.totalRecords || kbEntries.length;
+  const kbTotalSources = kbStats.totalSources || new Set(
+    kbEntries.map((e) => e.metadata?.source_file || e.metadata?.filename || e.metadata?.source).filter(Boolean)
+  ).size || (kbTotalRecords > 0 ? 1 : 0);
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1508,15 +1545,32 @@ function App() {
           <button className="nav-item" onClick={() => setNotice("Workspace settings are coming soon") }>
             <Settings size={17} /> Workspace settings
           </button>
-          <div className="plan-meter">
-            <div>
-              <span>Knowledge base</span>
-              <strong>68%</strong>
+          <div
+            className="kb-summary-card"
+            title="Open Knowledge Base & Documents"
+            onClick={() => {
+              setKbModalTab("upload");
+              setShowKBModal(true);
+              setMobileNavOpen(false);
+              navigate("/knowledge-base");
+            }}
+          >
+            <div className="kb-summary-header">
+              <span>Knowledge Base</span>
+              <span className="kb-summary-status">
+                <span className="status-dot" /> Live
+              </span>
             </div>
-            <div className="meter">
-              <span />
+            <div className="kb-summary-body">
+              <div className="kb-summary-count">
+                <span>{kbTotalRecords.toLocaleString()} indexed records</span>
+                <FolderOpen size={14} style={{ color: "var(--blue)" }} />
+              </div>
+              <div className="kb-summary-sources">
+                <span>{kbTotalSources} source {kbTotalSources === 1 ? "document" : "documents"}</span>
+                <span className="kb-manage-link">Manage ↗</span>
+              </div>
             </div>
-            <small>6,842 of 10,000 records</small>
           </div>
         </div>
       </aside>

@@ -27,6 +27,7 @@ from app.models.schemas import (
     KBUploadResponse,
 )
 from app.services.document_parser_service import DocumentParserService
+from app.services.postgres_service import PostgresService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
@@ -100,6 +101,21 @@ async def list_knowledge_base_entries(
         )
         for d in docs
     ]
+
+
+@router.get("/stats")
+async def get_knowledge_base_stats(
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """
+    Returns live Knowledge Base statistics for the tenant:
+    - total_records: count of indexed Q&A entries in PostgreSQL
+    - total_sources: number of distinct source documents
+    - categories_count: count of distinct categories
+    - sync_status: 'synced' if entries exist, else 'ready'
+    """
+    return await PostgresService.get_kb_stats(db, tenant_id=tenant_id)
 
 
 @router.get("/{entry_id}", response_model=KBEntryResponse)
