@@ -1,376 +1,53 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  AlertCircle,
-  ArrowUpRight,
-  BookOpen,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  Database,
-  Download,
-  FileText,
-  FolderOpen,
-  History,
-  LayoutGrid,
-  Link,
-  Menu,
-  Plus,
-  RefreshCw,
-  Search,
-  Send,
-  Settings,
-  Sparkles,
-  Tag,
-  ThumbsDown,
-  ThumbsUp,
-  Trash2,
-  Upload,
-  X,
-  Zap,
-  Play,
-  Clock,
-  MessageSquare,
-  CheckCircle,
-  TrendingUp,
-  Building2,
-  Cpu,
-  ShieldCheck,
-  Save,
-  Sliders,
-} from "lucide-react";
-
-type Source = {
-  id: string;
-  question: string;
-  answer: string;
-  score: number;
-};
-
-type SearchResponse = {
-  suggested_answer: string;
-  confidence_score: number;
-  sources: Source[];
-};
-
-type KBItem = {
-  id: string;
-  tenant_id: string;
-  title?: string;
-  content?: string;
-  question?: string;
-  answer?: string;
-  category?: string;
-  metadata?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type WorkspaceSettings = {
-  tenant_id: string;
-  company_name: string;
-  industry: string;
-  admin_email: string;
-  company_context: string;
-  default_model: string;
-  default_top_k: number;
-  response_tone: string;
-  disclaimer: string;
-  auto_promote_golden_qa: boolean;
-  sme_roles_config: {
-    security_sme_email: string;
-    legal_reviewer_email: string;
-    final_approver_email: string;
-    [key: string]: any;
-  };
-};
-
-const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
-  tenant_id: "acme-corp",
-  company_name: "Acme Corporation",
-  industry: "Enterprise Cloud & SaaS",
-  admin_email: "security-team@acme.corp",
-  company_context: "Acme Corporation is an enterprise security and workflow platform specializing in SOC 2 Type II, ISO 27001, and FedRAMP certified deployments.",
-  default_model: "gemini-2.5-flash",
-  default_top_k: 5,
-  response_tone: "concise",
-  disclaimer: "CONFIDENTIAL: The responses provided herein contain proprietary information intended solely for the recipient's evaluation.",
-  auto_promote_golden_qa: true,
-  sme_roles_config: {
-    security_sme_email: "security-sme@acme.corp",
-    legal_reviewer_email: "legal-review@acme.corp",
-    final_approver_email: "vp-compliance@acme.corp",
-  },
-};
-
-type SourceMode = "url" | "upload" | "extension";
-
-function getApiBaseUrl(): string {
-  const envUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
-  if (!envUrl || envUrl === "/api") {
-    return "/api";
-  }
-  // If user provided a host without /api suffix (e.g. http://localhost:8000 or https://cloudrun.app)
-  if (!envUrl.startsWith("/") && !envUrl.endsWith("/api")) {
-    return `${envUrl}/api`;
-  }
-  return envUrl;
-}
+  Source,
+  SearchResponse,
+  KBItem,
+  WorkspaceSettings,
+  DEFAULT_WORKSPACE_SETTINGS,
+  SourceMode,
+  ReviewerRole,
+  RecentRFPItem,
+  DEFAULT_RECENT_RFPS,
+  ActivityLogItem,
+  DEFAULT_ACTIVITY_LOGS,
+  starterQuestions,
+  demoResponse,
+} from "./types";
+import {
+  getApiBaseUrl,
+  demoAnswerFor,
+  extractFormQuestions,
+  responseIdFromPath,
+  reviewIdFromPath,
+} from "./utils/helpers";
+import { Topbar } from "./components/layout/Topbar";
+import { Sidebar } from "./components/layout/Sidebar";
+import { HomeWelcomeView } from "./components/workspace/HomeWelcomeView";
+import { ReviewImportPage } from "./components/workspace/ReviewImportPage";
+import { QuestionnaireWorkspace } from "./components/workspace/QuestionnaireWorkspace";
+import { ReviewGovernanceModal } from "./components/modals/ReviewGovernanceModal";
+import { KnowledgeBaseModal } from "./components/modals/KnowledgeBaseModal";
+import { ActivityLogModal } from "./components/modals/ActivityLogModal";
+import { WorkspaceSettingsModal } from "./components/modals/WorkspaceSettingsModal";
+import { ToastNotice } from "./components/common/ToastNotice";
 
 const apiBaseUrl = getApiBaseUrl();
 
-const sampleDemoFiles = [
-  { name: "Security Whitepaper", file: "01_Security_and_Compliance_Whitepaper.md", format: "MD" },
-  { name: "SLA & Operations", file: "02_SLA_Disaster_Recovery_and_Operations.pdf", format: "PDF" },
-  { name: "Privacy & Subprocessors", file: "03_Data_Privacy_GDPR_and_Subprocessors.json", format: "JSON" },
-  { name: "Vendor Security Q&A", file: "04_Standard_Vendor_Security_Questionnaire.csv", format: "CSV" },
-  { name: "API & Integrations", file: "05_Product_Features_and_API_Integrations.docx", format: "DOCX" },
-  { name: "Code of Conduct / HR", file: "06_Employee_Code_of_Conduct_and_HR_Policies.txt", format: "TXT" },
-  { name: "Drone Fleet Safety SOP", file: "07_Autonomous_Drone_Fleet_Logistics_and_Aviation_Safety.txt", format: "TXT" },
-];
-
-const playgroundStarterQueries = [
-  "What encryption standards are enforced for databases at rest?",
-  "What are our Recovery Point Objective (RPO) and Recovery Time Objective (RTO)?",
-  "Are we compliant with SOC 2 Type II and ISO 27001?",
-  "Who are our authorized subprocessors and where are they located?",
-  "What is our policy for employee background checks?",
-  "What are the rate limits and authentication methods for the REST API?",
-];
-
-const demoResponse: SearchResponse = {
-  suggested_answer:
-    "Acme retains customer data for the duration of the active subscription and for up to 30 days after termination to support recovery and orderly account closure. Backups are rotated on a 35-day schedule, after which data is permanently deleted unless a longer period is required by law.",
-  confidence_score: 0.91,
-  sources: [
-    {
-      id: "kb-2048",
-      question: "How long is customer data retained after account termination?",
-      answer:
-        "Customer data is retained for 30 days after termination. Encrypted backups are rotated after 35 days.",
-      score: 0.0323,
-    },
-    {
-      id: "kb-1182",
-      question: "What is your data deletion policy?",
-      answer:
-        "Customers may request deletion at any time. Production data is removed within 30 days and backup copies expire on their normal rotation schedule.",
-      score: 0.0317,
-    },
-    {
-      id: "kb-0751",
-      question: "Where is customer information stored?",
-      answer:
-        "Customer information is stored in encrypted cloud infrastructure with access restricted to authorized personnel.",
-      score: 0.0308,
-    },
-  ],
-};
-
-const starterQuestions = [
-  "Describe your data retention and automated backup rotation policy.",
-  "Explain how customer data is encrypted at rest and in transit.",
-  "List your security certifications and compliance audit standards.",
-  "What uptime SLA guarantee do you provide and what are your support hours?",
-  "What is your typical implementation timeline and customer onboarding process?",
-  "What authentication and Single Sign-On (SSO) integrations are supported?",
-  "Describe your drone battery safety, thermal runaway mitigation, and charging protocols.",
-  "What FAA waivers and Beyond Visual Line of Sight (BVLOS) authorizations are held?",
-  "What is the guaranteed latency SLA and failover mechanism for remote pilot teleoperation?",
-];
-
-function demoAnswerFor(question: string): SearchResponse {
-  const normalized = question.toLowerCase();
-  const answer = normalized.includes("encrypt")
-    ? "Customer data is encrypted in transit using TLS 1.2 or higher and at rest using AES-256. Encryption keys are managed through a restricted key-management service."
-    : normalized.includes("certif") || normalized.includes("compliance")
-      ? "Our security program is aligned with industry best practices, and we maintain current SOC 2 Type II and ISO 27001 certifications. Current reports are available under NDA."
-      : normalized.includes("implement") || normalized.includes("timeline")
-        ? "A standard implementation typically takes 4 to 8 weeks, depending on integrations, data preparation, and stakeholder availability. A dedicated implementation manager coordinates the rollout."
-        : normalized.includes("support")
-          ? "The platform includes email support, a searchable help center, and an assigned customer success contact. Premium plans add priority response times and dedicated support."
-          : demoResponse.suggested_answer;
-  return { ...demoResponse, suggested_answer: answer, confidence_score: 0.84 };
-}
-
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      fields.push(current.trim().replace(/^"|"$/g, ""));
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  fields.push(current.trim().replace(/^"|"$/g, ""));
-  return fields;
-}
-
-function extractFormQuestions(text: string, fileName: string) {
-  if (fileName.endsWith(".json")) {
-    try {
-      const parsed = JSON.parse(text);
-      const records = Array.isArray(parsed) ? parsed : parsed.questions || parsed.records || parsed.items || [];
-      return records
-        .map(
-          (record: { question?: string; text?: string; title?: string; prompt?: string }) =>
-            record.question || record.title || record.text || record.prompt || "",
-        )
-        .map((q: any) => String(q).trim())
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-  if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
-    const isTsv = fileName.endsWith(".tsv");
-    const rawLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (rawLines.length === 0) return [];
-
-    const parseLine = (line: string) => {
-      if (isTsv) {
-        return line.split("\t").map((f) => f.trim().replace(/^"|"$/g, ""));
-      }
-      return parseCsvLine(line);
-    };
-
-    const firstLineFields = parseLine(rawLines[0]);
-    const headerLower = firstLineFields.map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ""));
-
-    const questionSynonyms = ["question", "q", "title", "topic", "prompt", "inquiry", "requirement", "item"];
-    let colIdx = headerLower.findIndex((h) => questionSynonyms.includes(h));
-
-    const hasHeaderRow = colIdx !== -1 || headerLower.some((h) => ["answer", "a", "category", "section", "response", "details", "tags"].includes(h));
-
-    if (colIdx === -1) {
-      colIdx = 0;
-    }
-
-    const dataLines = hasHeaderRow ? rawLines.slice(1) : rawLines;
-    return dataLines
-      .map((line) => {
-        const fields = parseLine(line);
-        const val = fields[colIdx] || fields[0] || "";
-        return val.replace(/^"|"$/g, "").trim();
-      })
-      .filter(Boolean);
-  }
-  const document = new DOMParser().parseFromString(text, "text/html");
-  return [
-    ...document.querySelectorAll(
-      'textarea, input:not([type="hidden"]), [contenteditable="true"]',
-    ),
-  ]
-    .map(
-      (field) =>
-        document
-          .querySelector(`label[for="${CSS.escape(field.id)}"]`)
-          ?.textContent?.trim() ||
-        field.getAttribute("aria-label") ||
-        field.getAttribute("placeholder") ||
-        "",
-    )
-    .filter((q) => q.length > 5);
-}
-
-interface RecentRFPItem {
-  id: string;
-  title: string;
-  editedAt: string;
-  color: "blue" | "orange" | "green";
-  questionsCount?: number;
-}
-
-const DEFAULT_RECENT_RFPS: RecentRFPItem[] = [
-  { id: "demo", title: "Northstar security review", editedAt: "8 min ago", color: "blue", questionsCount: 12 },
-  { id: "grove-rfp", title: "Grove procurement RFP", editedAt: "Yesterday", color: "orange", questionsCount: 8 },
-  { id: "meridian-form", title: "Meridian vendor form", editedAt: "Aug 18", color: "green", questionsCount: 15 },
-];
-
-interface ActivityLogItem {
-  id: string;
-  user: string;
-  action: string;
-  details: string;
-  timestamp: string;
-  type: "approval" | "generation" | "kb" | "import" | "review" | "settings" | "export";
-}
-
-const DEFAULT_ACTIVITY_LOGS: ActivityLogItem[] = [
-  {
-    id: "act-1",
-    user: "Proposal Drafter",
-    action: "Loaded questionnaire form",
-    details: "Northstar security review (12 detected questions)",
-    timestamp: "10 minutes ago",
-    type: "import",
-  },
-  {
-    id: "act-2",
-    user: "Gemini 2.5 Flash",
-    action: "Generated response draft",
-    details: "Drafted answers for 12 questions grounded in knowledge base",
-    timestamp: "8 minutes ago",
-    type: "generation",
-  },
-  {
-    id: "act-3",
-    user: "Security SME",
-    action: "Approved response item",
-    details: "Approved Q01: 'Does the system support SAML 2.0 / Okta SSO?'",
-    timestamp: "5 minutes ago",
-    type: "approval",
-  },
-  {
-    id: "act-4",
-    user: "Security SME",
-    action: "Promoted Golden Q&A to Knowledge Base",
-    details: "Upserted approved SOC2 compliance response into Pinecone & Algolia index",
-    timestamp: "3 minutes ago",
-    type: "kb",
-  },
-];
-
-function formatScore(score: number) {
-  return `${Math.round(score * 100)}%`;
-}
-
-function responseIdFromPath(path: string) {
-  return path.match(/^\/response\/workspace\/([^/]+)$/)?.[1] || "";
-}
-
-function reviewIdFromPath(path: string) {
-  return path.match(/^\/review\/([^/]+)$/)?.[1] || "";
-}
-
-function App() {
+export function App() {
   const [question, setQuestion] = useState(starterQuestions[0]);
   const [tenantId, setTenantId] = useState("acme-corp");
   const [topK, setTopK] = useState(5);
   const [response, setResponse] = useState<SearchResponse>(demoResponse);
   const [answer, setAnswer] = useState(demoResponse.suggested_answer);
-  const [answersByQuestion, setAnswersByQuestion] = useState<
-    Record<string, string>
-  >({ [starterQuestions[0]]: demoResponse.suggested_answer });
+  const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, string>>({
+    [starterQuestions[0]]: demoResponse.suggested_answer,
+  });
   const [reviewStatusByQuestion, setReviewStatusByQuestion] = useState<Record<string, string>>({});
   const [activeSource, setActiveSource] = useState(demoResponse.sources[0].id);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [answerStatus, setAnswerStatus] = useState<
-    "Draft" | "Approved" | "Rejected"
-  >("Draft");
-  const [role, setRole] = useState<
-    "Proposal manager" | "Security SME" | "Legal reviewer" | "Final approver"
-  >("Proposal manager");
+  const [, setAnswerStatus] = useState<"Draft" | "Approved" | "Rejected">("Draft");
+  const [role, setRole] = useState<ReviewerRole>("Proposal manager");
   const [notice, setNotice] = useState("Demo data loaded");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [formUrl, setFormUrl] = useState("");
@@ -387,7 +64,9 @@ function App() {
   // Send for Review & Governance State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewModalScope, setReviewModalScope] = useState<"all" | "current">("all");
-  const [reviewTargetRole, setReviewTargetRole] = useState<"Security SME" | "Legal reviewer" | "Final approver">("Security SME");
+  const [reviewTargetRole, setReviewTargetRole] = useState<
+    "Security SME" | "Legal reviewer" | "Final approver"
+  >("Security SME");
   const [reviewInstructions, setReviewInstructions] = useState("");
   const [reviewSelectedQuestion, setReviewSelectedQuestion] = useState<string | null>(null);
   const [reviewCommentsByQuestion, setReviewCommentsByQuestion] = useState<Record<string, string>>({});
@@ -397,6 +76,72 @@ function App() {
   // Activity Log & Audit State
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(DEFAULT_ACTIVITY_LOGS);
+
+  // Environment & Health State
+  const [backendEnv, setBackendEnv] = useState<string>(
+    () => import.meta.env.VITE_APP_ENV || "local",
+  );
+  const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
+  const [activeApiBase, setActiveApiBase] = useState<string>(() => {
+    const saved = localStorage.getItem("rfpengine.custom_api_url");
+    if (saved) {
+      return saved;
+    }
+    return apiBaseUrl;
+  });
+
+  // Workspace Settings State
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"profile" | "ai" | "governance" | "data">("profile");
+  const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>(
+    DEFAULT_WORKSPACE_SETTINGS,
+  );
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSaveNotice, setSettingsSaveNotice] = useState<string | null>(null);
+
+  // Knowledge Base State
+  const [showKBModal, setShowKBModal] = useState(false);
+  const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
+  const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
+  const [kbStats, setKbStats] = useState<{
+    totalRecords: number;
+    totalSources: number;
+    categoriesCount: number;
+    syncStatus: string;
+  }>({
+    totalRecords: 0,
+    totalSources: 0,
+    categoriesCount: 0,
+    syncStatus: "ready",
+  });
+  const [isFetchingKB, setIsFetchingKB] = useState(false);
+  const [isUploadingKB, setIsUploadingKB] = useState(false);
+  const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Playground State
+  const [playgroundQuery, setPlaygroundQuery] = useState("");
+  const [playgroundTopK, setPlaygroundTopK] = useState(5);
+  const [playgroundLoading, setPlaygroundLoading] = useState(false);
+  const [playgroundResult, setPlaygroundResult] = useState<SearchResponse | null>(null);
+  const [playgroundError, setPlaygroundError] = useState<string | null>(null);
+
+  // Toast State
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
+  function showToast(text: string) {
+    setToastNotice(text);
+    setTimeout(() => setToastNotice(null), 3500);
+  }
+
+  // Golden Q&A Promotion tracking
+  const [promotedQuestions, setPromotedQuestions] = useState<Record<string, boolean>>(() => {
+    try {
+      const stored = localStorage.getItem("rfpengine.promoted_questions");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
 
   function logActivity(action: string, details: string, type: ActivityLogItem["type"]) {
     const newEntry: ActivityLogItem = {
@@ -427,17 +172,6 @@ function App() {
       console.warn("Failed to post audit log to backend:", e);
     }
   }
-
-  // Environment & Health State
-  const [backendEnv, setBackendEnv] = useState<string>(() => import.meta.env.VITE_APP_ENV || "local");
-  const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
-  const [activeApiBase, setActiveApiBase] = useState<string>(() => {
-    const saved = localStorage.getItem("rfpengine.custom_api_url");
-    if (saved) {
-      return saved;
-    }
-    return apiBaseUrl;
-  });
 
   useEffect(() => {
     async function checkHealth() {
@@ -471,7 +205,9 @@ function App() {
               user: l.user_role || "User",
               action: l.action,
               details: l.details,
-              timestamp: l.created_at ? new Date(l.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Recently",
+              timestamp: l.created_at
+                ? new Date(l.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : "Recently",
               type: l.event_type as ActivityLogItem["type"],
             }));
             setActivityLogs(mapped);
@@ -505,13 +241,6 @@ function App() {
     fetchRecentHistory();
   }, [activeApiBase, tenantId]);
 
-  // Workspace Settings State
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"profile" | "ai" | "governance" | "data">("profile");
-  const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [settingsSaveNotice, setSettingsSaveNotice] = useState<string | null>(null);
-
   async function fetchWorkspaceSettings() {
     try {
       const res = await fetch(`${activeApiBase}/v1/responses/workspace/settings?tenant_id=${tenantId}`);
@@ -522,6 +251,9 @@ function App() {
           ...data,
           sme_roles_config: { ...prev.sme_roles_config, ...(data.sme_roles_config || {}) },
         }));
+        if (data.default_top_k) {
+          setTopK(data.default_top_k);
+        }
       }
     } catch (e) {
       console.warn("Could not fetch workspace settings:", e);
@@ -545,6 +277,9 @@ function App() {
           ...saved,
           sme_roles_config: { ...prev.sme_roles_config, ...(saved.sme_roles_config || {}) },
         }));
+        if (saved.default_top_k) {
+          setTopK(saved.default_top_k);
+        }
         setSettingsSaveNotice("Settings saved successfully to PostgreSQL");
         logActivity("Updated Workspace Settings", `Updated configuration for tenant ${tenantId}`, "settings");
         setTimeout(() => setSettingsSaveNotice(null), 3500);
@@ -580,63 +315,6 @@ function App() {
   useEffect(() => {
     fetchWorkspaceSettings();
   }, [activeApiBase, tenantId]);
-
-  // Knowledge Base State
-  const [showKBModal, setShowKBModal] = useState(false);
-  const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
-  const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
-  const [kbStats, setKbStats] = useState<{
-    totalRecords: number;
-    totalSources: number;
-    categoriesCount: number;
-    syncStatus: string;
-  }>({
-    totalRecords: 0,
-    totalSources: 0,
-    categoriesCount: 0,
-    syncStatus: "ready",
-  });
-  const [isFetchingKB, setIsFetchingKB] = useState(false);
-  const [isUploadingKB, setIsUploadingKB] = useState(false);
-  const [kbUploadMsg, setKbUploadMsg] = useState<{ text: string; isError?: boolean } | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  // Playground State
-  const [playgroundQuery, setPlaygroundQuery] = useState("");
-  const [playgroundTopK, setPlaygroundTopK] = useState(5);
-  const [playgroundLoading, setPlaygroundLoading] = useState(false);
-  const [playgroundResult, setPlaygroundResult] = useState<SearchResponse | null>(null);
-  const [playgroundError, setPlaygroundError] = useState<string | null>(null);
-
-  async function handlePlaygroundSearch(queryText?: string) {
-    const query = (queryText || playgroundQuery).trim();
-    if (!query) return;
-    if (queryText) {
-      setPlaygroundQuery(queryText);
-    }
-    setPlaygroundLoading(true);
-    setPlaygroundError(null);
-    try {
-      const res = await fetch(`${activeApiBase}/v1/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          question: query,
-          top_k: playgroundTopK,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(`Search failed with status ${res.status}`);
-      }
-      const data: SearchResponse = await res.json();
-      setPlaygroundResult(data);
-    } catch (err: any) {
-      setPlaygroundError(err.message || "Failed to execute hybrid search");
-    } finally {
-      setPlaygroundLoading(false);
-    }
-  }
 
   async function fetchKBStats() {
     try {
@@ -713,12 +391,6 @@ function App() {
     }
   }
 
-  async function handleFileUpload(files: FileList | null) {
-    if (files && files.length > 0) {
-      handleKBUpload(files[0]);
-    }
-  }
-
   async function handleDeleteKBEntry(id: string) {
     try {
       await fetch(`${activeApiBase}/v1/knowledge-base/${id}`, { method: "DELETE" });
@@ -736,39 +408,46 @@ function App() {
     }
   }
 
+  async function handlePlaygroundSearch(queryText?: string) {
+    const query = (queryText || playgroundQuery).trim();
+    if (!query) return;
+    if (queryText) {
+      setPlaygroundQuery(queryText);
+    }
+    setPlaygroundLoading(true);
+    setPlaygroundError(null);
+    try {
+      const res = await fetch(`${activeApiBase}/v1/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          question: query,
+          top_k: playgroundTopK,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Search failed with status ${res.status}`);
+      }
+      const data: SearchResponse = await res.json();
+      setPlaygroundResult(data);
+    } catch (err: any) {
+      setPlaygroundError(err.message || "Failed to execute hybrid search");
+    } finally {
+      setPlaygroundLoading(false);
+    }
+  }
+
+  function navigate(path: string) {
+    window.history.pushState({}, "", path);
+    setRoute(path);
+  }
+
   useEffect(() => {
     const handlePopState = () => setRoute(window.location.pathname || "/");
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
-
-  useEffect(() => {
-    const approveButton =
-      document.querySelector<HTMLButtonElement>(".approve-button");
-    const rejectButton =
-      document.querySelector<HTMLButtonElement>(".reject-button");
-    if (!approveButton || !rejectButton) return;
-    const approve = () => {
-      const nextStatus =
-        role === "Proposal manager"
-          ? "SME review"
-          : role === "Final approver"
-            ? "Final approved"
-            : "Approved by SME";
-      setAnswerStatus(nextStatus as "Approved");
-      setNotice(`${nextStatus} · ${role}`);
-    };
-    const reject = () => {
-      setAnswerStatus("Rejected");
-      setNotice("Answer rejected and needs revision");
-    };
-    approveButton.addEventListener("click", approve);
-    rejectButton.addEventListener("click", reject);
-    return () => {
-      approveButton.removeEventListener("click", approve);
-      rejectButton.removeEventListener("click", reject);
-    };
-  }, [route, answerStatus, role]);
 
   useEffect(() => {
     if (route === "/knowledge-base") {
@@ -808,11 +487,7 @@ function App() {
     }
   }, [route]);
 
-  function loadQuestions(
-    questions: string[],
-    source: string,
-    mode: SourceMode,
-  ) {
+  function loadQuestions(questions: string[], source: string, mode: SourceMode) {
     const id = `${mode}-${Date.now().toString(36)}`;
     localStorage.setItem(
       `rfpengine.response.${id}`,
@@ -845,7 +520,11 @@ function App() {
       return [newRfpItem, ...filtered].slice(0, 5);
     });
 
-    logActivity("Loaded questionnaire form", `${source} (${questions.length} detected questions)`, "import");
+    logActivity(
+      "Loaded questionnaire form",
+      `${source} (${questions.length} detected questions)`,
+      "import",
+    );
 
     try {
       fetch(`${activeApiBase}/v1/responses/history`, {
@@ -855,14 +534,16 @@ function App() {
           "X-Tenant-ID": tenantId,
         },
         body: JSON.stringify(newRfpItem),
-      }).then(async (res) => {
-        if (res.ok) {
-          const data = await res.json();
-          if (data.history && Array.isArray(data.history)) {
-            setRecentRFPs(data.history);
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (data.history && Array.isArray(data.history)) {
+              setRecentRFPs(data.history);
+            }
           }
-        }
-      }).catch((e) => console.warn("Failed to sync recent RFP to backend history:", e));
+        })
+        .catch((e) => console.warn("Failed to sync recent RFP to backend history:", e));
     } catch (e) {
       console.warn("Failed to post recent RFP to backend:", e);
     }
@@ -870,9 +551,7 @@ function App() {
     setSourceStatus(
       `${source} · ${questions.length} question${questions.length === 1 ? "" : "s"} detected`,
     );
-    setNotice(
-      questions.length ? "Form questions loaded" : "No questions found",
-    );
+    setNotice(questions.length ? "Form questions loaded" : "No questions found");
     return id;
   }
 
@@ -883,8 +562,7 @@ function App() {
         throw new Error("Use an http or https URL.");
       setSourceStatus("Fetching form...");
       const result = await fetch(url.href);
-      if (!result.ok)
-        throw new Error(`Could not fetch form (${result.status})`);
+      if (!result.ok) throw new Error(`Could not fetch form (${result.status})`);
       return loadQuestions(
         extractFormQuestions(await result.text(), url.pathname.toLowerCase()),
         url.hostname,
@@ -917,18 +595,6 @@ function App() {
     }
   }
 
-  function navigate(path: string) {
-    window.history.pushState({}, "", path);
-    setRoute(path);
-  }
-
-  const [toastNotice, setToastNotice] = useState<string | null>(null);
-
-  function showToast(text: string) {
-    setToastNotice(text);
-    setTimeout(() => setToastNotice(null), 3500);
-  }
-
   function openImport(id?: string) {
     navigate(
       `/review/${id || responseId || localStorage.getItem("rfpengine.latest") || "demo"}`,
@@ -947,11 +613,13 @@ function App() {
   }
 
   function submitSendForReview() {
-    const targetQuestions = reviewSelectedQuestion 
-      ? [reviewSelectedQuestion] 
-      : reviewModalScope === "current" 
-        ? [question] 
-        : (detectedQuestions.length > 0 ? detectedQuestions : [question]);
+    const targetQuestions = reviewSelectedQuestion
+      ? [reviewSelectedQuestion]
+      : reviewModalScope === "current"
+        ? [question]
+        : detectedQuestions.length > 0
+          ? detectedQuestions
+          : [question];
 
     let targetStatus = "SME review";
     if (reviewTargetRole === "Legal reviewer") targetStatus = "Legal review";
@@ -971,18 +639,11 @@ function App() {
     saveReviewStatuses(nextStatuses);
     setReviewCommentsByQuestion(nextComments);
 
-    showToast(`Dispatched ${targetQuestions.length} draft${targetQuestions.length === 1 ? "" : "s"} to ${reviewTargetRole}!`);
+    showToast(
+      `Dispatched ${targetQuestions.length} draft${targetQuestions.length === 1 ? "" : "s"} to ${reviewTargetRole}!`,
+    );
     setShowReviewModal(false);
   }
-
-  const [promotedQuestions, setPromotedQuestions] = useState<Record<string, boolean>>(() => {
-    try {
-      const stored = localStorage.getItem("rfpengine.promoted_questions");
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
 
   async function handlePromoteToKnowledgeBase(itemText: string, index = 0) {
     const itemAnswer = answersByQuestion[itemText] || (itemText === question ? answer : "");
@@ -993,10 +654,13 @@ function App() {
 
     try {
       if (responseId && responseId !== "demo") {
-        const res = await fetch(`${activeApiBase}/v1/workspaces/${responseId}/questions/${index}/promote`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
+        const res = await fetch(
+          `${activeApiBase}/v1/workspaces/${responseId}/questions/${index}/promote`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          },
+        );
         if (!res.ok) {
           throw new Error(`Promotion failed with HTTP ${res.status}`);
         }
@@ -1021,14 +685,22 @@ function App() {
       const nextPromoted = { ...promotedQuestions, [itemText]: true };
       setPromotedQuestions(nextPromoted);
       localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
-      logActivity("Promoted Golden Q&A to Knowledge Base", `Promoted answer for "${itemText}" to canonical Knowledge Base`, "kb");
+      logActivity(
+        "Promoted Golden Q&A to Knowledge Base",
+        `Promoted answer for "${itemText}" to canonical Knowledge Base`,
+        "kb",
+      );
       showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
     } catch (err) {
       console.warn("Promotion API fallback:", err);
       const nextPromoted = { ...promotedQuestions, [itemText]: true };
       setPromotedQuestions(nextPromoted);
       localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
-      logActivity("Promoted Golden Q&A to Knowledge Base", `Promoted answer for "${itemText}" to canonical Knowledge Base`, "kb");
+      logActivity(
+        "Promoted Golden Q&A to Knowledge Base",
+        `Promoted answer for "${itemText}" to canonical Knowledge Base`,
+        "kb",
+      );
       showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
     }
   }
@@ -1047,7 +719,10 @@ function App() {
   }
 
   function handleRequestChanges(item: string) {
-    const note = window.prompt(`Enter revision feedback / changes requested:`, reviewCommentsByQuestion[item] || "");
+    const note = window.prompt(
+      `Enter revision feedback / changes requested:`,
+      reviewCommentsByQuestion[item] || "",
+    );
     if (note === null) return;
 
     const nextStatuses = { ...reviewStatusByQuestion, [item]: "Changes requested" };
@@ -1055,7 +730,10 @@ function App() {
     saveReviewStatuses(nextStatuses);
 
     if (note.trim()) {
-      const nextComments = { ...reviewCommentsByQuestion, [item]: `[Changes Requested by ${role}]: ${note.trim()}` };
+      const nextComments = {
+        ...reviewCommentsByQuestion,
+        [item]: `[Changes Requested by ${role}]: ${note.trim()}`,
+      };
       setReviewCommentsByQuestion(nextComments);
     }
 
@@ -1129,15 +807,6 @@ function App() {
     showToast(`Question reset to In Review`);
   }
 
-  function getStatusBadgeClass(status?: string) {
-    if (!status || status === "NOT GENERATED" || status === "DRAFT READY") return "status-draft";
-    if (status.includes("SME review") || status.includes("Ready")) return "status-review";
-    if (status.includes("Legal review")) return "status-legal";
-    if (status.includes("Approved") || status.includes("Final")) return "status-approved";
-    if (status.includes("Changes")) return "status-changes";
-    return "status-draft";
-  }
-
   async function openOriginalForm() {
     let baseTargetUrl = formUrl;
     if (!baseTargetUrl && uploadedFileContent && !sourceLabel.toLowerCase().endsWith(".csv")) {
@@ -1149,8 +818,7 @@ function App() {
     }
     const allQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
     const currentAnswers = { ...answersByQuestion };
-    
-    // Ensure current question is set
+
     if (question && answer && !currentAnswers[question]) {
       currentAnswers[question] = answer;
     }
@@ -1176,17 +844,17 @@ function App() {
           } catch {
             currentAnswers[item] = demoAnswerFor(item).suggested_answer;
           }
-        })
+        }),
       );
       setAnswersByQuestion(currentAnswers);
       saveAnswers(currentAnswers);
     }
 
     const payloadAnswers = Object.fromEntries(
-      allQuestions.map((item) => [item, currentAnswers[item] || ""])
+      allQuestions.map((item) => [item, currentAnswers[item] || ""]),
     );
 
-    // 1. Sync directly to Chrome Extension Service Worker via DOM postMessage
+    // Sync to extension via DOM postMessage
     window.postMessage(
       {
         type: "RFPENGINE_SYNC_ANSWERS",
@@ -1198,7 +866,7 @@ function App() {
       "*",
     );
 
-    // 2. Also keep URL fragment as universal fallback
+    // URL fragment fallback
     const handoff = encodeURIComponent(
       JSON.stringify({
         questions: allQuestions,
@@ -1217,8 +885,7 @@ function App() {
     const rows = [
       "question,answer",
       ...detectedQuestions.map(
-        (item) =>
-          `${escapeCsv(item)},${escapeCsv(answersByQuestion[item] || "")}`,
+        (item) => `${escapeCsv(item)},${escapeCsv(answersByQuestion[item] || "")}`,
       ),
     ];
     const link = document.createElement("a");
@@ -1234,10 +901,7 @@ function App() {
     if (!responseId) return;
     const key = `rfpengine.response.${responseId}`;
     const saved = JSON.parse(localStorage.getItem(key) || "{}");
-    localStorage.setItem(
-      key,
-      JSON.stringify({ ...saved, answers: nextAnswers }),
-    );
+    localStorage.setItem(key, JSON.stringify({ ...saved, answers: nextAnswers }));
   }
 
   function saveReviewStatuses(nextStatuses: Record<string, string>) {
@@ -1294,7 +958,7 @@ function App() {
     setNotice("Generating answers in parallel for all questions...");
     showToast("Generating AI answers for all questions...");
     const generated: Record<string, string> = { ...answersByQuestion };
-    
+
     await Promise.all(
       detectedQuestions.map(async (item) => {
         try {
@@ -1309,7 +973,7 @@ function App() {
         } catch {
           generated[item] = demoAnswerFor(item).suggested_answer;
         }
-      })
+      }),
     );
 
     setAnswersByQuestion(generated);
@@ -1322,1988 +986,240 @@ function App() {
 
   const allCurrentQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
   const approvedCount = allCurrentQuestions.filter((q) =>
-    ["Approved", "Approved by SME", "Approved by Legal", "Final approved"].includes(reviewStatusByQuestion[q])
+    ["Approved", "Approved by SME", "Approved by Legal", "Final approved"].includes(
+      reviewStatusByQuestion[q],
+    ),
   ).length;
   const inReviewCount = allCurrentQuestions.filter((q) =>
-    ["SME review", "Legal review", "Ready for Final Approval"].includes(reviewStatusByQuestion[q])
+    ["SME review", "Legal review", "Ready for Final Approval"].includes(reviewStatusByQuestion[q]),
   ).length;
-  const changesRequestedCount = allCurrentQuestions.filter((q) =>
-    reviewStatusByQuestion[q] === "Changes requested"
+  const changesRequestedCount = allCurrentQuestions.filter(
+    (q) => reviewStatusByQuestion[q] === "Changes requested",
   ).length;
-  const isAllApproved = allCurrentQuestions.length > 0 && approvedCount === allCurrentQuestions.length;
+  const isAllApproved =
+    allCurrentQuestions.length > 0 && approvedCount === allCurrentQuestions.length;
 
   if (route.startsWith("/review/")) {
     return (
-      <div className="import-page">
-        <header className="import-header">
-          <div className="brand-mark" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
-            <span>R</span>
-          </div>
-          <div className="brand-name" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
-            RFP<span>Engine</span>
-          </div>
-          <span className="import-header-label">Response assistant</span>
-        </header>
-        <main className="import-main">
-          <p className="breadcrumb">
-            <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}>Responses</span> <span>/</span> New response
-          </p>
-          <h1>Review your questionnaire</h1>
-          <section className="import-source panel">
-            <div className="source-input-row">
-              <div className="source-url-field">
-                <Link size={16} />
-                <input
-                  value={formUrl}
-                  onChange={(event) => setFormUrl(event.target.value)}
-                  placeholder="https://buyer.example/questionnaire"
-                />
-                <button
-                  className="source-button"
-                  onClick={loadFormUrl}
-                  disabled={!formUrl.trim()}
-                >
-                  Load URL
-                </button>
-              </div>
-              <label className="upload-form-button">
-                <Upload size={15} /> Upload HTML, JSON, or CSV
-                <input
-                  type="file"
-                  accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
-                  onChange={loadFormFile}
-                />
-              </label>
-            </div>
-            <p className="source-status">
-              <span className="status-dot" /> {sourceStatus}
-            </p>
-          </section>
-          <section className="import-questions panel">
-            <div className="import-question-heading">
-              <div>
-                <p className="eyebrow">02 / Detected questions</p>
-                <h2>
-                  {detectedQuestions.length
-                    ? `${detectedQuestions.length} questions ready`
-                    : "No questions detected"}
-                </h2>
-              </div>
-              <span className="source-count">Review before continuing</span>
-            </div>
-            {detectedQuestions.length ? (
-              <div className="import-question-list">
-                {detectedQuestions.map((detectedQuestion, index) => (
-                  <div
-                    className="import-question"
-                    key={`${detectedQuestion}-${index}`}
-                  >
-                    <span className="source-rank">
-                      Q{String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span>{detectedQuestion}</span>
-                    <Check size={15} />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="empty-import">
-                Load a URL or upload a form file to see its questions here.
-              </p>
-            )}
-            <button
-              className="primary-button continue-button"
-              onClick={openWorkspace}
-              disabled={!detectedQuestions.length}
-            >
-              Continue to workspace <ArrowUpRight size={15} />
-            </button>
-          </section>
-        </main>
-      </div>
+      <ReviewImportPage
+        onNavigateHome={() => navigate("/")}
+        formUrl={formUrl}
+        setFormUrl={setFormUrl}
+        loadFormUrl={loadFormUrl}
+        loadFormFile={loadFormFile}
+        sourceStatus={sourceStatus}
+        detectedQuestions={detectedQuestions}
+        openWorkspace={openWorkspace}
+      />
     );
   }
 
-  // Active navigation states for sidebar
   const isKBModalOpen = showKBModal;
   const isActivityOpen = showActivityModal;
 
-  const isKbActive = !isActivityOpen && (route === "/knowledge-base" || (isKBModalOpen && kbModalTab === "upload"));
-  const isPlaygroundActive = !isActivityOpen && (route === "/playground" || (isKBModalOpen && kbModalTab === "playground"));
+  const isKbActive =
+    !isActivityOpen &&
+    (route === "/knowledge-base" || (isKBModalOpen && kbModalTab === "upload"));
+  const isPlaygroundActive =
+    !isActivityOpen &&
+    (route === "/playground" || (isKBModalOpen && kbModalTab === "playground"));
   const isActivityActive = isActivityOpen;
-  const isResponsesActive = !isKBModalOpen && !isActivityOpen && (
-    route.startsWith("/response") || 
-    route.startsWith("/review") || 
-    (route !== "/" && route !== "/knowledge-base" && route !== "/playground")
-  );
+  const isResponsesActive =
+    !isKBModalOpen &&
+    !isActivityOpen &&
+    (route.startsWith("/response") ||
+      route.startsWith("/review") ||
+      (route !== "/" && route !== "/knowledge-base" && route !== "/playground"));
   const isOverviewActive = !isKBModalOpen && !isActivityOpen && route === "/";
 
-  const activeResponseId = responseIdFromPath(route) || reviewIdFromPath(route) || responseId || "demo";
+  const activeResponseId =
+    responseIdFromPath(route) || reviewIdFromPath(route) || responseId || "demo";
 
   const kbTotalRecords = kbStats.totalRecords || kbEntries.length;
-  const kbTotalSources = kbStats.totalSources || new Set(
-    kbEntries.map((e) => e.metadata?.source_file || e.metadata?.filename || e.metadata?.source).filter(Boolean)
-  ).size || (kbTotalRecords > 0 ? 1 : 0);
+  const kbTotalSources =
+    kbStats.totalSources ||
+    new Set(
+      kbEntries
+        .map((e) => e.metadata?.source_file || e.metadata?.filename || e.metadata?.source)
+        .filter(Boolean),
+    ).size ||
+    (kbTotalRecords > 0 ? 1 : 0);
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <button
-          className="mobile-menu"
-          aria-label="Open navigation"
-          onClick={() => setMobileNavOpen(!mobileNavOpen)}
-        >
-          {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-        <button className="brand-mark" onClick={() => navigate("/")} aria-label="Go to home">
-          <span>R</span>
-        </button>
-        <div className="brand-name">
-          RFP<span>Engine</span>
-        </div>
-        <div
-          className="workspace-switcher"
-          onClick={() => setShowSettingsModal(true)}
-          style={{ cursor: "pointer" }}
-          title="Open Workspace Settings"
-        >
-          <span className="workspace-dot" /> {workspaceSettings.company_name || "Acme Corporation"}{" "}
-          <ChevronDown size={15} />
-        </div>
-        <div
-          className="env-indicator"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            fontSize: "11px",
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: "9999px",
-            backgroundColor: backendEnv === "prod" || backendEnv === "production" ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
-            color: backendEnv === "prod" || backendEnv === "production" ? "#10b981" : "#f59e0b",
-            border: `1px solid ${backendEnv === "prod" || backendEnv === "production" ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.25)"}`,
-            cursor: "pointer",
-            marginLeft: "8px",
-          }}
-          onClick={() => {
-            const nextUrl = activeApiBase.includes("localhost") || activeApiBase.startsWith("/api")
-              ? "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api"
-              : "/api";
-            localStorage.setItem("rfpengine.custom_api_url", nextUrl);
-            setActiveApiBase(nextUrl);
-          }}
-          title={`Active API: ${activeApiBase}\nStatus: ${backendHealth.toUpperCase()}\nClick to toggle Local / Cloud Prod target`}
-        >
-          <span
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              backgroundColor: backendHealth === "ok" ? (backendEnv === "prod" || backendEnv === "production" ? "#10b981" : "#f59e0b") : "#ef4444",
-            }}
-          />
-          {backendEnv === "prod" || backendEnv === "production" ? "PROD CLOUD" : "LOCAL DEV"}
-        </div>
-        <div className="topbar-spacer" />
-        <a
-          href="https://rfpengine.aroadmap.dev/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="outline-button"
-          style={{
-            padding: "6px 12px",
-            fontSize: "11px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            background: "#eef2ff",
-            borderColor: "#c7d2fe",
-            color: "var(--blue)",
-            fontWeight: 700,
-            textDecoration: "none",
-          }}
-          title="Open live strategy & PRD roadmap on aroadmap.dev"
-        >
-          <TrendingUp size={14} /> 🗺️ Roadmap (aroadmap.dev)
-        </a>
-        <button className="icon-button" title="Open notifications">
-          <AlertCircle size={18} />
-        </button>
-        <button className="avatar" title="Account menu">
-          JD
-        </button>
-      </header>
+      <Topbar
+        mobileNavOpen={mobileNavOpen}
+        setMobileNavOpen={setMobileNavOpen}
+        companyName={workspaceSettings.company_name}
+        onOpenSettings={() => setShowSettingsModal(true)}
+        backendEnv={backendEnv}
+        backendHealth={backendHealth}
+        activeApiBase={activeApiBase}
+        setActiveApiBase={setActiveApiBase}
+        onNavigateHome={() => navigate("/")}
+      />
 
-      <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
-        <div className="sidebar-section">
-          <p className="eyebrow">Workspace</p>
-          <nav>
-            <button
-              className={`nav-item ${isOverviewActive ? "active" : ""}`}
-              onClick={() => {
-                setShowKBModal(false);
-                setShowActivityModal(false);
-                setMobileNavOpen(false);
-                navigate("/");
-              }}
-            >
-              <LayoutGrid size={17} /> Overview
-            </button>
-            <button
-              className={`nav-item ${isResponsesActive ? "active" : ""}`}
-              onClick={() => {
-                setShowKBModal(false);
-                setShowActivityModal(false);
-                setMobileNavOpen(false);
-                const targetId = activeResponseId;
-                setResponseId(targetId);
-                navigate(`/response/workspace/${targetId}`);
-              }}
-            >
-              <FileText size={17} /> Responses{" "}
-              <span className="nav-count">{recentRFPs.length > 0 ? recentRFPs.length : 12}</span>
-            </button>
-            <button
-              className={`nav-item ${isKbActive ? "active" : ""}`}
-              onClick={() => {
-                setShowActivityModal(false);
-                setMobileNavOpen(false);
-                setKbModalTab("upload");
-                setShowKBModal(true);
-                navigate("/knowledge-base");
-              }}
-            >
-              <FolderOpen size={17} /> Knowledge base
-            </button>
-            <button
-              className={`nav-item ${isPlaygroundActive ? "active" : ""}`}
-              onClick={() => {
-                setShowActivityModal(false);
-                setMobileNavOpen(false);
-                setKbModalTab("playground");
-                setShowKBModal(true);
-                navigate("/playground");
-              }}
-            >
-              <Zap size={17} /> KB Playground
-            </button>
-            <a
-              href="https://rfpengine.aroadmap.dev/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="nav-item"
-              style={{ textDecoration: "none" }}
-              onClick={() => setMobileNavOpen(false)}
-            >
-              <TrendingUp size={17} /> Product Roadmap
-              <span
-                className="nav-count"
-                style={{
-                  background: "#e0e7ff",
-                  color: "var(--blue)",
-                  padding: "1px 5px",
-                  borderRadius: "10px",
-                  fontWeight: 700,
-                  fontSize: "9px",
-                }}
-              >
-                LIVE ↗
-              </span>
-            </a>
-            <button
-              className={`nav-item ${isActivityActive ? "active" : ""}`}
-              onClick={() => {
-                setShowKBModal(false);
-                setShowActivityModal(true);
-                setMobileNavOpen(false);
-              }}
-            >
-              <History size={17} /> Activity
-            </button>
-          </nav>
-        </div>
-        <div className="sidebar-section recent-section">
-          <p className="eyebrow">
-            Recent RFPs{" "}
-            <button
-              className="tiny-action"
-              title="Add RFP"
-              onClick={() => {
-                setShowKBModal(false);
-                setShowActivityModal(false);
-                setMobileNavOpen(false);
-                navigate("/");
-              }}
-            >
-              <Plus size={14} />
-            </button>
-          </p>
-          {recentRFPs.map((rfp) => {
-            const isSelected = isResponsesActive && activeResponseId === rfp.id;
-            return (
-              <button
-                key={rfp.id}
-                className={`recent-item ${isSelected ? "selected" : ""}`}
-                onClick={() => {
-                  setShowKBModal(false);
-                  setShowActivityModal(false);
-                  setMobileNavOpen(false);
-                  setResponseId(rfp.id);
-                  navigate(`/response/workspace/${rfp.id}`);
-                }}
-              >
-                <span className={`file-icon ${rfp.color || "blue"}`}>
-                  <FileText size={15} />
-                </span>
-                <span>
-                  <strong>{rfp.title}</strong>
-                  <small>Edited {rfp.editedAt}</small>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="sidebar-bottom">
-          <button
-            className={`nav-item ${showSettingsModal ? "active" : ""}`}
-            onClick={() => {
-              setShowSettingsModal(true);
-              setMobileNavOpen(false);
-            }}
-          >
-            <Settings size={17} /> Workspace settings
-          </button>
-          <div
-            className="kb-summary-card"
-            title="Open Knowledge Base & Documents"
-            onClick={() => {
-              setKbModalTab("upload");
-              setShowKBModal(true);
-              setMobileNavOpen(false);
-              navigate("/knowledge-base");
-            }}
-          >
-            <div className="kb-summary-header">
-              <span>Knowledge Base</span>
-              <span className="kb-summary-status">
-                <span className="status-dot" /> Live
-              </span>
-            </div>
-            <div className="kb-summary-body">
-              <div className="kb-summary-count">
-                <span>{kbTotalRecords.toLocaleString()} indexed records</span>
-                <FolderOpen size={14} style={{ color: "var(--blue)" }} />
-              </div>
-              <div className="kb-summary-sources">
-                <span>{kbTotalSources} source {kbTotalSources === 1 ? "document" : "documents"}</span>
-                <span className="kb-manage-link">Manage ↗</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
+      <Sidebar
+        mobileNavOpen={mobileNavOpen}
+        setMobileNavOpen={setMobileNavOpen}
+        isOverviewActive={isOverviewActive}
+        isResponsesActive={isResponsesActive}
+        isKbActive={isKbActive}
+        isPlaygroundActive={isPlaygroundActive}
+        isActivityActive={isActivityActive}
+        recentRFPs={recentRFPs}
+        activeResponseId={activeResponseId}
+        onNavigateHome={() => {
+          setShowKBModal(false);
+          setShowActivityModal(false);
+          navigate("/");
+        }}
+        onSelectRFP={(id) => {
+          setShowKBModal(false);
+          setShowActivityModal(false);
+          setResponseId(id);
+          navigate(`/response/workspace/${id}`);
+        }}
+        onOpenKB={(tab) => {
+          setShowActivityModal(false);
+          setKbModalTab(tab);
+          setShowKBModal(true);
+          navigate(tab === "upload" ? "/knowledge-base" : "/playground");
+        }}
+        onOpenActivity={() => {
+          setShowKBModal(false);
+          setShowActivityModal(true);
+        }}
+        onOpenSettings={() => setShowSettingsModal(true)}
+        showSettingsModal={showSettingsModal}
+        kbTotalRecords={kbTotalRecords}
+        kbTotalSources={kbTotalSources}
+      />
 
       <main className="main-content">
         {route === "/" ? (
-          <section className="home-screen">
-            <p className="eyebrow">Start a response</p>
-            <h1>Bring in your questionnaire</h1>
-            <p className="home-subtitle">
-              Choose how you want to load the buyer form.
-            </p>
-            <div className="home-feature-grid">
-              <div className="home-feature">
-                <div className="home-feature-icon">
-                  <Link size={22} />
-                </div>
-                <h2>Paste a form URL</h2>
-                <p>
-                  Load a hosted questionnaire and extract its questions for
-                  review.
-                </p>
-                <div className="home-url-row">
-                  <input
-                    value={formUrl}
-                    onChange={(event) => setFormUrl(event.target.value)}
-                    placeholder="https://buyer.example/form"
-                  />
-                  <button
-                    className="primary-button"
-                    onClick={async () => {
-                      const id = await loadFormUrl();
-                      if (id) openImport(id);
-                    }}
-                    disabled={!formUrl.trim()}
-                  >
-                    Load URL <ArrowUpRight size={15} />
-                  </button>
-                </div>
-              </div>
-              <div className="home-feature">
-                <div className="home-feature-icon upload-icon">
-                  <Upload size={22} />
-                </div>
-                <h2>Upload form data</h2>
-                <p>
-                  Import an HTML, JSON, or CSV questionnaire from your computer.
-                </p>
-                <label className="home-upload-button">
-                  <Upload size={16} /> Choose a form file
-                  <input
-                    type="file"
-                    accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
-                    onChange={async (event) => {
-                      const id = await loadFormFile(event);
-                      if (id) openImport(id);
-                    }}
-                  />
-                </label>
-                <small>Questions are extracted locally in your browser.</small>
-              </div>
-            </div>
-          </section>
+          <HomeWelcomeView
+            formUrl={formUrl}
+            setFormUrl={setFormUrl}
+            loadFormUrl={loadFormUrl}
+            loadFormFile={loadFormFile}
+            openImport={openImport}
+          />
         ) : (
-          <>
-            <div className="page-heading">
-              <div>
-                <p className="breadcrumb">
-                  <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}>Responses</span> <span>/</span> <span style={{ cursor: "pointer" }} onClick={() => openImport(responseId || "demo")}>Review questionnaire</span>
-                </p>
-                <h1>Response workspace</h1>
-                <p className="subtitle">
-                  Draft accurate answers from your approved knowledge base.
-                </p>
-              </div>
-            </div>
-
-            <div className="source-actions">
-              <span className="source-badge">
-                {sourceMode === "url"
-                  ? "Hosted form"
-                  : sourceMode === "upload"
-                    ? "Uploaded form"
-                    : "Live page"}{" "}
-                · {sourceLabel}
-              </span>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {!sourceLabel.toLowerCase().endsWith(".csv") && (
-                  <button className="outline-button" onClick={openOriginalForm} title="Launch buyer form with pre-approved answers">
-                    <Link size={15} /> Open original form
-                  </button>
-                )}
-              </div>
-            </div>
-            {detectedQuestions.length === 0 && (
-              <section className="question-panel panel">
-                <div className="panel-label">
-                  <span className="step-number">01</span>
-                  <div>
-                    <p className="eyebrow">Question to answer</p>
-                    <span className="label-hint">
-                      Ask a question or paste one from your RFP
-                    </span>
-                  </div>
-                </div>
-                <textarea
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  rows={3}
-                />
-                <div className="question-footer">
-                  <div className="question-meta">
-                    <span className="status-dot" /> Knowledge base connected{" "}
-                    <span className="divider" /> Tenant:{" "}
-                    <select
-                      value={tenantId}
-                      onChange={(event) => setTenantId(event.target.value)}
-                    >
-                      <option value="acme-corp">acme-corp</option>
-                      <option value="demo-tenant">demo-tenant</option>
-                    </select>
-                  </div>
-                  <button
-                    className="primary-button"
-                    onClick={generateAnswer}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
-                    {isGenerating ? "Drafting..." : "Draft with Proposal Drafter"} <ArrowUpRight size={15} />
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {/* Governance & Reviewer Role Bar */}
-            <div className="governance-bar panel">
-              <div className="governance-role-select">
-                <span className="eyebrow">Acting Role:</span>
-                <div className="role-pills">
-                  <button
-                    className={`role-pill ${role === "Proposal manager" ? "active" : ""}`}
-                    onClick={() => {
-                      setRole("Proposal manager");
-                      showToast("Active Role: Proposal Drafter");
-                    }}
-                  >
-                    🧑‍💻 Proposal Drafter
-                  </button>
-                  <button
-                    className={`role-pill ${role === "Security SME" ? "active" : ""}`}
-                    onClick={() => {
-                      setRole("Security SME");
-                      showToast("Active Role: Security SME");
-                    }}
-                  >
-                    🛡️ Security SME
-                  </button>
-                  <button
-                    className={`role-pill ${role === "Legal reviewer" ? "active" : ""}`}
-                    onClick={() => {
-                      setRole("Legal reviewer");
-                      showToast("Active Role: Legal Reviewer");
-                    }}
-                  >
-                    ⚖️ Legal Reviewer
-                  </button>
-                  <button
-                    className={`role-pill ${role === "Final approver" ? "active" : ""}`}
-                    onClick={() => {
-                      setRole("Final approver");
-                      showToast("Active Role: Final Approver");
-                    }}
-                  >
-                    👑 Final Approver
-                  </button>
-                </div>
-              </div>
-              <div className="governance-stats">
-                <span className="stat-badge approved">
-                  <Check size={12} /> {approvedCount} / {allCurrentQuestions.length} Approved
-                </span>
-                {inReviewCount > 0 && (
-                  <span className="stat-badge review">
-                    <Clock size={12} /> {inReviewCount} In Review
-                  </span>
-                )}
-                {changesRequestedCount > 0 && (
-                  <span className="stat-badge changes">
-                    <MessageSquare size={12} /> {changesRequestedCount} Changes Requested
-                  </span>
-                )}
-                {isBatchApproved ? (
-                  <>
-                    <button
-                      className="outline-button"
-                      disabled
-                      style={{ padding: "5px 10px", fontSize: "11px", opacity: 0.6 }}
-                    >
-                      <Check size={12} /> Approved as Drafter
-                    </button>
-                    <button
-                      className="primary-button"
-                      style={{ padding: "5px 12px", fontSize: "11px" }}
-                      onClick={handleReviewReset}
-                      title="Reset response to In Review status"
-                    >
-                      <RefreshCw size={12} /> Review
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="outline-button"
-                    style={{ padding: "5px 10px", fontSize: "11px" }}
-                    onClick={handleBatchApproveAll}
-                    title={`Batch approve all questions as ${role}`}
-                  >
-                    <Check size={12} /> Approve All as {role === "Proposal manager" ? "Drafter" : role}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* All-Approved Governance Celebration Banner */}
-            {isAllApproved && (
-              <div className="celebration-banner">
-                <div>
-                  <strong>
-                    <CheckCircle size={18} /> Governance Complete: All {allCurrentQuestions.length} Responses Approved!
-                  </strong>
-                  <p>
-                    {sourceLabel.toLowerCase().endsWith(".csv")
-                      ? "All answers have passed approval. Ready to export completed questionnaire as CSV."
-                      : "All answers have passed SME & Legal reviews. Ready for 1-click buyer form injection."}
-                  </p>
-                </div>
-                {sourceLabel.toLowerCase().endsWith(".csv") ? (
-                  <button
-                    className="primary-button"
-                    onClick={exportAnswers}
-                    style={{ padding: "8px 16px" }}
-                  >
-                    <Download size={14} /> 📥 Export CSV with Generated Answers
-                  </button>
-                ) : (
-                  <button
-                    className="primary-button"
-                    onClick={openOriginalForm}
-                    style={{ padding: "8px 16px" }}
-                  >
-                    <Sparkles size={14} /> ⚡ Inject Answers into Buyer Form
-                  </button>
-                )}
-              </div>
-            )}
-
-            {detectedQuestions.length > 0 && (
-              <div
-                className="question-header-bar panel"
-                style={{
-                  padding: "14px 20px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "16px",
-                }}
-              >
-                <div>
-                  <span className="eyebrow">Questionnaire Response Workspace</span>
-                  <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--ink)" }}>
-                    {detectedQuestions.length} Questions in Questionnaire
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  <div className="question-meta">
-                    <span className="status-dot" /> Tenant:{" "}
-                    <select
-                      value={tenantId}
-                      onChange={(event) => setTenantId(event.target.value)}
-                    >
-                      <option value="acme-corp">acme-corp</option>
-                      <option value="demo-tenant">demo-tenant</option>
-                    </select>
-                  </div>
-                  <button
-                    className="primary-button"
-                    onClick={generateAllAnswers}
-                    disabled={isGenerating || isBatchApproved}
-                  >
-                    {isGenerating ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
-                    {isGenerating ? "Generating All..." : "⚡ Generate All Answers"} <ArrowUpRight size={15} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="workspace-grid">
-              <section className={`answer-column ${detectedQuestions.length ? "has-question-list" : ""}`}>
-                {detectedQuestions.length > 0 && (
-                  <div className="question-review-list">
-                    {detectedQuestions.map((item, index) => (
-                      <article className="question-review-card panel" key={`${item}-${index}`}>
-                        <div className="question-review-header">
-                          <span className="source-rank">Q{String(index + 1).padStart(2, "0")}</span>
-                          <span className={`review-status ${getStatusBadgeClass(reviewStatusByQuestion[item])}`}>
-                            {reviewStatusByQuestion[item] ||
-                              (answersByQuestion[item] ? "DRAFT READY" : "NOT GENERATED")}
-                          </span>
-                        </div>
-                        <h2>{item}</h2>
-
-                        {reviewCommentsByQuestion[item] && (
-                          <div className="review-note-callout">
-                            <MessageSquare size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
-                            <div>{reviewCommentsByQuestion[item]}</div>
-                          </div>
-                        )}
-
-                        <textarea
-                          className="question-review-answer"
-                          value={answersByQuestion[item] || ""}
-                          placeholder="Click 'Generate All Answers' to populate this response with AI..."
-                          onChange={(event) => {
-                            const nextAnswers = { ...answersByQuestion, [item]: event.target.value };
-                            setAnswersByQuestion(nextAnswers);
-                            saveAnswers(nextAnswers);
-                          }}
-                        />
-                        <div className="question-review-actions">
-                          <button
-                            className="reject-button"
-                            onClick={() => handleRequestChanges(item)}
-                            title="Leave feedback / request edits"
-                          >
-                            <ThumbsDown size={14} /> Request changes
-                          </button>
-                          <button
-                            className="outline-button"
-                            onClick={() => openSendForReviewModal("current", item)}
-                            title="Route to Security SME, Legal, or Final Approver"
-                          >
-                            <Send size={14} /> Send for review
-                          </button>
-                          <button
-                            className="approve-button"
-                            onClick={() => handleApproveQuestion(item)}
-                            disabled={isBatchApproved || Boolean(reviewStatusByQuestion[item]?.toLowerCase().includes("approve"))}
-                            title={`Approve answer as ${role}`}
-                          >
-                            <Check size={14} /> Approve as {role === "Proposal manager" ? "Drafter" : role}
-                          </button>
-                          {(isBatchApproved || reviewStatusByQuestion[item]?.toLowerCase().includes("approve")) && (
-                            <button
-                              className="outline-button"
-                              onClick={() => handleIndividualReview(item)}
-                              title="Return question to review state"
-                              style={{ padding: "4px 10px", fontSize: "12px" }}
-                            >
-                              <RefreshCw size={12} /> Review
-                            </button>
-                          )}
-                          {reviewStatusByQuestion[item]?.toLowerCase().includes("approve") && (
-                            promotedQuestions[item] ? (
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  fontSize: "11px",
-                                  fontWeight: 700,
-                                  color: "#b45309",
-                                  background: "#fef3c7",
-                                  padding: "4px 10px",
-                                  borderRadius: "9999px",
-                                  border: "1px solid #fcd34d",
-                                }}
-                              >
-                                <Sparkles size={12} /> ⭐ Promoted to KB
-                              </span>
-                            ) : (
-                              <button
-                                className="primary-button"
-                                style={{
-                                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderColor: "#b45309",
-                                  fontSize: "12px",
-                                  padding: "6px 12px",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "5px",
-                                  color: "#ffffff",
-                                  fontWeight: 700,
-                                }}
-                                onClick={() => handlePromoteToKnowledgeBase(item, index)}
-                                title="Promote verified answer to canonical Knowledge Base as Golden Q&A"
-                              >
-                                <Sparkles size={13} /> ⭐ Promote to KB
-                              </button>
-                            )
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">02 / Draft response</p>
-                    <h2>Drafted by Proposal Drafter</h2>
-                  </div>
-                  <span className="live-badge">
-                    <span /> {notice.includes("live") ? "Live" : "Preview"}
-                  </span>
-                </div>
-                <div className="answer-panel panel">
-                  <div className="answer-toolbar">
-                    <span className="source-label" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600, color: "var(--blue)" }}>
-                      <Sparkles size={14} /> ✍️ Proposal Drafter
-                    </span>
-                    <button className="ghost-button" onClick={generateAnswer}>
-                      <RefreshCw size={14} /> Re-draft
-                    </button>
-                  </div>
-                  <textarea
-                    className="answer-editor"
-                    value={answer}
-                    onChange={(event) => setAnswer(event.target.value)}
-                  />
-                  <div className="answer-footer">
-                    <span>{answer.length} characters</span>
-                    <div className="answer-actions">
-                      <button
-                        className="reject-button"
-                        onClick={() => handleRequestChanges(question)}
-                      >
-                        <ThumbsDown size={15} /> Request changes
-                      </button>
-                      <button
-                        className="approve-button"
-                        onClick={() => handleApproveQuestion(question)}
-                      >
-                        <Check size={15} /> Approve answer
-                      </button>
-                      {reviewStatusByQuestion[question]?.toLowerCase().includes("approve") && (
-                        promotedQuestions[question] ? (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#b45309",
-                              background: "#fef3c7",
-                              padding: "5px 12px",
-                              borderRadius: "9999px",
-                              border: "1px solid #fcd34d",
-                            }}
-                          >
-                            <Sparkles size={13} /> ⭐ Promoted to KB
-                          </span>
-                        ) : (
-                          <button
-                            className="primary-button"
-                            style={{
-                              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                              borderColor: "#b45309",
-                              fontSize: "12px",
-                              padding: "6px 12px",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "5px",
-                              color: "#ffffff",
-                              fontWeight: 700,
-                            }}
-                            onClick={() => handlePromoteToKnowledgeBase(question, 0)}
-                            title="Promote verified answer to canonical Knowledge Base as Golden Q&A"
-                          >
-                            <Sparkles size={14} /> ⭐ Promote to KB
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="review-note">
-                  <span className="note-icon">
-                    <BookOpen size={15} />
-                  </span>
-                  <p>
-                    <strong>Review before approving.</strong> This draft was generated by your <strong>AI Proposal Drafter</strong> and
-                    grounded in {response.sources.length} retrieved sources. Check that the language matches your current policy.
-                  </p>
-                </div>
-              </section>
-
-              <aside className="sources-column">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">03 / Evidence</p>
-                    <h2>Retrieved sources</h2>
-                  </div>
-                  <span className="source-count">
-                    {response.sources.length} sources
-                  </span>
-                </div>
-                <div className="source-list">
-                  {response.sources.map((source, index) => (
-                    <button
-                      key={source.id}
-                      className={`source-card ${activeSource === source.id ? "source-active" : ""}`}
-                      onClick={() => setActiveSource(source.id)}
-                    >
-                      <div className="source-card-top">
-                        <span className="source-rank">0{index + 1}</span>
-                        <span className="match-score">
-                          {formatScore(Math.min(source.score * 30, 0.99))} match
-                        </span>
-                      </div>
-                      <strong>{source.question}</strong>
-                      <p>{source.answer}</p>
-                      <div className="source-id">
-                        <span>{source.id}</span>
-                        <ArrowUpRight size={14} />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </aside>
-            </div>
-
-            <div className="bottom-strip">
-              <div className="confidence">
-                <div className="confidence-ring">
-                  <span>{Math.round(response.confidence_score * 100)}</span>
-                </div>
-                <div>
-                  <p className="eyebrow">Confidence score</p>
-                  <strong>Strong source alignment</strong>
-                  <small>Based on semantic and keyword retrieval</small>
-                </div>
-              </div>
-              <div className="shortcut-hint">
-                <span className="key">⌘</span>
-                <span className="key">↵</span> Generate answer
-              </div>
-              <button
-                className="send-button"
-                title="Send drafts for Governance Review"
-                onClick={() => openSendForReviewModal("all")}
-              >
-                <Send size={16} /> Send for review
-              </button>
-            </div>
-          </>
+          <QuestionnaireWorkspace
+            onNavigateHome={() => navigate("/")}
+            onOpenImport={openImport}
+            responseId={responseId}
+            sourceMode={sourceMode}
+            sourceLabel={sourceLabel}
+            openOriginalForm={openOriginalForm}
+            detectedQuestions={detectedQuestions}
+            question={question}
+            setQuestion={setQuestion}
+            tenantId={tenantId}
+            setTenantId={setTenantId}
+            generateAnswer={generateAnswer}
+            generateAllAnswers={generateAllAnswers}
+            isGenerating={isGenerating}
+            role={role}
+            setRole={setRole}
+            showToast={showToast}
+            approvedCount={approvedCount}
+            inReviewCount={inReviewCount}
+            changesRequestedCount={changesRequestedCount}
+            isBatchApproved={isBatchApproved}
+            handleBatchApproveAll={handleBatchApproveAll}
+            handleReviewReset={handleReviewReset}
+            isAllApproved={isAllApproved}
+            exportAnswers={exportAnswers}
+            reviewStatusByQuestion={reviewStatusByQuestion}
+            reviewCommentsByQuestion={reviewCommentsByQuestion}
+            answersByQuestion={answersByQuestion}
+            setAnswersByQuestion={setAnswersByQuestion}
+            saveAnswers={saveAnswers}
+            handleRequestChanges={handleRequestChanges}
+            openSendForReviewModal={openSendForReviewModal}
+            handleApproveQuestion={handleApproveQuestion}
+            handleIndividualReview={handleIndividualReview}
+            promotedQuestions={promotedQuestions}
+            handlePromoteToKnowledgeBase={handlePromoteToKnowledgeBase}
+            notice={notice}
+            answer={answer}
+            setAnswer={setAnswer}
+            response={response}
+            activeSource={activeSource}
+            setActiveSource={setActiveSource}
+          />
         )}
       </main>
 
-      {/* Send for Review Governance Modal */}
-      {showReviewModal && (
-        <div className="kb-modal-backdrop" onClick={() => setShowReviewModal(false)}>
-          <div className="kb-modal-container review-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="kb-modal-header">
-              <h2 style={{ fontSize: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                <Send size={18} color="var(--blue)" /> Send Answers for Governance Review
-              </h2>
-              <button className="icon-button" onClick={() => setShowReviewModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="kb-modal-body" style={{ padding: "20px 24px" }}>
-              <p style={{ margin: "0 0 14px", fontSize: "12px", color: "var(--muted)" }}>
-                Route RFP drafts to the appropriate Subject Matter Expert (SME), Legal counsel, or Final Approver.
-              </p>
-              <form
-                className="review-modal-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitSendForReview();
-                }}
-              >
-                <label>
-                  Target Reviewer Role:
-                  <select
-                    value={reviewTargetRole}
-                    onChange={(e) => setReviewTargetRole(e.target.value as any)}
-                  >
-                    <option value="Security SME">🛡️ Security SME (Technical Architecture, Encryption, SLAs)</option>
-                    <option value="Legal reviewer">⚖️ Legal Reviewer (Compliance, Terms, GDPR, Liability)</option>
-                    <option value="Final approver">👑 Final Executive Approver (Sign-off & Lock)</option>
-                  </select>
-                </label>
+      {/* Modals */}
+      <ReviewGovernanceModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        reviewTargetRole={reviewTargetRole}
+        setReviewTargetRole={setReviewTargetRole}
+        reviewSelectedQuestion={reviewSelectedQuestion}
+        reviewModalScope={reviewModalScope}
+        setReviewModalScope={setReviewModalScope}
+        reviewInstructions={reviewInstructions}
+        setReviewInstructions={setReviewInstructions}
+        onSubmit={submitSendForReview}
+        allQuestionsCount={allCurrentQuestions.length}
+        currentQuestionText={question}
+      />
 
-                <label>
-                  Review Scope:
-                  <select
-                    value={reviewSelectedQuestion ? "current" : reviewModalScope}
-                    onChange={(e) => setReviewModalScope(e.target.value as "all" | "current")}
-                    disabled={!!reviewSelectedQuestion}
-                  >
-                    <option value="all">
-                      Entire Questionnaire ({allCurrentQuestions.length} Questions)
-                    </option>
-                    <option value="current">
-                      {reviewSelectedQuestion
-                        ? `Selected: "${reviewSelectedQuestion.slice(0, 40)}..."`
-                        : `Current: "${question.slice(0, 40)}..."`}
-                    </option>
-                  </select>
-                </label>
+      <KnowledgeBaseModal
+        isOpen={showKBModal}
+        onClose={closeKBModal}
+        tab={kbModalTab}
+        setTab={(tab) => {
+          setKbModalTab(tab);
+          navigate(tab === "upload" ? "/knowledge-base" : "/playground");
+        }}
+        isDragOver={isDragOver}
+        setIsDragOver={setIsDragOver}
+        isUploadingKB={isUploadingKB}
+        handleKBUpload={handleKBUpload}
+        kbUploadMsg={kbUploadMsg}
+        isFetchingKB={isFetchingKB}
+        kbEntries={kbEntries}
+        fetchKBEntries={fetchKBEntries}
+        handleDeleteKBEntry={handleDeleteKBEntry}
+        playgroundTopK={playgroundTopK}
+        setPlaygroundTopK={setPlaygroundTopK}
+        playgroundQuery={playgroundQuery}
+        setPlaygroundQuery={setPlaygroundQuery}
+        playgroundLoading={playgroundLoading}
+        handlePlaygroundSearch={handlePlaygroundSearch}
+        playgroundError={playgroundError}
+        playgroundResult={playgroundResult}
+      />
 
-                <label>
-                  Review Instructions & Notes (Optional):
-                  <textarea
-                    placeholder="e.g. Please verify that our 35-day backup rotation window matches our current SOC 2 Type II audit report."
-                    value={reviewInstructions}
-                    onChange={(e) => setReviewInstructions(e.target.value)}
-                    rows={3}
-                  />
-                </label>
+      <ActivityLogModal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        activityLogs={activityLogs}
+      />
 
-                <div className="review-modal-actions">
-                  <button
-                    type="button"
-                    className="outline-button"
-                    onClick={() => setShowReviewModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="primary-button">
-                    <Send size={14} /> Dispatch to {reviewTargetRole}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Knowledge Base Modal */}
-      {showKBModal && (
-        <div className="kb-modal-backdrop" onClick={closeKBModal}>
-          <div className="kb-modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="kb-modal-header">
-              <div className="kb-modal-tabs">
-                <button
-                  className={`kb-tab-btn ${kbModalTab === "upload" ? "active" : ""}`}
-                  onClick={() => {
-                    setKbModalTab("upload");
-                    navigate("/knowledge-base");
-                  }}
-                >
-                  <FolderOpen size={16} /> Documents & Ingestion
-                </button>
-                <button
-                  className={`kb-tab-btn ${kbModalTab === "playground" ? "active" : ""}`}
-                  onClick={() => {
-                    setKbModalTab("playground");
-                    navigate("/playground");
-                  }}
-                >
-                  <Zap size={16} /> Retrieval Playground
-                </button>
-              </div>
-              <button
-                className="icon-button"
-                onClick={closeKBModal}
-                aria-label="Close Knowledge Base modal"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="kb-modal-body">
-              {kbModalTab === "upload" ? (
-                <>
-                  {/* Upload Card */}
-                  <div
-                    className={`kb-upload-card ${isDragOver ? "drag-over" : ""}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragOver(true);
-                    }}
-                    onDragLeave={() => setIsDragOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsDragOver(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) handleKBUpload(file);
-                    }}
-                  >
-                    <div className="kb-upload-icon">
-                      <Upload size={24} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: "14px" }}>
-                        Upload Knowledge Base Files
-                      </strong>
-                      <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                        Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code>
-                      </p>
-                    </div>
-
-                    <div className="kb-upload-action">
-                      <label className="kb-upload-btn">
-                        {isUploadingKB ? (
-                          <>
-                            <RefreshCw size={14} className="spin" /> Ingesting & Categorizing...
-                          </>
-                        ) : (
-                          <>
-                            <Upload size={14} /> Browse & Ingest Document
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          accept=".csv,.tsv,.json,.jsonl,.pdf,.docx,.txt,.md"
-                          disabled={isUploadingKB}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleKBUpload(file);
-                          }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Sample Files Download Bar for Live Demo */}
-                  <div className="kb-samples-card">
-                    <div className="kb-samples-header">
-                      <span className="eyebrow" style={{ color: "var(--blue)" }}>Demo Sample Knowledge Documents</span>
-                      <small style={{ color: "var(--muted)", fontSize: "11px" }}>Single-click to download sample files for live upload demonstration</small>
-                    </div>
-                    <div className="kb-samples-grid">
-                      {sampleDemoFiles.map((sample) => (
-                        <a
-                          key={sample.file}
-                          href={`/sample_docs/${sample.file}`}
-                          download={sample.file}
-                          className="kb-sample-pill"
-                          title={`Download ${sample.file}`}
-                        >
-                          <Download size={13} />
-                          <span className="kb-sample-name">{sample.name}</span>
-                          <span className="kb-sample-badge">{sample.format}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Status Alert */}
-                  {kbUploadMsg && (
-                    <div
-                      className={`kb-alert ${
-                        kbUploadMsg.isError ? "kb-alert-error" : "kb-alert-success"
-                      }`}
-                    >
-                      {kbUploadMsg.isError ? (
-                        <AlertCircle size={16} />
-                      ) : (
-                        <CheckCircle2 size={16} />
-                      )}
-                      <span>{kbUploadMsg.text}</span>
-                    </div>
-                  )}
-
-                  {/* Records Section */}
-                  <div className="kb-records-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
-                      <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                        {isFetchingKB
-                          ? "Fetching indexed passages from storage..."
-                          : `${kbEntries.length} record${kbEntries.length === 1 ? "" : "s"} stored in knowledge base`}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        fontSize: "12px",
-                        padding: "6px 12px",
-                        cursor: "pointer",
-                        borderRadius: "6px",
-                        height: "auto",
-                      }}
-                      onClick={() => fetchKBEntries()}
-                      disabled={isFetchingKB}
-                      title="Refresh indexed records"
-                    >
-                      <RefreshCw size={13} className={isFetchingKB ? "spin" : ""} />
-                      {isFetchingKB ? "Refreshing..." : "Refresh"}
-                    </button>
-                  </div>
-
-                  <div className="kb-records-grid">
-                    {kbEntries.map((entry) => {
-                      const entryTitle = entry.title || entry.question || "Untitled Passage";
-                      const entryBody = entry.content || entry.answer || "";
-                      const sourceFile = entry.metadata?.source_file;
-                      const pageNum = entry.metadata?.page_number;
-
-                      return (
-                        <div key={entry.id} className="kb-record-card">
-                          <div className="kb-record-top">
-                            <div className="kb-record-title">{entryTitle}</div>
-                            <button
-                              className="kb-delete-btn"
-                              title="Delete knowledge entry"
-                              onClick={() => handleDeleteKBEntry(entry.id)}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          <div className="kb-record-answer">{entryBody}</div>
-                          <div className="kb-record-tags">
-                            {entry.category && (
-                              <span className="kb-tag">
-                                <Tag size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
-                                {entry.category}
-                              </span>
-                            )}
-                            {sourceFile && (
-                              <span className="kb-tag kb-tag-file">
-                                <FileText size={10} style={{ marginRight: 3, verticalAlign: "middle" }} />
-                                {sourceFile}
-                                {pageNum ? ` (p.${pageNum})` : ""}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {kbEntries.length === 0 && !isFetchingKB && (
-                      <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
-                        No knowledge records found. Upload a file above or click a sample document to get started.
-                      </div>
-                    )}
-
-                    {isFetchingKB && kbEntries.length === 0 && (
-                      <div style={{ textAlign: "center", padding: "30px", color: "var(--muted)", fontSize: "12px" }}>
-                        <RefreshCw size={16} className="spin" style={{ display: "inline-block", marginRight: "8px", verticalAlign: "middle" }} />
-                        Loading indexed knowledge records from cloud storage...
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                /* Playground Tab */
-                <div className="kb-playground-container">
-                  <div className="kb-playground-input-card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <strong style={{ fontSize: "14px" }}>Knowledge Retrieval & AI Answering Playground</strong>
-                        <p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                          Test questions against your knowledge base with real-time AI answer generation and source retrieval
-                        </p>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--muted)" }}>
-                        <span>Depth:</span>
-                        <select
-                          value={playgroundTopK}
-                          onChange={(e) => setPlaygroundTopK(Number(e.target.value))}
-                          style={{ padding: "4px 8px", border: "1px solid var(--line)", background: "#fff", fontSize: "12px" }}
-                        >
-                          <option value={3}>Top 3</option>
-                          <option value={5}>Top 5</option>
-                          <option value={8}>Top 8</option>
-                          <option value={10}>Top 10</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <form
-                      className="kb-playground-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handlePlaygroundSearch();
-                      }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Type any question to test retrieval (e.g. Describe your encryption and key rotation policy)..."
-                        value={playgroundQuery}
-                        onChange={(e) => setPlaygroundQuery(e.target.value)}
-                      />
-                      <button
-                        type="submit"
-                        className="kb-playground-run-btn"
-                        disabled={playgroundLoading || !playgroundQuery.trim()}
-                      >
-                        {playgroundLoading ? (
-                          <>
-                            <RefreshCw size={14} className="spin" /> Searching...
-                          </>
-                        ) : (
-                          <>
-                            <Play size={14} /> Run Search
-                          </>
-                        )}
-                      </button>
-                    </form>
-
-                    <div className="kb-playground-starters">
-                      <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>Try sample questions:</span>
-                      {playgroundStarterQueries.map((q) => (
-                        <button
-                          key={q}
-                          type="button"
-                          className="kb-starter-chip"
-                          onClick={() => {
-                            setPlaygroundQuery(q);
-                            handlePlaygroundSearch(q);
-                          }}
-                        >
-                          {q}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {playgroundError && (
-                    <div className="kb-alert kb-alert-error">
-                      <AlertCircle size={16} />
-                      <span>{playgroundError}</span>
-                    </div>
-                  )}
-
-                  {playgroundResult && (
-                    <div className="kb-playground-output">
-                      <div className="kb-answer-card">
-                        <div className="kb-answer-header">
-                          <strong style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <Sparkles size={15} color="var(--blue)" /> Grounded AI Formulation
-                          </strong>
-                          <span
-                            className={`kb-confidence-badge ${
-                              playgroundResult.confidence_score >= 0.85 ? "confidence-high" : "confidence-med"
-                            }`}
-                          >
-                            {Math.round(playgroundResult.confidence_score * 100)}% Confidence
-                          </span>
-                        </div>
-                        <div className="kb-answer-text">
-                          {playgroundResult.suggested_answer}
-                        </div>
-                      </div>
-
-                      <div className="kb-sources-card">
-                        <strong style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <Database size={15} color="var(--navy)" /> Retrieved Source Chunks ({playgroundResult.sources.length})
-                        </strong>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                          {playgroundResult.sources.map((src, idx) => (
-                            <div key={src.id || idx} className="kb-source-item">
-                              <div className="kb-source-top">
-                                <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--ink)" }}>
-                                  #{idx + 1} {src.question || src.id}
-                                </span>
-                                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                                  <span className="kb-source-method">
-                                    Source #{idx + 1}
-                                  </span>
-                                  <span className="kb-source-score">
-                                    Match Score: {(src.score || 0).toFixed(4)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="kb-source-passage">{src.answer}</div>
-                            </div>
-                          ))}
-                          {playgroundResult.sources.length === 0 && (
-                            <div style={{ fontSize: "12px", color: "var(--muted)", padding: "10px 0" }}>
-                              No matching sources found in knowledge base for this query.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!playgroundResult && !playgroundLoading && (
-                    <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", background: "#fff", border: "1px solid var(--line)" }}>
-                      <Zap size={28} color="var(--blue)" style={{ marginBottom: "8px" }} />
-                      <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>Test Knowledge Base Answering</div>
-                      <p style={{ margin: "4px auto 0", maxWidth: "450px", fontSize: "12px" }}>
-                        Click any starter question above or type a custom inquiry to test answer retrieval and citations.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Activity Log Modal */}
-      {showActivityModal && (
-        <div className="kb-modal-backdrop" onClick={() => setShowActivityModal(false)}>
-          <div className="kb-modal-container" style={{ maxWidth: "720px" }} onClick={(e) => e.stopPropagation()}>
-            <div className="kb-modal-header" style={{ justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <History size={20} color="var(--blue)" />
-                <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "var(--ink)" }}>Workspace Activity & Audit Log</h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setShowActivityModal(false)}
-                aria-label="Close Activity modal"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="kb-modal-body" style={{ padding: "20px 24px" }}>
-              <div className="activity-stats-bar" style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
-                <div style={{ flex: 1, background: "#f8fafc", padding: "12px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                  <span className="eyebrow" style={{ color: "var(--muted)" }}>Total Events</span>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--ink)" }}>{activityLogs.length}</div>
-                </div>
-                <div style={{ flex: 1, background: "#f0fdf4", padding: "12px 14px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
-                  <span className="eyebrow" style={{ color: "#166534" }}>Approvals</span>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: "#15803d" }}>
-                    {activityLogs.filter((a) => a.type === "approval").length}
-                  </div>
-                </div>
-                <div style={{ flex: 1, background: "#fef3c7", padding: "12px 14px", borderRadius: "8px", border: "1px solid #fde68a" }}>
-                  <span className="eyebrow" style={{ color: "#92400e" }}>KB Promotions</span>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: "#b45309" }}>
-                    {activityLogs.filter((a) => a.type === "kb").length}
-                  </div>
-                </div>
-              </div>
-
-              <div className="activity-feed-list" style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "420px", overflowY: "auto" }}>
-                {activityLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    style={{
-                      display: "flex",
-                      gap: "14px",
-                      padding: "14px",
-                      borderRadius: "8px",
-                      background: "#ffffff",
-                      border: "1px solid #e2e8f0",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "8px",
-                        borderRadius: "6px",
-                        background:
-                          log.type === "approval"
-                            ? "#ecfdf5"
-                            : log.type === "kb"
-                              ? "#fffbeb"
-                              : log.type === "generation"
-                                ? "#eff6ff"
-                                : "#f1f5f9",
-                        color:
-                          log.type === "approval"
-                            ? "#059669"
-                            : log.type === "kb"
-                              ? "#d97706"
-                              : log.type === "generation"
-                                ? "#2563eb"
-                                : "#64748b",
-                      }}
-                    >
-                      {log.type === "approval" && <CheckCircle2 size={18} />}
-                      {log.type === "kb" && <Sparkles size={18} />}
-                      {log.type === "generation" && <Zap size={18} />}
-                      {log.type === "import" && <FolderOpen size={18} />}
-                      {log.type === "review" && <Clock size={18} />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <strong style={{ fontSize: "14px", color: "var(--ink)" }}>{log.action}</strong>
-                        <small style={{ color: "var(--muted)", fontSize: "11px" }}>{log.timestamp}</small>
-                      </div>
-                      <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>{log.details}</p>
-                      <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--muted)" }}>
-                        Actor: <strong>{log.user}</strong>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Workspace Settings Modal */}
-      {showSettingsModal && (
-        <div className="kb-modal-backdrop" onClick={() => setShowSettingsModal(false)}>
-          <div className="settings-modal-container" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="settings-modal-header">
-              <div className="settings-header-title">
-                <Settings size={20} color="var(--navy)" />
-                <h2 style={{ margin: 0 }}>Workspace Settings</h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setShowSettingsModal(false)}
-                aria-label="Close settings modal"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Navigation Tabs */}
-            <div className="settings-tabs-nav">
-              <button
-                className={`settings-tab-item ${settingsTab === "profile" ? "active" : ""}`}
-                onClick={() => setSettingsTab("profile")}
-              >
-                <Building2 size={14} /> Profile & Identity
-              </button>
-              <button
-                className={`settings-tab-item ${settingsTab === "ai" ? "active" : ""}`}
-                onClick={() => setSettingsTab("ai")}
-              >
-                <Cpu size={14} /> AI & Model Tuning
-              </button>
-              <button
-                className={`settings-tab-item ${settingsTab === "governance" ? "active" : ""}`}
-                onClick={() => setSettingsTab("governance")}
-              >
-                <ShieldCheck size={14} /> SME Governance
-              </button>
-              <button
-                className={`settings-tab-item ${settingsTab === "data" ? "active" : ""}`}
-                onClick={() => setSettingsTab("data")}
-              >
-                <Database size={14} /> Data & Export
-              </button>
-            </div>
-
-            {/* Content Area */}
-            <div className="settings-modal-content">
-              {/* TAB 1: Profile & Identity */}
-              {settingsTab === "profile" && (
-                <>
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <Building2 size={16} color="var(--blue)" /> Organization Identity
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Configure baseline tenant profile information and administrator contact details.
-                      </p>
-                    </div>
-
-                    <div className="settings-grid-2">
-                      <div className="settings-field">
-                        <label>Company Name</label>
-                        <input
-                          type="text"
-                          value={workspaceSettings.company_name}
-                          onChange={(e) =>
-                            setWorkspaceSettings({ ...workspaceSettings, company_name: e.target.value })
-                          }
-                          placeholder="e.g. Acme Corporation"
-                        />
-                      </div>
-                      <div className="settings-field">
-                        <label>Industry / Vertical</label>
-                        <input
-                          type="text"
-                          value={workspaceSettings.industry}
-                          onChange={(e) =>
-                            setWorkspaceSettings({ ...workspaceSettings, industry: e.target.value })
-                          }
-                          placeholder="e.g. Enterprise Cloud & SaaS"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="settings-grid-2">
-                      <div className="settings-field">
-                        <label>Tenant ID (Immutable)</label>
-                        <input
-                          type="text"
-                          value={workspaceSettings.tenant_id}
-                          disabled
-                          style={{ opacity: 0.7, cursor: "not-allowed", background: "#f1f5f9" }}
-                        />
-                        <span className="settings-field-hint">Tenant isolation scope for PostgreSQL and vector collections</span>
-                      </div>
-                      <div className="settings-field">
-                        <label>Admin Notification Email</label>
-                        <input
-                          type="email"
-                          value={workspaceSettings.admin_email}
-                          onChange={(e) =>
-                            setWorkspaceSettings({ ...workspaceSettings, admin_email: e.target.value })
-                          }
-                          placeholder="e.g. admin@company.com"
-                        />
-                        <span className="settings-field-hint">Primary recipient for compliance alerts and export notifications</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <FileText size={16} color="var(--navy)" /> Company Context & Grounding Facts
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Provide background on security certifications (SOC 2 Type II, ISO 27001), infrastructure hosting, data privacy commitments, and standard product terminology. This context grounds every answer formulation.
-                      </p>
-                    </div>
-
-                    <div className="settings-field">
-                      <textarea
-                        rows={4}
-                        value={workspaceSettings.company_context}
-                        onChange={(e) =>
-                          setWorkspaceSettings({ ...workspaceSettings, company_context: e.target.value })
-                        }
-                        placeholder="e.g. Acme Corp provides an enterprise AI platform hosted in AWS us-east-1 and eu-central-1. All customer data is encrypted at rest (AES-256) and in transit (TLS 1.3). We hold SOC 2 Type II, ISO 27001, and HIPAA compliance certifications."
-                      />
-                      <span className="settings-field-hint">
-                        Injected into system instructions for high-fidelity compliance grounding.
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* TAB 2: AI & Model Tuning */}
-              {settingsTab === "ai" && (
-                <>
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <Cpu size={16} color="var(--blue)" /> Model Selection & Generation
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Select the primary LLM engine for response generation and customize response formatting.
-                      </p>
-                    </div>
-
-                    <div className="settings-grid-2">
-                      <div className="settings-field">
-                        <label>Default AI Model</label>
-                        <select
-                          value={workspaceSettings.default_model}
-                          onChange={(e) =>
-                            setWorkspaceSettings({ ...workspaceSettings, default_model: e.target.value })
-                          }
-                        >
-                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Fast & Accurate)</option>
-                          <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning & Analysis)</option>
-                          <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
-                        </select>
-                        <span className="settings-field-hint">
-                          Gemini 2.5 Flash is tuned for sub-second RAG generation with high factual precision.
-                        </span>
-                      </div>
-
-                      <div className="settings-field">
-                        <label>Response Tone</label>
-                        <select
-                          value={workspaceSettings.response_tone}
-                          onChange={(e) =>
-                            setWorkspaceSettings({ ...workspaceSettings, response_tone: e.target.value })
-                          }
-                        >
-                          <option value="concise">Concise & Direct (Audit / RFP Style)</option>
-                          <option value="detailed">Comprehensive & Detailed</option>
-                          <option value="technical">Technical & Architecture-focused</option>
-                          <option value="executive">Executive & Commercial</option>
-                        </select>
-                        <span className="settings-field-hint">
-                          Governs sentence brevity and factual density in generated answers.
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="settings-field" style={{ marginTop: "8px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <label style={{ margin: 0 }}>
-                          Top-K Retrieved Context Chunks: <span style={{ color: "var(--blue)", fontWeight: 700 }}>{workspaceSettings.default_top_k}</span>
-                        </label>
-                        <span style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "'DM Mono', monospace" }}>
-                          Range: 3 – 10 passages
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={3}
-                        max={10}
-                        step={1}
-                        value={workspaceSettings.default_top_k}
-                        onChange={(e) =>
-                          setWorkspaceSettings({
-                            ...workspaceSettings,
-                            default_top_k: parseInt(e.target.value, 10) || 5,
-                          })
-                        }
-                        style={{ padding: 0, marginTop: "6px" }}
-                      />
-                      <span className="settings-field-hint">
-                        Number of high-similarity vector chunks retrieved from ChromaDB/PostgreSQL during synthesis.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <Sliders size={16} color="var(--navy)" /> Default Legal Disclaimer
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Standard legal confidentiality statement appended to exported RFP response packages.
-                      </p>
-                    </div>
-
-                    <div className="settings-field">
-                      <textarea
-                        rows={3}
-                        value={workspaceSettings.disclaimer}
-                        onChange={(e) =>
-                          setWorkspaceSettings({ ...workspaceSettings, disclaimer: e.target.value })
-                        }
-                        placeholder="CONFIDENTIAL: The information provided herein is proprietary..."
-                      />
-                      <span className="settings-field-hint">
-                        Included in exported Word, Excel, and JSON questionnaire deliverables.
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* TAB 3: SME Governance */}
-              {settingsTab === "governance" && (
-                <>
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <ShieldCheck size={16} color="var(--blue)" /> SME Reviewer Routing
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Configure default Subject Matter Expert email routing for section triage and multi-stage compliance approvals.
-                      </p>
-                    </div>
-
-                    <div className="settings-grid-2">
-                      <div className="settings-field">
-                        <label>Security & Infrastructure SME</label>
-                        <input
-                          type="email"
-                          value={workspaceSettings.sme_roles_config?.security_sme_email || ""}
-                          onChange={(e) =>
-                            setWorkspaceSettings({
-                              ...workspaceSettings,
-                              sme_roles_config: {
-                                ...workspaceSettings.sme_roles_config,
-                                security_sme_email: e.target.value,
-                              },
-                            })
-                          }
-                          placeholder="e.g. infosec@company.com"
-                        />
-                        <span className="settings-field-hint">Routes questions tagged #Security or #Infra</span>
-                      </div>
-
-                      <div className="settings-field">
-                        <label>Legal & Compliance SME</label>
-                        <input
-                          type="email"
-                          value={workspaceSettings.sme_roles_config?.legal_reviewer_email || ""}
-                          onChange={(e) =>
-                            setWorkspaceSettings({
-                              ...workspaceSettings,
-                              sme_roles_config: {
-                                ...workspaceSettings.sme_roles_config,
-                                legal_reviewer_email: e.target.value,
-                              },
-                            })
-                          }
-                          placeholder="e.g. legal-review@company.com"
-                        />
-                        <span className="settings-field-hint">Routes questions tagged #Legal or #Compliance</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-field">
-                      <label>Final Authority Approver</label>
-                      <input
-                        type="email"
-                        value={workspaceSettings.sme_roles_config?.final_approver_email || ""}
-                        onChange={(e) =>
-                          setWorkspaceSettings({
-                            ...workspaceSettings,
-                            sme_roles_config: {
-                              ...workspaceSettings.sme_roles_config,
-                              final_approver_email: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder="e.g. vp-compliance@company.com"
-                      />
-                      <span className="settings-field-hint">Authorizes final release lock before export</span>
-                    </div>
-                  </div>
-
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <Sparkles size={16} color="#d97706" /> Continuous Learning & Golden Q&A
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Control how finalized answers flow back into the company knowledge graph.
-                      </p>
-                    </div>
-
-                    <div className="settings-toggle-box">
-                      <div className="settings-toggle-info">
-                        <strong>Auto-promote 100% Approved Responses to Knowledge Base</strong>
-                        <small>
-                          When active, answers given full 5-star or verified human approval automatically index into the tenant's vector collection for future RFPs.
-                        </small>
-                      </div>
-                      <label className="settings-switch">
-                        <input
-                          type="checkbox"
-                          checked={workspaceSettings.auto_promote_golden_qa}
-                          onChange={(e) =>
-                            setWorkspaceSettings({
-                              ...workspaceSettings,
-                              auto_promote_golden_qa: e.target.checked,
-                            })
-                          }
-                        />
-                        <span className="settings-slider-thumb" />
-                      </label>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* TAB 4: Data & Export */}
-              {settingsTab === "data" && (
-                <>
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <Database size={16} color="var(--blue)" /> Workspace Snapshot & Metrics
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Overview of tenant-partitioned storage resources and records in PostgreSQL.
-                      </p>
-                    </div>
-
-                    <div className="activity-stats-bar" style={{ display: "flex", gap: "12px", margin: "4px 0" }}>
-                      <div style={{ flex: 1, background: "#f8fafc", padding: "12px 14px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-                        <span className="eyebrow" style={{ color: "var(--muted)" }}>Tenant ID</span>
-                        <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", fontFamily: "'DM Mono', monospace" }}>
-                          {workspaceSettings.tenant_id}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1, background: "#f0fdf4", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                        <span className="eyebrow" style={{ color: "#166534" }}>Indexed KB Records</span>
-                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>
-                          {kbEntries.length || kbStats.totalRecords || 0}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1, background: "#eff6ff", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bfdbfe" }}>
-                        <span className="eyebrow" style={{ color: "#1e40af" }}>Recent Questionnaires</span>
-                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#1d4ed8" }}>
-                          {recentRFPs.length}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="settings-group-card">
-                    <div>
-                      <div className="settings-group-title">
-                        <Download size={16} color="var(--navy)" /> Tenant Data Portability
-                      </div>
-                      <p className="settings-group-subtitle">
-                        Download a complete JSON archive of this workspace, including configuration, recent questionnaire outputs, and indexed knowledge base pairs.
-                      </p>
-                    </div>
-
-                    <div>
-                      <button
-                        className="secondary-button"
-                        onClick={exportWorkspaceData}
-                        style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-                      >
-                        <Download size={15} /> Download Workspace Archive (.json)
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="settings-group-card danger-zone">
-                    <div>
-                      <div className="settings-group-title" style={{ color: "#b91c1c" }}>
-                        <AlertCircle size={16} color="#b91c1c" /> Reset Workspace Configuration
-                      </div>
-                      <p className="settings-group-subtitle" style={{ color: "#7f1d1d" }}>
-                        Restore default system settings for tone, model, and SME assignments. This does not erase indexed knowledge base entries.
-                      </p>
-                    </div>
-
-                    <div>
-                      <button
-                        className="secondary-button"
-                        style={{ color: "#b91c1c", borderColor: "#fca5a5", background: "#fff" }}
-                        onClick={() =>
-                          setWorkspaceSettings({
-                            ...DEFAULT_WORKSPACE_SETTINGS,
-                            tenant_id: tenantId,
-                          })
-                        }
-                      >
-                        Reset to Defaults
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="settings-modal-footer">
-              <div className="settings-footer-status">
-                {settingsSaveNotice ? (
-                  <span
-                    style={{
-                      color:
-                        settingsSaveNotice.includes("Error") || settingsSaveNotice.includes("Failed")
-                          ? "#b91c1c"
-                          : "#15803d",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {settingsSaveNotice}
-                  </span>
-                ) : (
-                  <span>Tenant: {tenantId} • PostgreSQL Connected</span>
-                )}
-              </div>
-              <div className="settings-footer-actions">
-                <button
-                  className="secondary-button"
-                  onClick={() => setShowSettingsModal(false)}
-                >
-                  Close
-                </button>
-                <button
-                  className="primary-button"
-                  onClick={() => saveWorkspaceSettings()}
-                  disabled={isSavingSettings}
-                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-                >
-                  <Save size={14} />
-                  {isSavingSettings ? "Saving..." : "Save Settings"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <WorkspaceSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        settings={workspaceSettings}
+        setSettings={setWorkspaceSettings}
+        onSave={saveWorkspaceSettings}
+        onExport={exportWorkspaceData}
+        isSaving={isSavingSettings}
+        saveNotice={settingsSaveNotice}
+        tenantId={tenantId}
+        kbRecordsCount={kbEntries.length || kbStats.totalRecords}
+        recentRfpsCount={recentRFPs.length}
+        settingsTab={settingsTab}
+        setSettingsTab={setSettingsTab}
+      />
 
       {/* Floating Toast Notification */}
-      {toastNotice && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            background: "#18243b",
-            color: "#ffffff",
-            padding: "14px 20px",
-            borderRadius: "8px",
-            boxShadow: "0 12px 35px rgba(0,0,0,0.35)",
-            fontSize: "13px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            zIndex: 999999,
-            borderLeft: "4px solid var(--lime)",
-            animation: "fadeIn 0.2s ease-out",
-          }}
-        >
-          <CheckCircle2 size={18} style={{ color: "var(--lime)" }} />
-          <span style={{ fontWeight: 500 }}>{toastNotice}</span>
-        </div>
-      )}
+      <ToastNotice message={toastNotice} />
     </div>
   );
 }
