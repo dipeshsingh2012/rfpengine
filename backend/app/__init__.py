@@ -1,1 +1,1 @@
-# Makes backend/app a package
+# Mark as package

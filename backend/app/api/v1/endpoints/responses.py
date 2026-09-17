@@ -1,8 +1,10 @@
-from fastapi import APIRouter
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, Header
 
 router = APIRouter()
 
-@router.get("/status")
-async def get_status() -> Dict[str, Any]:
-    return {"status": "operational"}
+@router.get("/history")  # This is relative to the prefix in the main router
+async def get_responses_history(
+    x_tenant_id: str = Header(alias="X-Tenant-ID")
+):
+    # Implementation logic...
+    return {"history": []}

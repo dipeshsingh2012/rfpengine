@@ -1,25 +1,20 @@
-from typing import Any, Dict, List
+from typing import List, Dict, Any
+from pydantic import BaseModel
+
+class SearchResult(BaseModel):
+    doc_id: str
+    score: float
+    content: str
 
 class SearchService:
-    """Service for performing searches across indexed documents."""
-
     def __init__(self):
-        # Mock index
-        self._mock_index = [
-            {"id": "1", "text": "The quick brown fox"},
-            {"id": "2", "text": "Jumped over the lazy dog"},
-            {"id": "3", "text": "Python programming is fun"},
+        # Mock search implementation
+        pass
+
+    async def search(self, tenant_id: str, query: str, limit: int = 5) -> List[SearchResult]:
+        # In a real scenario, this would query a Vector DB filtered by tenant_id
+        return [
+            SearchResult(doc_id="doc_1", score=0.95, content=f"Mock result for {query}")
         ]
 
-    def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Performs a simple keyword search.
-        """
-        if not query:
-            return []
-
-        results = [
-            doc for doc in self._mock_index 
-            if query.lower() in doc["text"].lower()
-        ]
-        return results[:limit]
+search_service = SearchService()

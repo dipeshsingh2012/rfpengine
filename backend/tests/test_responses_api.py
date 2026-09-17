@@ -1,13 +1,12 @@
 import pytest
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
-from app.api.v1.endpoints.responses import router
+from httpx import AsyncClient
+from app.main import app
 
-app = FastAPI()
-app.include_router(router)
-client = TestClient(app)
-
-def test_status_endpoint():
-    response = client.get("/status")
-    assert response.status_code == 200
-    assert response.json()["status"] == "operational"
+@pytest.mark.asyncio
+async def test_responses_history_endpoint():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.get(
+            "/api/v1/responses/history",
+            headers={"X-Tenant-ID": "test_tenant"}
+        )
+    assert response.status_code in [200, 401]

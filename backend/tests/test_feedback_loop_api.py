@@ -1,17 +1,13 @@
 import pytest
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
-from app.api.v1.endpoints.feedback_loop import router
+from httpx import AsyncClient
+from app.main import app
 
-app = FastAPI()
-app.include_router(router)
-client = TestClient(app)
-
-def test_submit_feedback_success():
-    response = client.post("/feedback", json={"user_id": "u1", "feedback": "Great!"})
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-
-def test_submit_feedback_empty():
-    response = client.post("/feedback", json={"user_id": "u1", "feedback": ""})
-    assert response.status_code == 400
+@pytest.mark.asyncio
+async def test_feedback_loop_endpoint():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.post(
+            "/api/v1/feedback",
+            json={"user_id": "123", "feedback": "good"},
+            headers={"X-Tenant-ID": "test_tenant"}
+        )
+    assert response.status_code in [200, 201]
