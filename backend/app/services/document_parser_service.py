@@ -140,6 +140,7 @@ class DocumentParserService:
                 or norm_row.get("response")
                 or norm_row.get("details")
                 or norm_row.get("a")
+                or title
             )
 
             category = (
@@ -150,7 +151,7 @@ class DocumentParserService:
                 or cls.infer_category(filename, body_content or "", default_category)
             )
 
-            if body_content:
+            if title or body_content:
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,

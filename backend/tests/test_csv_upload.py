@@ -188,3 +188,24 @@ def test_upload_csv_file_api_invalid_extension_error():
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert "unsupported file format" in response.json()["detail"].lower()
+
+
+def test_parse_csv_quoted_commas_and_empty_answers():
+    """Test parsing CSV where questions contain commas inside quotes and answer column is unpopulated."""
+    csv_data = (
+        'Question,Answer,Category\n'
+        '"Do you support SSO, SAML 2.0, and MFA?",,"Security & Cryptography"\n'
+        '"What are your RTO, RPO, and SLA metrics?",,"SLA & Operations"\n'
+    ).encode("utf-8")
+
+    entries = DocumentParserService.parse_document(
+        content=csv_data,
+        filename="blank_questionnaire.csv",
+        tenant_id="acme-corp",
+    )
+
+    assert len(entries) == 2
+    assert entries[0].title == "Do you support SSO, SAML 2.0, and MFA?"
+    assert entries[0].category == "Security & Cryptography"
+    assert entries[1].title == "What are your RTO, RPO, and SLA metrics?"
+    assert entries[1].category == "SLA & Operations"

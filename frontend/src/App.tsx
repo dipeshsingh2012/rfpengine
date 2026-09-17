@@ -150,22 +150,77 @@ function demoAnswerFor(question: string): SearchResponse {
   return { ...demoResponse, suggested_answer: answer, confidence_score: 0.84 };
 }
 
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      fields.push(current.trim().replace(/^"|"$/g, ""));
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  fields.push(current.trim().replace(/^"|"$/g, ""));
+  return fields;
+}
+
 function extractFormQuestions(text: string, fileName: string) {
   if (fileName.endsWith(".json")) {
-    const parsed = JSON.parse(text);
-    const records = Array.isArray(parsed) ? parsed : parsed.questions || [];
-    return records
-      .map(
-        (record: { question?: string; text?: string }) =>
-          record.question || record.text || "",
-      )
-      .filter(Boolean);
+    try {
+      const parsed = JSON.parse(text);
+      const records = Array.isArray(parsed) ? parsed : parsed.questions || parsed.records || parsed.items || [];
+      return records
+        .map(
+          (record: { question?: string; text?: string; title?: string; prompt?: string }) =>
+            record.question || record.title || record.text || record.prompt || "",
+        )
+        .map((q: any) => String(q).trim())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
   }
-  if (fileName.endsWith(".csv")) {
-    return text
-      .split(/\r?\n/)
-      .slice(1)
-      .map((line) => line.split(",")[2] || line.split(",")[0])
+  if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
+    const isTsv = fileName.endsWith(".tsv");
+    const rawLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (rawLines.length === 0) return [];
+
+    const parseLine = (line: string) => {
+      if (isTsv) {
+        return line.split("\t").map((f) => f.trim().replace(/^"|"$/g, ""));
+      }
+      return parseCsvLine(line);
+    };
+
+    const firstLineFields = parseLine(rawLines[0]);
+    const headerLower = firstLineFields.map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ""));
+
+    const questionSynonyms = ["question", "q", "title", "topic", "prompt", "inquiry", "requirement", "item"];
+    let colIdx = headerLower.findIndex((h) => questionSynonyms.includes(h));
+
+    const hasHeaderRow = colIdx !== -1 || headerLower.some((h) => ["answer", "a", "category", "section", "response", "details", "tags"].includes(h));
+
+    if (colIdx === -1) {
+      colIdx = 0;
+    }
+
+    const dataLines = hasHeaderRow ? rawLines.slice(1) : rawLines;
+    return dataLines
+      .map((line) => {
+        const fields = parseLine(line);
+        const val = fields[colIdx] || fields[0] || "";
+        return val.replace(/^"|"$/g, "").trim();
+      })
       .filter(Boolean);
   }
   const document = new DOMParser().parseFromString(text, "text/html");
@@ -904,19 +959,7 @@ function App() {
             Responses <span>/</span> New response
           </p>
           <h1>Review your questionnaire</h1>
-          <p className="subtitle">
-            Confirm the questions found before drafting answers.
-          </p>
           <section className="import-source panel">
-            <div className="panel-label">
-              <span className="step-number">01</span>
-              <div>
-                <p className="eyebrow">Form source</p>
-                <span className="label-hint">
-                  Load a hosted questionnaire or upload form data
-                </span>
-              </div>
-            </div>
             <div className="source-input-row">
               <div className="source-url-field">
                 <Link size={16} />
@@ -1294,15 +1337,6 @@ function App() {
             </div>
 
             <section className="source-panel panel">
-              <div className="panel-label">
-                <span className="step-number">00</span>
-                <div>
-                  <p className="eyebrow">Form source</p>
-                  <span className="label-hint">
-                    Load a hosted questionnaire or upload form data
-                  </span>
-                </div>
-              </div>
               <div className="source-input-row">
                 <div className="source-url-field">
                   <Link size={16} />
