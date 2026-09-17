@@ -255,6 +255,50 @@ const DEFAULT_RECENT_RFPS: RecentRFPItem[] = [
   { id: "meridian-form", title: "Meridian vendor form", editedAt: "Aug 18", color: "green", questionsCount: 15 },
 ];
 
+interface ActivityLogItem {
+  id: string;
+  user: string;
+  action: string;
+  details: string;
+  timestamp: string;
+  type: "approval" | "generation" | "kb" | "import" | "review";
+}
+
+const DEFAULT_ACTIVITY_LOGS: ActivityLogItem[] = [
+  {
+    id: "act-1",
+    user: "Proposal Drafter",
+    action: "Loaded questionnaire form",
+    details: "Northstar security review (12 detected questions)",
+    timestamp: "10 minutes ago",
+    type: "import",
+  },
+  {
+    id: "act-2",
+    user: "Gemini 2.5 Flash",
+    action: "Generated response draft",
+    details: "Drafted answers for 12 questions grounded in knowledge base",
+    timestamp: "8 minutes ago",
+    type: "generation",
+  },
+  {
+    id: "act-3",
+    user: "Security SME",
+    action: "Approved response item",
+    details: "Approved Q01: 'Does the system support SAML 2.0 / Okta SSO?'",
+    timestamp: "5 minutes ago",
+    type: "approval",
+  },
+  {
+    id: "act-4",
+    user: "Security SME",
+    action: "Promoted Golden Q&A to Knowledge Base",
+    details: "Upserted approved SOC2 compliance response into Pinecone & Algolia index",
+    timestamp: "3 minutes ago",
+    type: "kb",
+  },
+];
+
 function formatScore(score: number) {
   return `${Math.round(score * 100)}%`;
 }
@@ -307,6 +351,22 @@ function App() {
   const [reviewCommentsByQuestion, setReviewCommentsByQuestion] = useState<Record<string, string>>({});
   const [uploadedFileContent, setUploadedFileContent] = useState<string>("");
   const [isBatchApproved, setIsBatchApproved] = useState<boolean>(false);
+
+  // Activity Log & Audit State
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(DEFAULT_ACTIVITY_LOGS);
+
+  function logActivity(action: string, details: string, type: ActivityLogItem["type"]) {
+    const newEntry: ActivityLogItem = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user: role,
+      action,
+      details,
+      timestamp: "Just now",
+      type,
+    };
+    setActivityLogs((prev) => [newEntry, ...prev]);
+  }
 
   // Environment & Health State
   const [backendEnv, setBackendEnv] = useState<string>(() => import.meta.env.VITE_APP_ENV || "local");
@@ -588,6 +648,8 @@ function App() {
       return [newRfpItem, ...filtered].slice(0, 5);
     });
 
+    logActivity("Loaded questionnaire form", `${source} (${questions.length} detected questions)`, "import");
+
     try {
       fetch(`${activeApiBase}/v1/responses/history`, {
         method: "POST",
@@ -762,12 +824,14 @@ function App() {
       const nextPromoted = { ...promotedQuestions, [itemText]: true };
       setPromotedQuestions(nextPromoted);
       localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
+      logActivity("Promoted Golden Q&A to Knowledge Base", `Promoted answer for "${itemText}" to canonical Knowledge Base`, "kb");
       showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
     } catch (err) {
       console.warn("Promotion API fallback:", err);
       const nextPromoted = { ...promotedQuestions, [itemText]: true };
       setPromotedQuestions(nextPromoted);
       localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
+      logActivity("Promoted Golden Q&A to Knowledge Base", `Promoted answer for "${itemText}" to canonical Knowledge Base`, "kb");
       showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
     }
   }
@@ -781,6 +845,7 @@ function App() {
     const nextStatuses = { ...reviewStatusByQuestion, [item]: nextStatus };
     setReviewStatusByQuestion(nextStatuses);
     saveReviewStatuses(nextStatuses);
+    logActivity("Approved response item", `Approved "${item.substring(0, 45)}..." as ${role}`, "approval");
     showToast(`Question marked: ${nextStatus}`);
   }
 
@@ -815,6 +880,7 @@ function App() {
     setReviewStatusByQuestion(nextStatuses);
     saveReviewStatuses(nextStatuses);
     setIsBatchApproved(true);
+    logActivity("Batch approved questionnaire", `Approved ${allQuestions.length} questions as ${role}`, "approval");
     showToast(`All ${allQuestions.length} questions marked: ${nextStatus}!`);
 
     try {
@@ -1297,7 +1363,10 @@ function App() {
                 LIVE ↗
               </span>
             </a>
-            <button className="nav-item">
+            <button
+              className={`nav-item ${showActivityModal ? "active" : ""}`}
+              onClick={() => setShowActivityModal(true)}
+            >
               <History size={17} /> Activity
             </button>
           </nav>
@@ -2340,6 +2409,104 @@ function App() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Log Modal */}
+      {showActivityModal && (
+        <div className="kb-modal-backdrop" onClick={() => setShowActivityModal(false)}>
+          <div className="kb-modal-container" style={{ maxWidth: "720px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="kb-modal-header" style={{ justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <History size={20} color="var(--blue)" />
+                <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "var(--ink)" }}>Workspace Activity & Audit Log</h2>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setShowActivityModal(false)}
+                aria-label="Close Activity modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="kb-modal-body" style={{ padding: "20px 24px" }}>
+              <div className="activity-stats-bar" style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+                <div style={{ flex: 1, background: "#f8fafc", padding: "12px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                  <span className="eyebrow" style={{ color: "var(--muted)" }}>Total Events</span>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--ink)" }}>{activityLogs.length}</div>
+                </div>
+                <div style={{ flex: 1, background: "#f0fdf4", padding: "12px 14px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                  <span className="eyebrow" style={{ color: "#166534" }}>Approvals</span>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color: "#15803d" }}>
+                    {activityLogs.filter((a) => a.type === "approval").length}
+                  </div>
+                </div>
+                <div style={{ flex: 1, background: "#fef3c7", padding: "12px 14px", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                  <span className="eyebrow" style={{ color: "#92400e" }}>KB Promotions</span>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color: "#b45309" }}>
+                    {activityLogs.filter((a) => a.type === "kb").length}
+                  </div>
+                </div>
+              </div>
+
+              <div className="activity-feed-list" style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "420px", overflowY: "auto" }}>
+                {activityLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    style={{
+                      display: "flex",
+                      gap: "14px",
+                      padding: "14px",
+                      borderRadius: "8px",
+                      background: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "8px",
+                        borderRadius: "6px",
+                        background:
+                          log.type === "approval"
+                            ? "#ecfdf5"
+                            : log.type === "kb"
+                              ? "#fffbeb"
+                              : log.type === "generation"
+                                ? "#eff6ff"
+                                : "#f1f5f9",
+                        color:
+                          log.type === "approval"
+                            ? "#059669"
+                            : log.type === "kb"
+                              ? "#d97706"
+                              : log.type === "generation"
+                                ? "#2563eb"
+                                : "#64748b",
+                      }}
+                    >
+                      {log.type === "approval" && <CheckCircle2 size={18} />}
+                      {log.type === "kb" && <Sparkles size={18} />}
+                      {log.type === "generation" && <Zap size={18} />}
+                      {log.type === "import" && <FolderOpen size={18} />}
+                      {log.type === "review" && <Clock size={18} />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <strong style={{ fontSize: "14px", color: "var(--ink)" }}>{log.action}</strong>
+                        <small style={{ color: "var(--muted)", fontSize: "11px" }}>{log.timestamp}</small>
+                      </div>
+                      <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>{log.details}</p>
+                      <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--muted)" }}>
+                        Actor: <strong>{log.user}</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
