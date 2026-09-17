@@ -290,6 +290,8 @@ function App() {
   const [reviewInstructions, setReviewInstructions] = useState("");
   const [reviewSelectedQuestion, setReviewSelectedQuestion] = useState<string | null>(null);
   const [reviewCommentsByQuestion, setReviewCommentsByQuestion] = useState<Record<string, string>>({});
+  const [uploadedFileContent, setUploadedFileContent] = useState<string>("");
+  const [isBatchApproved, setIsBatchApproved] = useState<boolean>(false);
 
   // Environment & Health State
   const [backendEnv, setBackendEnv] = useState<string>(() => import.meta.env.VITE_APP_ENV || "local");
@@ -576,8 +578,10 @@ function App() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      const fileText = await file.text();
+      setUploadedFileContent(fileText);
       return loadQuestions(
-        extractFormQuestions(await file.text(), file.name.toLowerCase()),
+        extractFormQuestions(fileText, file.name.toLowerCase()),
         file.name,
         "upload",
       );
@@ -729,7 +733,7 @@ function App() {
     showToast(`Marked "Changes requested" with review note`);
   }
 
-  function handleBatchApproveAll() {
+  async function handleBatchApproveAll() {
     let nextStatus = "Approved";
     if (role === "Security SME") nextStatus = "Approved by SME";
     if (role === "Legal reviewer") nextStatus = "Approved by Legal";
@@ -743,7 +747,56 @@ function App() {
 
     setReviewStatusByQuestion(nextStatuses);
     saveReviewStatuses(nextStatuses);
+    setIsBatchApproved(true);
     showToast(`All ${allQuestions.length} questions marked: ${nextStatus}!`);
+
+    try {
+      await fetch(`${activeApiBase}/v1/responses/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: responseId || "demo",
+          status: nextStatus,
+          role,
+        }),
+      });
+    } catch (e) {
+      console.warn("Backend batch approval sync failed:", e);
+    }
+  }
+
+  async function handleReviewReset() {
+    setIsBatchApproved(false);
+    const allQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
+    const resetStatuses: Record<string, string> = {};
+    allQuestions.forEach((q) => {
+      resetStatuses[q] = "In Review";
+    });
+    setReviewStatusByQuestion(resetStatuses);
+    saveReviewStatuses(resetStatuses);
+    showToast("Response status reset to In Review. Drafting enabled.");
+
+    try {
+      await fetch(`${activeApiBase}/v1/responses/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: responseId || "demo",
+          status: "In Review",
+          role,
+        }),
+      });
+    } catch (e) {
+      console.warn("Backend review reset sync failed:", e);
+    }
+  }
+
+  function handleIndividualReview(item: string) {
+    const nextStatuses = { ...reviewStatusByQuestion, [item]: "In Review" };
+    setReviewStatusByQuestion(nextStatuses);
+    saveReviewStatuses(nextStatuses);
+    setIsBatchApproved(false);
+    showToast(`Question reset to In Review`);
   }
 
   function getStatusBadgeClass(status?: string) {
@@ -756,7 +809,14 @@ function App() {
   }
 
   async function openOriginalForm() {
-    const baseTargetUrl = formUrl || `${window.location.origin}/mock-questionnaire.html`;
+    let baseTargetUrl = formUrl;
+    if (!baseTargetUrl && uploadedFileContent && !sourceLabel.toLowerCase().endsWith(".csv")) {
+      const blob = new Blob([uploadedFileContent], { type: "text/html" });
+      baseTargetUrl = URL.createObjectURL(blob);
+    }
+    if (!baseTargetUrl) {
+      baseTargetUrl = `${window.location.origin}/mock-questionnaire.html`;
+    }
     const allQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
     const currentAnswers = { ...answersByQuestion };
     
@@ -1414,14 +1474,34 @@ function App() {
                     <MessageSquare size={12} /> {changesRequestedCount} Changes Requested
                   </span>
                 )}
-                <button
-                  className="outline-button"
-                  style={{ padding: "5px 10px", fontSize: "11px" }}
-                  onClick={handleBatchApproveAll}
-                  title={`Batch approve all questions as ${role}`}
-                >
-                  <Check size={12} /> Approve All as {role === "Proposal manager" ? "Drafter" : role}
-                </button>
+                {isBatchApproved ? (
+                  <>
+                    <button
+                      className="outline-button"
+                      disabled
+                      style={{ padding: "5px 10px", fontSize: "11px", opacity: 0.6 }}
+                    >
+                      <Check size={12} /> Approved as Drafter
+                    </button>
+                    <button
+                      className="primary-button"
+                      style={{ padding: "5px 12px", fontSize: "11px" }}
+                      onClick={handleReviewReset}
+                      title="Reset response to In Review status"
+                    >
+                      <RefreshCw size={12} /> Review
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="outline-button"
+                    style={{ padding: "5px 10px", fontSize: "11px" }}
+                    onClick={handleBatchApproveAll}
+                    title={`Batch approve all questions as ${role}`}
+                  >
+                    <Check size={12} /> Approve All as {role === "Proposal manager" ? "Drafter" : role}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1432,15 +1512,29 @@ function App() {
                   <strong>
                     <CheckCircle size={18} /> Governance Complete: All {allCurrentQuestions.length} Responses Approved!
                   </strong>
-                  <p>All answers have passed SME & Legal reviews. Ready for 1-click buyer form injection.</p>
+                  <p>
+                    {sourceLabel.toLowerCase().endsWith(".csv")
+                      ? "All answers have passed approval. Ready to export completed questionnaire as CSV."
+                      : "All answers have passed SME & Legal reviews. Ready for 1-click buyer form injection."}
+                  </p>
                 </div>
-                <button
-                  className="primary-button"
-                  onClick={openOriginalForm}
-                  style={{ padding: "8px 16px" }}
-                >
-                  <Sparkles size={14} /> ⚡ Inject Answers into Buyer Form
-                </button>
+                {sourceLabel.toLowerCase().endsWith(".csv") ? (
+                  <button
+                    className="primary-button"
+                    onClick={exportAnswers}
+                    style={{ padding: "8px 16px" }}
+                  >
+                    <Download size={14} /> 📥 Export CSV with Generated Answers
+                  </button>
+                ) : (
+                  <button
+                    className="primary-button"
+                    onClick={openOriginalForm}
+                    style={{ padding: "8px 16px" }}
+                  >
+                    <Sparkles size={14} /> ⚡ Inject Answers into Buyer Form
+                  </button>
+                )}
               </div>
             )}
 
@@ -1475,7 +1569,7 @@ function App() {
                   <button
                     className="primary-button"
                     onClick={generateAllAnswers}
-                    disabled={isGenerating}
+                    disabled={isGenerating || isBatchApproved}
                   >
                     {isGenerating ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
                     {isGenerating ? "Generating All..." : "⚡ Generate All Answers"} <ArrowUpRight size={15} />
@@ -1534,10 +1628,21 @@ function App() {
                           <button
                             className="approve-button"
                             onClick={() => handleApproveQuestion(item)}
+                            disabled={isBatchApproved || Boolean(reviewStatusByQuestion[item]?.toLowerCase().includes("approve"))}
                             title={`Approve answer as ${role}`}
                           >
                             <Check size={14} /> Approve as {role === "Proposal manager" ? "Drafter" : role}
                           </button>
+                          {(isBatchApproved || reviewStatusByQuestion[item]?.toLowerCase().includes("approve")) && (
+                            <button
+                              className="outline-button"
+                              onClick={() => handleIndividualReview(item)}
+                              title="Return question to review state"
+                              style={{ padding: "4px 10px", fontSize: "12px" }}
+                            >
+                              <RefreshCw size={12} /> Review
+                            </button>
+                          )}
                           {reviewStatusByQuestion[item]?.toLowerCase().includes("approve") && (
                             promotedQuestions[item] ? (
                               <span
