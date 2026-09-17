@@ -1228,39 +1228,6 @@ function App() {
       </aside>
 
       <main className="main-content">
-        {route.startsWith("/response/workspace/") && (
-          <div className="role-bar">
-            <div className="role-selector">
-              <span className="eyebrow">Viewing as</span>
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value as typeof role)}
-              >
-                <option>Proposal manager</option>
-                <option>Security SME</option>
-                <option>Legal reviewer</option>
-                <option>Final approver</option>
-              </select>
-            </div>
-            <div className="queue-summary">
-              <span>
-                <strong>12</strong> total
-              </span>
-              <span>
-                <strong>8</strong> approved
-              </span>
-              <span className="queue-warning">
-                <strong>2</strong> SME review
-              </span>
-              <span>
-                <strong>1</strong> revision
-              </span>
-            </div>
-            <span className="workflow-status">
-              {answerStatus === "Draft" ? "Draft in progress" : answerStatus}
-            </span>
-          </div>
-        )}
         {route === "/" ? (
           <section className="home-screen">
             <p className="eyebrow">Start a response</p>
@@ -1331,48 +1298,7 @@ function App() {
                   Draft accurate answers from your approved knowledge base.
                 </p>
               </div>
-              <button className="outline-button" onClick={() => navigate("/")}>
-                <Upload size={16} /> Import RFP
-              </button>
             </div>
-
-            <section className="source-panel panel">
-              <div className="source-input-row">
-                <div className="source-url-field">
-                  <Link size={16} />
-                  <input
-                    value={formUrl}
-                    onChange={(event) => setFormUrl(event.target.value)}
-                    placeholder="Paste form URL, e.g. https://buyer.example/questionnaire"
-                  />
-                  <button
-                    className="source-button"
-                    onClick={loadFormUrl}
-                    disabled={!formUrl.trim()}
-                  >
-                    Load URL
-                  </button>
-                </div>
-                <label className="upload-form-button">
-                  <Upload size={15} /> Upload HTML, JSON, or CSV
-                  <input
-                    type="file"
-                    accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
-                    onChange={loadFormFile}
-                  />
-                </label>
-              </div>
-              <div className="source-status-row">
-                <p className="source-status">
-                  <span className="status-dot" /> {sourceStatus}
-                </p>
-                {route.startsWith("/review/") && detectedQuestions.length > 0 && (
-                  <button className="source-button" onClick={openWorkspace}>
-                    Continue to workspace <ArrowUpRight size={14} />
-                  </button>
-                )}
-              </div>
-            </section>
 
             <div className="source-actions">
               <span className="source-badge">
@@ -1384,12 +1310,11 @@ function App() {
                 · {sourceLabel}
               </span>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button className="outline-button" onClick={openOriginalForm} title="Launch buyer form with pre-approved answers">
-                  <Link size={15} /> Open original form
-                </button>
-                <button className="outline-button" onClick={exportAnswers} title="Download answers as CSV">
-                  <Download size={15} /> Export CSV
-                </button>
+                {!sourceLabel.toLowerCase().endsWith(".csv") && (
+                  <button className="outline-button" onClick={openOriginalForm} title="Launch buyer form with pre-approved answers">
+                    <Link size={15} /> Open original form
+                  </button>
+                )}
               </div>
             </div>
             {detectedQuestions.length === 0 && (
