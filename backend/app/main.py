@@ -7,10 +7,7 @@ app = FastAPI()
 # Add CORSMiddleware right here:
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://frontend-d5wo6laxd-dipesh-s-projects4.vercel.app/",  # Your production Vercel domain
-        "http://localhost:3000",        # Local frontend development
-    ],
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$|^https:\/\/rfpengine\.net$|^http:\/\/localhost:\d+$",
     allow_credentials=True,
     allow_methods=["*"],                # Allows GET, POST, OPTIONS, etc.
     allow_headers=["*"],                # Allows custom headers like Authorization
