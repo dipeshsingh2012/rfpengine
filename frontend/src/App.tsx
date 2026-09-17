@@ -85,7 +85,6 @@ export function App() {
     () => import.meta.env.VITE_APP_ENV || "local",
   );
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
-  const [activeApiBase, setActiveApiBase] = useState<string>(apiBaseUrl);
 
   // Responses Dashboard State (PostgreSQL backed, no localStorage)
   const [workspaceSummaries, setWorkspaceSummaries] = useState<WorkspaceSummaryItem[]>([]);
@@ -149,7 +148,7 @@ export function App() {
     setActivityLogs((prev) => [newEntry, ...prev]);
 
     try {
-      fetch(`${activeApiBase}/v1/responses/audit-logs`, {
+      fetch(`${apiBaseUrl}/v1/responses/audit-logs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -167,28 +166,11 @@ export function App() {
     }
   }
 
-  useEffect(() => {
-    async function checkHealth() {
-      try {
-        const res = await fetch(`${activeApiBase}/health`);
-        if (res.ok) {
-          const data = await res.json();
-          setBackendEnv(data.environment || (activeApiBase.includes("run.app") ? "prod" : "local"));
-          setBackendHealth(data.status || "ok");
-        } else {
-          setBackendHealth("degraded");
-        }
-      } catch {
-        setBackendHealth("degraded");
-      }
-    }
-    checkHealth();
-  }, [activeApiBase]);
 
   useEffect(() => {
     async function fetchAuditLogs() {
       try {
-        const res = await fetch(`${activeApiBase}/v1/responses/audit-logs`, {
+        const res = await fetch(`${apiBaseUrl}/v1/responses/audit-logs`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (res.ok) {
@@ -214,12 +196,12 @@ export function App() {
     if (showActivityModal) {
       fetchAuditLogs();
     }
-  }, [showActivityModal, activeApiBase, tenantId]);
+  }, [showActivityModal, apiBaseUrl, tenantId]);
 
   useEffect(() => {
     async function fetchRecentHistory() {
       try {
-        const res = await fetch(`${activeApiBase}/v1/responses/history`, {
+        const res = await fetch(`${apiBaseUrl}/v1/responses/history`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (res.ok) {
@@ -234,12 +216,12 @@ export function App() {
     }
     fetchRecentHistory();
     fetchWorkspaceSummaries();
-  }, [activeApiBase, tenantId, route]);
+  }, [apiBaseUrl, tenantId, route]);
 
   async function fetchWorkspaceSummaries() {
     setIsWorkspacesLoading(true);
     try {
-      const res = await fetch(`${activeApiBase}/v1/responses/workspaces`, {
+      const res = await fetch(`${apiBaseUrl}/v1/responses/workspaces`, {
         headers: { "X-Tenant-ID": tenantId },
       });
       if (res.ok) {
@@ -255,14 +237,14 @@ export function App() {
 
   async function handleDuplicateWorkspace(id: string) {
     try {
-      const res = await fetch(`${activeApiBase}/v1/responses/workspaces/${id}/duplicate`, {
+      const res = await fetch(`${apiBaseUrl}/v1/responses/workspaces/${id}/duplicate`, {
         method: "POST",
         headers: { "X-Tenant-ID": tenantId },
       });
       if (res.ok) {
         showToast("Questionnaire duplicated in PostgreSQL");
         await fetchWorkspaceSummaries();
-        const historyRes = await fetch(`${activeApiBase}/v1/responses/history`, {
+        const historyRes = await fetch(`${apiBaseUrl}/v1/responses/history`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (historyRes.ok) {
@@ -279,14 +261,14 @@ export function App() {
 
   async function handleDeleteWorkspace(id: string) {
     try {
-      const res = await fetch(`${activeApiBase}/v1/responses/workspaces/${id}`, {
+      const res = await fetch(`${apiBaseUrl}/v1/responses/workspaces/${id}`, {
         method: "DELETE",
         headers: { "X-Tenant-ID": tenantId },
       });
       if (res.ok) {
         showToast("Questionnaire permanently deleted from PostgreSQL");
         await fetchWorkspaceSummaries();
-        const historyRes = await fetch(`${activeApiBase}/v1/responses/history`, {
+        const historyRes = await fetch(`${apiBaseUrl}/v1/responses/history`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (historyRes.ok) {
@@ -303,7 +285,7 @@ export function App() {
 
   async function fetchWorkspaceSettings() {
     try {
-      const res = await fetch(`${activeApiBase}/v1/responses/workspace/settings?tenant_id=${tenantId}`);
+      const res = await fetch(`${apiBaseUrl}/v1/responses/workspace/settings?tenant_id=${tenantId}`);
       if (res.ok) {
         const data = await res.json();
         setWorkspaceSettings((prev) => ({
@@ -325,7 +307,7 @@ export function App() {
     setSettingsSaveNotice(null);
     try {
       const payload = updates ? { ...workspaceSettings, ...updates } : workspaceSettings;
-      const res = await fetch(`${activeApiBase}/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
+      const res = await fetch(`${apiBaseUrl}/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -374,11 +356,11 @@ export function App() {
 
   useEffect(() => {
     fetchWorkspaceSettings();
-  }, [activeApiBase, tenantId]);
+  }, [apiBaseUrl, tenantId]);
 
   async function fetchKBStats() {
     try {
-      const res = await fetch(`${activeApiBase}/v1/knowledge-base/stats?tenant_id=${tenantId}`);
+      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/stats?tenant_id=${tenantId}`);
       if (res.ok) {
         const data = await res.json();
         setKbStats({
@@ -396,7 +378,7 @@ export function App() {
   async function fetchKBEntries() {
     setIsFetchingKB(true);
     try {
-      const res = await fetch(`${activeApiBase}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
+      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
       if (res.ok) {
         const data = await res.json();
         setKbEntries(data);
@@ -413,14 +395,14 @@ export function App() {
   useEffect(() => {
     fetchKBEntries();
     fetchKBStats();
-  }, [tenantId, activeApiBase]);
+  }, [tenantId, apiBaseUrl]);
 
   useEffect(() => {
     if (showKBModal) {
       fetchKBEntries();
       fetchKBStats();
     }
-  }, [showKBModal, activeApiBase]);
+  }, [showKBModal, apiBaseUrl, tenantId]);
 
   async function handleKBUpload(file: File) {
     if (!file) return;
@@ -430,7 +412,7 @@ export function App() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tenant_id", tenantId);
-      const res = await fetch(`${activeApiBase}/v1/knowledge-base/upload`, {
+      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/upload`, {
         method: "POST",
         body: formData,
       });
@@ -453,7 +435,7 @@ export function App() {
 
   async function handleDeleteKBEntry(id: string) {
     try {
-      await fetch(`${activeApiBase}/v1/knowledge-base/${id}`, { method: "DELETE" });
+      await fetch(`${apiBaseUrl}/v1/knowledge-base/${id}`, { method: "DELETE" });
       setKbEntries((prev) => prev.filter((item) => item.id !== id));
       fetchKBStats();
     } catch (e) {
@@ -477,7 +459,7 @@ export function App() {
     setPlaygroundLoading(true);
     setPlaygroundError(null);
     try {
-      const res = await fetch(`${activeApiBase}/v1/search`, {
+      const res = await fetch(`${apiBaseUrl}/v1/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -527,7 +509,7 @@ export function App() {
     setResponseId(id);
 
     // Hydrate workspace details directly from PostgreSQL (no localStorage)
-    fetch(`${activeApiBase}/v1/responses/workspaces/${id}`, {
+    fetch(`${apiBaseUrl}/v1/responses/workspaces/${id}`, {
       headers: { "X-Tenant-ID": tenantId },
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -564,7 +546,7 @@ export function App() {
         }
       })
       .catch((err) => console.warn("Failed to load workspace from PostgreSQL:", err));
-  }, [route, activeApiBase, tenantId]);
+  }, [route, apiBaseUrl, tenantId]);
 
   async function loadQuestions(questions: string[], source: string, mode: SourceMode) {
     const id = `${mode}-${Date.now().toString(36)}`;
@@ -594,7 +576,7 @@ export function App() {
 
     // Persist directly to PostgreSQL database (zero localStorage)
     try {
-      await fetch(`${activeApiBase}/v1/responses/workspaces`, {
+      await fetch(`${apiBaseUrl}/v1/responses/workspaces`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -704,7 +686,7 @@ export function App() {
     saveReviewStatuses(nextStatuses);
 
     // Also persist via API to PostgreSQL
-    fetch(`${activeApiBase}/v1/responses/review`, {
+    fetch(`${apiBaseUrl}/v1/responses/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -732,7 +714,7 @@ export function App() {
     try {
       if (responseId && responseId !== "demo") {
         await fetch(
-          `${activeApiBase}/v1/responses/workspaces/${responseId}/questions/${index}/promote`,
+          `${apiBaseUrl}/v1/responses/workspaces/${responseId}/questions/${index}/promote`,
           {
             method: "POST",
             headers: {
@@ -743,7 +725,7 @@ export function App() {
           },
         );
       } else {
-        await fetch(`${activeApiBase}/v1/knowledge-base/entries`, {
+        await fetch(`${apiBaseUrl}/v1/knowledge-base/entries`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -838,7 +820,7 @@ export function App() {
     showToast(`All ${allQuestions.length} questions marked: ${nextStatus}!`);
 
     try {
-      await fetch(`${activeApiBase}/v1/responses/review`, {
+      await fetch(`${apiBaseUrl}/v1/responses/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -864,7 +846,7 @@ export function App() {
     showToast("Response status reset to In Review. Drafting enabled.");
 
     try {
-      await fetch(`${activeApiBase}/v1/responses/review`, {
+      await fetch(`${apiBaseUrl}/v1/responses/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -909,7 +891,7 @@ export function App() {
       await Promise.all(
         missing.map(async (item) => {
           try {
-            const result = await fetch(`${activeApiBase}/v1/search`, {
+            const result = await fetch(`${apiBaseUrl}/v1/search`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
@@ -982,7 +964,7 @@ export function App() {
   ) {
     if (!responseId || responseId === "demo") return;
     try {
-      await fetch(`${activeApiBase}/v1/responses/workspaces/${responseId}`, {
+      await fetch(`${apiBaseUrl}/v1/responses/workspaces/${responseId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1014,7 +996,7 @@ export function App() {
     setIsGenerating(true);
     setNotice("Searching approved knowledge...");
     try {
-      const result = await fetch(`${activeApiBase}/v1/search`, {
+      const result = await fetch(`${apiBaseUrl}/v1/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenant_id: tenantId, question, top_k: topK }),
@@ -1060,7 +1042,7 @@ export function App() {
     await Promise.all(
       detectedQuestions.map(async (item) => {
         try {
-          const result = await fetch(`${activeApiBase}/v1/search`, {
+          const result = await fetch(`${apiBaseUrl}/v1/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
@@ -1151,10 +1133,7 @@ export function App() {
         setMobileNavOpen={setMobileNavOpen}
         companyName={workspaceSettings.company_name}
         onOpenSettings={() => setShowSettingsModal(true)}
-        backendEnv={backendEnv}
         backendHealth={backendHealth}
-        activeApiBase={activeApiBase}
-        setActiveApiBase={setActiveApiBase}
         onNavigateHome={() => navigate("/")}
       />
 

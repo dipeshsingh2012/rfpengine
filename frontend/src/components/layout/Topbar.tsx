@@ -12,10 +12,7 @@ interface TopbarProps {
   setMobileNavOpen: (open: boolean) => void;
   companyName: string;
   onOpenSettings: () => void;
-  backendEnv: string;
   backendHealth: "ok" | "degraded" | "checking";
-  activeApiBase: string;
-  setActiveApiBase: (url: string) => void;
   onNavigateHome: () => void;
 }
 
@@ -24,14 +21,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   setMobileNavOpen,
   companyName,
   onOpenSettings,
-  backendEnv,
   backendHealth,
-  activeApiBase,
-  setActiveApiBase,
   onNavigateHome,
 }) => {
-  const isProd = backendEnv === "prod" || backendEnv === "production";
-
   return (
     <header className="topbar">
       <button
@@ -56,6 +48,8 @@ export const Topbar: React.FC<TopbarProps> = ({
         <span className="workspace-dot" /> {companyName || "Acme Corporation"}{" "}
         <ChevronDown size={15} />
       </div>
+
+      {/* Health indicator — read-only, no toggle */}
       <div
         className="env-indicator"
         style={{
@@ -66,32 +60,24 @@ export const Topbar: React.FC<TopbarProps> = ({
           fontWeight: 600,
           padding: "4px 10px",
           borderRadius: "9999px",
-          backgroundColor: isProd ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
-          color: isProd ? "#10b981" : "#f59e0b",
-          border: `1px solid ${isProd ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.25)"}`,
-          cursor: "pointer",
+          backgroundColor: "rgba(16, 185, 129, 0.12)",
+          color: "#10b981",
+          border: "1px solid rgba(16, 185, 129, 0.25)",
           marginLeft: "8px",
         }}
-        onClick={() => {
-          const nextUrl =
-            activeApiBase.includes("localhost") || activeApiBase.startsWith("/api")
-              ? "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api"
-              : "/api";
-          setActiveApiBase(nextUrl);
-        }}
-        title={`Active API: ${activeApiBase}\nStatus: ${backendHealth.toUpperCase()}\nClick to toggle Local / Cloud Prod target`}
+        title={`Status: ${backendHealth.toUpperCase()}`}
       >
         <span
           style={{
             width: "6px",
             height: "6px",
             borderRadius: "50%",
-            backgroundColor:
-              backendHealth === "ok" ? (isProd ? "#10b981" : "#f59e0b") : "#ef4444",
+            backgroundColor: backendHealth === "ok" ? "#10b981" : "#ef4444",
           }}
         />
-        {isProd ? "PROD CLOUD" : "LOCAL DEV"}
+        PROD
       </div>
+
       <div className="topbar-spacer" />
       <a
         href="https://rfpengine.aroadmap.dev/"
@@ -123,4 +109,3 @@ export const Topbar: React.FC<TopbarProps> = ({
     </header>
   );
 };
-
