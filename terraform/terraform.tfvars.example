@@ -6,10 +6,10 @@ credentials_file = "../gcp-key.json"
 # Neon PostgreSQL Connection URL
 database_url     = "postgresql://neondb_owner:your_password@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
 
-# Elastic Cloud Settings
-elasticsearch_url     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
-elasticsearch_index   = "rfp_knowledge_base"
-elasticsearch_api_key = ""
+# Algolia Cloud Settings
+algolia_app_id     = "YOUR_ALGOLIA_APP_ID"
+algolia_api_key    = "YOUR_ALGOLIA_API_KEY"
+algolia_index_name = "rfp_knowledge_base"
 
 # Pinecone Serverless Settings
 pinecone_index        = "rfp-knowledge-base"

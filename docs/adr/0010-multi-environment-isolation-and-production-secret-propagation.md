@@ -1,15 +1,15 @@
 # ADR 0010: Multi-Environment Isolation and Production Secret Propagation
 
 * **Status**: Accepted
-* **Date**: 2026-08-28
+* **Date**: 2026-08-28 (Updated 2026-09-17)
 * **Deciders**: Engineering Team
 
 ## Context
 
-As RFPEngine transitioned from a single local development environment to an enterprise multi-cloud deployment (Google Cloud Run, Vertex AI, Elastic Cloud, Neon PostgreSQL, Pinecone Serverless), several environment segregation and secret propagation challenges arose:
+As RFPEngine transitioned from a single local development environment to an enterprise multi-cloud deployment (Google Cloud Run, Vertex AI, Algolia Cloud, Neon PostgreSQL, Pinecone Serverless), several environment segregation and secret propagation challenges arose:
 
 1. **Vector Index Pollution**: Local automated test runs, exploratory queries, and document uploads shared the same Pinecone index as production, risking data corruption or false search results in production.
-2. **Configuration & Secrets Propagation**: Managing sensitive API credentials (database connection strings, Elastic Cloud API keys, Pinecone API keys) requires strict separation between local developer `.env` files and production runtime environments without leaking credentials into version control or Docker image layers.
+2. **Configuration & Secrets Propagation**: Managing sensitive API credentials (database connection strings, Algolia API keys, Pinecone API keys) requires strict separation between local developer environment files and production runtime environments without leaking credentials into version control or Docker image layers.
 3. **Frontend API URL Ambiguity**: Frontend single-page applications running across local dev servers (`http://localhost:5173`) and production domains (`https://www.rfpengine.net`) must target the appropriate backend endpoints without hardcoded URLs or broken relative proxy paths.
 
 ## Decision
@@ -25,7 +25,8 @@ We implement a comprehensive **Multi-Environment Isolation and Secret Propagatio
 - **Zero-Secret Docker Images**: `.env` and `.env.local` files are strictly excluded from Docker images via `.dockerignore` and `.gitignore`.
 - **GCP Secret Manager as Single Source of Truth for Prod**:
   - `rfpengine-database-url`: Encrypted Neon PostgreSQL connection string.
-  - `rfpengine-elasticsearch-api-key`: Elastic Cloud 9.5.2 API key.
+  - `rfpengine-algolia-app-id`: Algolia Application ID.
+  - `rfpengine-algolia-api-key`: Algolia API key.
   - `rfpengine-pinecone-api-key`: Pinecone Serverless API key.
 - **Native Boot-Time Secret Injection**:
   - In Terraform (`terraform/cloud_run.tf`), Cloud Run mounts secrets directly into process memory at container startup via `secret_key_ref`, eliminating the need for application-level secret fetching during request handling:
@@ -41,7 +42,7 @@ We implement a comprehensive **Multi-Environment Isolation and Secret Propagatio
     }
     ```
 - **Automated Synchronization Tooling**:
-  - `npm run secrets:sync`: Syncs and audits local `.env` keys into GCP Secret Manager with automated versioning.
+  - `python backend/scripts/gcp_secrets_sync.py`: Syncs and audits keys in GCP Secret Manager with automated versioning.
 
 ### 3. Frontend Multi-Environment Resolution & Live Switching
 - **Environment Profiles**:
@@ -65,8 +66,7 @@ We implement a comprehensive **Multi-Environment Isolation and Secret Propagatio
 - **Complete Vector Data Isolation**: Local testing and document uploads never corrupt production search indices.
 - **Secure Secret Propagation**: Production credentials never touch disk or git; they are managed in GCP Secret Manager and mounted into Cloud Run container memory.
 - **Deterministic Multi-Environment Builds**: `npm run build:frontend` produces production-ready bundles referencing the canonical Cloud Run API.
-- **Instant Observability**: The `/api/health` endpoint reports the active environment (`environment: "local" | "prod"`) and status across all 5 infrastructure dependencies.
+- **Instant Observability**: The `/api/health` endpoint reports the active environment (`environment: "local" | "prod"`) and status across all infrastructure dependencies.
 
 ### Negative / Trade-offs
-- Changing production secrets requires updating Secret Manager versions (handled via `npm run secrets:sync` or Terraform).
-
+- Changing production secrets requires updating Secret Manager versions (handled via `python backend/scripts/gcp_secrets_sync.py` or Terraform).

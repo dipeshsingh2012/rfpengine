@@ -136,7 +136,7 @@ async def promote_question_to_knowledge_base(
     """
     Level 1 Closed-Loop AI Feedback (ADR 0019):
     Promotes an SME-approved question answer directly into the canonical Knowledge Base,
-    updating PostgreSQL, Pinecone dense vectors, and Elasticsearch BM25 indexes.
+    updating PostgreSQL, Pinecone dense vectors, and Algolia indexes.
     """
     try:
         kb_entry, review = await PostgresService.promote_question_to_kb(

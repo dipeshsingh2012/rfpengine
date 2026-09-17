@@ -24,7 +24,7 @@ RFPEngine's single purpose is to help sellers scan buyer questionnaires, retriev
 
 ## 3. How Data Is Stored & Protected
 - **In Transit**: Encrypted via TLS 1.3.
-- **At Rest**: Encrypted via AES-256 in isolated multi-tenant databases (PostgreSQL, Elasticsearch, Pinecone Serverless).
+- **At Rest**: Encrypted via AES-256 in isolated multi-tenant databases (PostgreSQL, Algolia, Pinecone Serverless).
 - **AI Inference**: Processed securely via enterprise Google Cloud Vertex AI APIs (`gemini-2.5-flash` & `text-embedding-004`).
 
 ---

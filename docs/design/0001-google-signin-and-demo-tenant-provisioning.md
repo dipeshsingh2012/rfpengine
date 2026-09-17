@@ -115,7 +115,7 @@ sequenceDiagram
 
 ## 5. Security & Isolation Considerations
 
-1. **Tenant Sandboxing**: Demo tenants are isolated using the standard `tenant_id` database filter and Pinecone/Elasticsearch namespace boundaries.
+1. **Tenant Sandboxing**: Demo tenants are isolated using the standard `tenant_id` database filter and Pinecone/Algolia namespace boundaries.
 2. **Demo Tenant Lifecycle**: Demo tenants are tagged with `is_demo=True` and scheduled for automatic cleanup after 14 days of inactivity.
 3. **Role Enforcement**: Google Sign-in users receive `admin` role within their own isolated demo tenant, allowing them to test reviewer approval workflows, SME assignment, and document uploads.
 

@@ -56,13 +56,8 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       env {
-        name  = "ELASTICSEARCH_URL"
-        value = var.elasticsearch_url
-      }
-
-      env {
-        name  = "ELASTICSEARCH_INDEX"
-        value = var.elasticsearch_index
+        name  = "ALGOLIA_INDEX_NAME"
+        value = var.algolia_index_name
       }
 
       env {
@@ -112,10 +107,20 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       env {
-        name = "ELASTICSEARCH_API_KEY"
+        name = "ALGOLIA_APP_ID"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.elasticsearch_api_key.secret_id
+            secret  = google_secret_manager_secret.algolia_app_id.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "ALGOLIA_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.algolia_api_key.secret_id
             version = "latest"
           }
         }
@@ -135,7 +140,8 @@ resource "google_cloud_run_v2_service" "backend" {
 
   depends_on = [
     google_secret_manager_secret_iam_member.db_url_access,
-    google_secret_manager_secret_iam_member.elasticsearch_key_access,
+    google_secret_manager_secret_iam_member.algolia_app_id_access,
+    google_secret_manager_secret_iam_member.algolia_api_key_access,
     google_secret_manager_secret_iam_member.pinecone_key_access,
   ]
 }

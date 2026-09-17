@@ -1,14 +1,14 @@
 # ADR 0006: Centralized Secrets Management with GCP Secret Manager and Terraform
 
 * **Status**: Accepted
-* **Date**: 2026-08-28
+* **Date**: 2026-08-28 (Updated 2026-09-17)
 * **Deciders**: Engineering Team
 
 ## Context
 
 RFPEngine requires multiple sensitive credentials across its hybrid data architecture:
 - **PostgreSQL Database URL / Credentials** (Neon database connection).
-- **Elasticsearch API Key / URL** (Managed Elastic Cloud deployment).
+- **Algolia Application ID & API Key** (Managed Algolia Cloud deployment).
 - **Pinecone API Key** (Dense vector index).
 
 Google Cloud Vertex AI (Gemini 2.5 Flash and `text-embedding-004`) authenticates natively using the Cloud Run Service Account (`roles/aiplatform.user`) and local Application Default Credentials (`gcp-key.json`), requiring no 3rd-party API tokens.
@@ -27,14 +27,14 @@ We adopt **GCP Secret Manager** as the primary cloud secrets store:
    - **Standalone / Local / VM**: [`GCPSecretService`](file:///home/dipes/projects/RFPEngine/backend/app/services/gcp_secret_service.py) uses the `google-cloud-secret-manager` Python SDK to retrieve or sync secrets when running outside Cloud Run.
 2. **Terraform Provisioning**:
    - Complete Terraform module in [`terraform/`](file:///home/dipes/projects/RFPEngine/terraform/) managing:
-     - Canonical Secret Manager secrets (`rfpengine-database-url`, `rfpengine-elasticsearch-api-key`, `rfpengine-pinecone-api-key`).
+     - Canonical Secret Manager secrets (`rfpengine-database-url`, `rfpengine-algolia-app-id`, `rfpengine-algolia-api-key`, `rfpengine-pinecone-api-key`).
      - Dedicated least-privilege IAM service account (`rfpengine-backend-sa@rfpengine.iam.gserviceaccount.com`).
      - Secret accessor IAM role bindings (`roles/secretmanager.secretAccessor`).
      - Vertex AI User role bindings (`roles/aiplatform.user`).
      - Private Docker repository (`us-central1-docker.pkg.dev/rfpengine/rfpengine-repo`).
      - Cloud Run v2 API service (`https://rfpengine-api-fwwnzie4dq-uc.a.run.app`).
 3. **Local Dev Fallback**:
-   - The application automatically falls back to standard `.env` variables if GCP Secret Manager is disabled or unconfigured (`GCP_SECRET_MANAGER_ENABLED=false`).
+   - The application automatically falls back to standard environment variables if GCP Secret Manager is disabled or unconfigured (`GCP_SECRET_MANAGER_ENABLED=false`).
 
 ## Consequences
 
@@ -46,4 +46,3 @@ We adopt **GCP Secret Manager** as the primary cloud secrets store:
 
 ### Negative / Trade-offs
 - Cloud deployments are tied to Google Cloud Platform IAM and Secret Manager service.
-

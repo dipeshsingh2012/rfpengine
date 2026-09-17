@@ -12,7 +12,7 @@ sys.path.insert(0, str(backend_dir))
 from app.core.config import get_settings
 from app.core.db import Base, get_engine
 import app.models.db_models  # noqa: F401 - Register models with Base.metadata
-from app.services.elasticsearch_service import ElasticsearchService
+from app.services.algolia_service import AlgoliaService
 from app.services.pinecone_service import PineconeService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -21,7 +21,7 @@ logger = logging.getLogger("init_services")
 
 async def main() -> None:
     settings = get_settings()
-    logger.info("Starting initialization of PostgreSQL, Elasticsearch, and Pinecone...")
+    logger.info("Starting initialization of PostgreSQL, Algolia, and Pinecone...")
 
     # 1. PostgreSQL Tables
     logger.info("Step 1: Initializing PostgreSQL database tables...")
@@ -33,19 +33,22 @@ async def main() -> None:
     except Exception as exc:
         logger.error("✗ Failed to initialize PostgreSQL tables: %s", exc)
 
-    # 2. Elasticsearch Index
-    logger.info("Step 2: Initializing Elasticsearch index '%s'...", settings.elasticsearch_index)
-    es_service = ElasticsearchService(settings)
-    try:
-        success = await es_service.ensure_index_exists()
-        if success:
-            logger.info("✓ Elasticsearch index verified/created.")
-        else:
-            logger.warning("✗ Elasticsearch index creation failed.")
-    except Exception as exc:
-        logger.error("✗ Elasticsearch error: %s", exc)
-    finally:
-        await es_service.close()
+    # 2. Algolia Index
+    logger.info("Step 2: Initializing Algolia index '%s'...", settings.algolia_index_name)
+    algolia_service = AlgoliaService(settings)
+    if algolia_service.is_configured():
+        try:
+            success = await algolia_service.ensure_index_exists()
+            if success:
+                logger.info("✓ Algolia index verified/configured.")
+            else:
+                logger.warning("✗ Algolia index configuration failed.")
+        except Exception as exc:
+            logger.error("✗ Algolia error: %s", exc)
+        finally:
+            await algolia_service.close()
+    else:
+        logger.info("ℹ ALGOLIA_APP_ID / ALGOLIA_API_KEY not set. Algolia index configuration skipped.")
 
     # 3. Pinecone Index
     logger.info("Step 3: Initializing Pinecone index '%s'...", settings.pinecone_index)

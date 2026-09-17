@@ -4,7 +4,7 @@ RFPEngine Cloud Connection & Hybrid Retrieval Diagnostics Script.
 
 Verifies live connections and end-to-end operations across:
 1. PostgreSQL (Neon Database)
-2. Elasticsearch (Elastic Cloud)
+2. Algolia (Algolia Cloud)
 3. Pinecone (Serverless Vector Index)
 4. Google Cloud Vertex AI (Gemini 2.5 Flash & text-embedding-004)
 5. Hybrid RRF Retrieval & Grounded Answer Synthesis
@@ -12,14 +12,33 @@ Verifies live connections and end-to-end operations across:
 
 import asyncio
 import os
+import re
 import sys
 import time
+from pathlib import Path
 
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Load tfvars fallback if env vars are missing
+tfvars_path = Path(__file__).resolve().parent.parent.parent / "terraform" / "terraform.tfvars"
+if tfvars_path.exists():
+    content = tfvars_path.read_text()
+    for key, env_var in [
+        ("algolia_app_id", "ALGOLIA_APP_ID"),
+        ("algolia_api_key", "ALGOLIA_API_KEY"),
+        ("algolia_index_name", "ALGOLIA_INDEX_NAME"),
+        ("pinecone_api_key", "PINECONE_API_KEY"),
+        ("pinecone_index", "PINECONE_INDEX"),
+        ("database_url", "DATABASE_URL"),
+    ]:
+        if not os.getenv(env_var):
+            match = re.search(rf'{key}\s*=\s*\"([^\"]+)\"', content)
+            if match:
+                os.environ[env_var] = match.group(1)
+
 from app.core.config import get_settings
-from app.services.elasticsearch_service import ElasticsearchService
+from app.services.algolia_service import AlgoliaService
 from app.services.pinecone_service import PineconeService
 from app.services.hybrid_search_service import HybridSearchService
 from app.models.schemas import SearchRequest
@@ -41,7 +60,8 @@ async def main():
         try:
             secrets = await gcp_service.get_all_app_secrets()
             if secrets:
-                settings.apply_gcp_secrets(secrets)
+                for k, v in secrets.items():
+                    setattr(settings, k.upper(), v)
                 print(f"  🔒 Loaded {len(secrets)} secrets from GCP Secret Manager (project: {settings.gcp_project_id})")
         except Exception as exc:
             print(f"  ⚠️ Could not fetch secrets from GCP Secret Manager: {exc}")
@@ -51,7 +71,7 @@ async def main():
     # --------------------------------------------------------------------------
     print("\n[1/5] Checking PostgreSQL (Neon Database)...")
     try:
-        norm_url = normalize_database_url(settings.effective_database_url)
+        norm_url = normalize_database_url(settings.database_url)
         engine = create_async_engine(norm_url, pool_pre_ping=True)
         start = time.perf_counter()
         async with engine.connect() as conn:
@@ -65,23 +85,24 @@ async def main():
         print(f"  ❌ PostgreSQL Failed: {exc}")
 
     # --------------------------------------------------------------------------
-    # 2. Elasticsearch / Elastic Cloud Check
+    # 2. Algolia Cloud Check
     # --------------------------------------------------------------------------
-    print("\n[2/5] Checking Elasticsearch / Elastic Cloud...")
-    es_service = ElasticsearchService(settings)
-    try:
-        start = time.perf_counter()
-        health = await es_service.health_check()
-        latency = (time.perf_counter() - start) * 1000
-        if health.get("status") == "ok":
-            print(f"  ✅ Elastic Cloud Connected ({latency:.2f}ms)")
-            print(f"     Cluster: {health.get('cluster_name')}, ES Version: {health.get('version')}")
-            idx_ok = await es_service.ensure_index_exists()
-            print(f"     Target Index ('{settings.elasticsearch_index}'): {'Ready' if idx_ok else 'Failed'}")
-        else:
-            print(f"  ⚠️ Elastic Cloud Health Status: {health.get('status')} - {health.get('details')}")
-    except Exception as exc:
-        print(f"  ❌ Elastic Cloud Failed: {exc}")
+    print("\n[2/5] Checking Algolia Cloud...")
+    algolia_service = AlgoliaService(settings)
+    if not algolia_service.is_configured():
+        print("  ⚠️ Algolia is unconfigured (ALGOLIA_APP_ID or ALGOLIA_API_KEY not set)")
+    else:
+        try:
+            start = time.perf_counter()
+            health = await algolia_service.health_check()
+            latency = (time.perf_counter() - start) * 1000
+            if health.get("status") == "ok":
+                print(f"  ✅ Algolia Cloud Connected ({latency:.2f}ms)")
+                print(f"     Target Index ('{settings.algolia_index_name}'): Ready")
+            else:
+                print(f"  ⚠️ Algolia Cloud Health Status: {health.get('status')} - {health.get('details')}")
+        except Exception as exc:
+            print(f"  ❌ Algolia Cloud Check Failed: {exc}")
 
     # --------------------------------------------------------------------------
     # 3. Pinecone Serverless Check
@@ -96,7 +117,6 @@ async def main():
             pc_health = await pc_service.health_check()
             latency = (time.perf_counter() - start) * 1000
             print(f"  ✅ Pinecone API Connected ({latency:.2f}ms)")
-            print(f"     Available Indexes: {pc_health.get('indexes')}")
             print(f"     Target Index ('{settings.pinecone_index}'): {pc_health.get('status')}")
         except Exception as exc:
             print(f"  ❌ Pinecone Failed: {exc}")
@@ -105,7 +125,7 @@ async def main():
     # 4. LLM & Embeddings Check (Google Cloud Vertex AI)
     # --------------------------------------------------------------------------
     print("\n[4/5] Checking LLM & Vector Embeddings...")
-    hybrid_service = HybridSearchService(settings, es_service, pc_service)
+    hybrid_service = HybridSearchService(settings, algolia_service, pc_service)
     start = time.perf_counter()
     try:
         emb = await hybrid_service.generate_embedding("Test embedding ping")
@@ -149,7 +169,7 @@ async def main():
     except Exception as exc:
         print(f"  ❌ Hybrid Search Failed: {exc}")
 
-    await es_service.close()
+    await algolia_service.close()
     print("\n" + "=" * 70)
     print("Diagnostics complete.")
     print("=" * 70)

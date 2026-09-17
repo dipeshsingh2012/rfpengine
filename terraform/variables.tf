@@ -41,9 +41,15 @@ variable "database_url" {
   sensitive   = true
 }
 
-variable "elasticsearch_api_key" {
+variable "algolia_app_id" {
   type        = string
-  description = "Elasticsearch API Key for Elastic Cloud"
+  description = "Algolia Application ID"
+  default     = ""
+}
+
+variable "algolia_api_key" {
+  type        = string
+  description = "Algolia API Key (Search/Admin key for knowledge base indexing)"
   sensitive   = true
   default     = ""
 }
@@ -57,15 +63,9 @@ variable "pinecone_api_key" {
 
 # --- Search & Infrastructure Settings ---
 
-variable "elasticsearch_url" {
+variable "algolia_index_name" {
   type        = string
-  description = "Elasticsearch endpoint URL (Elastic Cloud)"
-  default     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
-}
-
-variable "elasticsearch_index" {
-  type        = string
-  description = "Elasticsearch index name"
+  description = "Algolia search index name"
   default     = "rfp_knowledge_base"
 }
 

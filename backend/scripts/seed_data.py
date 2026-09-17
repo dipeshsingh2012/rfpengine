@@ -10,9 +10,29 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
+import os
+import re
+
+# Load tfvars fallback if env vars are missing
+tfvars_path = backend_dir.parent / "terraform" / "terraform.tfvars"
+if tfvars_path.exists():
+    content = tfvars_path.read_text()
+    for key, env_var in [
+        ("algolia_app_id", "ALGOLIA_APP_ID"),
+        ("algolia_api_key", "ALGOLIA_API_KEY"),
+        ("algolia_index_name", "ALGOLIA_INDEX_NAME"),
+        ("pinecone_api_key", "PINECONE_API_KEY"),
+        ("pinecone_index", "PINECONE_INDEX"),
+        ("database_url", "DATABASE_URL"),
+    ]:
+        if not os.getenv(env_var):
+            match = re.search(rf'{key}\s*=\s*\"([^\"]+)\"', content)
+            if match:
+                os.environ[env_var] = match.group(1)
+
 from app.core.config import get_settings
 from app.services.document_parser_service import DocumentParserService
-from app.services.elasticsearch_service import ElasticsearchService
+from app.services.algolia_service import AlgoliaService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.pinecone_service import PineconeService
 from app.services.gcp_secret_service import GCPSecretService
@@ -41,11 +61,11 @@ async def main() -> None:
     logger.info("Starting knowledge base ingestion from '%s' for tenant '%s'...", sample_docs_dir, tenant_id)
 
     # 1. Initialize services
-    es_service = ElasticsearchService(settings)
+    algolia_service = AlgoliaService(settings)
     pinecone_service = PineconeService(settings)
     hybrid_search = HybridSearchService(
         settings=settings,
-        es_service=es_service,
+        algolia_service=algolia_service,
         pinecone_service=pinecone_service,
     )
 
@@ -108,41 +128,35 @@ async def main() -> None:
     except Exception as exc:
         logger.warning("PostgreSQL sync skipped or encountered error: %s", exc)
 
-    # 4. Batch Index into Elasticsearch / Elastic Cloud
-    logger.info("Indexing %d passage chunks into Elasticsearch index '%s'...", len(all_chunks), settings.elasticsearch_index)
-    es_docs = [
-        {
-            "id": doc_ids[i],
-            "tenant_id": chunk.tenant_id,
-            "title": chunk.title,
-            "content": chunk.content,
-            "question": chunk.title,
-            "answer": chunk.content,
-            "category": chunk.category or "",
-            "metadata": chunk.metadata or {},
-        }
-        for i, chunk in enumerate(all_chunks)
-    ]
-    try:
-        await es_service.ensure_index_exists()
+    # 4. Batch Index into Algolia Cloud
+    if algolia_service.is_configured():
+        logger.info("Indexing %d passage chunks into Algolia index '%s'...", len(all_chunks), settings.algolia_index_name)
+        alg_docs = [
+            {
+                "id": doc_ids[i],
+                "tenant_id": chunk.tenant_id,
+                "title": chunk.title,
+                "content": chunk.content,
+                "question": chunk.title,
+                "answer": chunk.content,
+                "category": chunk.category or "",
+                "metadata": chunk.metadata or {},
+            }
+            for i, chunk in enumerate(all_chunks)
+        ]
         try:
-            await es_service.client.delete_by_query(
-                index=settings.elasticsearch_index,
-                query={"term": {"tenant_id": tenant_id}},
-                refresh=True,
-            )
-        except Exception as del_err:
-            logger.debug("Elasticsearch tenant prune notice: %s", del_err)
-
-        indexed_count = await es_service.bulk_index_documents(es_docs)
-        if indexed_count > 0:
-            logger.info("✓ Elasticsearch bulk indexing completed: %d documents indexed.", indexed_count)
-        else:
-            logger.warning("Elasticsearch bulk indexing returned 0 documents indexed.")
-    except Exception as exc:
-        logger.error("✗ Failed to index in Elasticsearch: %s", exc)
-    finally:
-        await es_service.close()
+            await algolia_service.ensure_index_exists()
+            indexed_count = await algolia_service.bulk_index_documents(alg_docs)
+            if indexed_count > 0:
+                logger.info("✓ Algolia bulk indexing completed: %d documents indexed.", indexed_count)
+            else:
+                logger.warning("Algolia bulk indexing returned 0 documents indexed.")
+        except Exception as exc:
+            logger.error("✗ Failed to index in Algolia: %s", exc)
+        finally:
+            await algolia_service.close()
+    else:
+        logger.info("ℹ Algolia unconfigured. Skipping Algolia indexing step.")
 
     # 5. Batch Embed & Bulk Upsert into Pinecone Serverless
     if pinecone_service.is_configured():

@@ -120,7 +120,7 @@ class DocumentParserService:
             if not row:
                 continue
 
-            norm_row = {k.strip().lower(): v.strip() for k, v in row.items() if k and v}
+            norm_row = {k.strip("\ufeff\ufeef\ufffe").strip().lower(): v.strip() for k, v in row.items() if k and v}
 
             title = (
                 norm_row.get("title")

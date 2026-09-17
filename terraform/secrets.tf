@@ -12,19 +12,34 @@ resource "google_secret_manager_secret_version" "database_url_val" {
   secret_data = var.database_url
 }
 
-# 2. ELASTICSEARCH_API_KEY Secret (Elastic Cloud)
-resource "google_secret_manager_secret" "elasticsearch_api_key" {
-  secret_id = "${var.app_name}-elasticsearch-api-key"
+# 2. ALGOLIA_APP_ID Secret (Algolia Cloud)
+resource "google_secret_manager_secret" "algolia_app_id" {
+  secret_id = "${var.app_name}-algolia-app-id"
 
   replication {
     auto {}
   }
 }
 
-resource "google_secret_manager_secret_version" "elasticsearch_api_key_val" {
-  count       = var.elasticsearch_api_key != "" ? 1 : 0
-  secret      = google_secret_manager_secret.elasticsearch_api_key.id
-  secret_data = var.elasticsearch_api_key
+resource "google_secret_manager_secret_version" "algolia_app_id_val" {
+  count       = var.algolia_app_id != "" ? 1 : 0
+  secret      = google_secret_manager_secret.algolia_app_id.id
+  secret_data = var.algolia_app_id
+}
+
+# 3. ALGOLIA_API_KEY Secret (Algolia Cloud)
+resource "google_secret_manager_secret" "algolia_api_key" {
+  secret_id = "${var.app_name}-algolia-api-key"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "algolia_api_key_val" {
+  count       = var.algolia_api_key != "" ? 1 : 0
+  secret      = google_secret_manager_secret.algolia_api_key.id
+  secret_data = var.algolia_api_key
 }
 
 # 3. PINECONE_API_KEY Secret (Pinecone Serverless)

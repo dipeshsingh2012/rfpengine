@@ -1223,11 +1223,10 @@ function App() {
             <p className="eyebrow">Start a response</p>
             <h1>Bring in your questionnaire</h1>
             <p className="home-subtitle">
-              Choose how you want to load the seller form.
+              Choose how you want to load the buyer form.
             </p>
             <div className="home-feature-grid">
               <div className="home-feature">
-                <span className="home-feature-number">01</span>
                 <div className="home-feature-icon">
                   <Link size={22} />
                 </div>
@@ -1253,10 +1252,8 @@ function App() {
                     Load URL <ArrowUpRight size={15} />
                   </button>
                 </div>
-                <small>Works when the page permits browser access.</small>
               </div>
               <div className="home-feature">
-                <span className="home-feature-number">02</span>
                 <div className="home-feature-icon upload-icon">
                   <Upload size={22} />
                 </div>

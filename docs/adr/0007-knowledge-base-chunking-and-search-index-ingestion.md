@@ -1,7 +1,7 @@
 # ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy
 
 * **Status**: Accepted
-* **Date**: 2026-08-28
+* **Date**: 2026-08-28 (Updated 2026-09-17)
 * **Deciders**: Engineering Team
 
 ## Context
@@ -11,10 +11,10 @@ RFPEngine requires ingesting diverse seller documentation formats—ranging from
 Two key architectural challenges arose:
 1. **Chunking Strategy & Vector Quality**:
    - Chunks that are too large (>1000 tokens) result in diluted vector embeddings and poor semantic matching against granular buyer questions.
-   - Chunks that are too small (<100 tokens) lack surrounding context, exceptions, and SLAs needed by the LLM (`gpt-4o`) to formulate accurate answers.
+   - Chunks that are too small (<100 tokens) lack surrounding context, exceptions, and SLAs needed by the LLM (`gemini-2.5-flash`) to formulate accurate answers.
 2. **Datastore Separation & Postgres Bloat**:
    - Storing high-volume, fine-grained document chunks in relational PostgreSQL tables introduces schema maintenance overhead, storage inflation, and database bloat without providing search benefits.
-   - Live search is conducted across Elasticsearch (BM25 keyword search) and Pinecone (dense vector search), merged via Reciprocal Rank Fusion (RRF).
+   - Live search is conducted across Algolia (sparse keyword search) and Pinecone (dense vector search), merged via Reciprocal Rank Fusion (RRF).
 
 ## Decision
 
@@ -41,21 +41,20 @@ We establish a dedicated **multi-format ingestion pipeline** and a **search-inde
    - Paved path for an asynchronous background LLM worker (`gemini-2.5-flash-lite`) to perform fine-grained zero-shot classification and compliance tag enrichment.
 
 4. **Idempotent 3-Way Synchronization & Retrieval Playground**:
-   - Ingested document chunks are indexed directly and idempotently into **PostgreSQL** (`kb_entries`), **Elastic Cloud** (BM25 inverted index + full text in `_source`), and **Pinecone Serverless** (dense vectors + citation metadata).
+   - Ingested document chunks are indexed directly and idempotently into **PostgreSQL** (`kb_entries`), **Algolia Cloud** (sparse keyword index + full text), and **Pinecone Serverless** (dense vectors + citation metadata).
    - **Idempotent Seeding Pipeline**: `scripts/seed_data.py` performs atomic pruning on existing tenant vectors and documents, guaranteeing that running the seed 1 time or 100 times always results in an exact 1:1 match across all 3 storage backends.
-   - **Retrieval Playground (`/playground`)**: A dedicated testing interface allowing sellers and engineers to run ad-hoc queries, inspect Elasticsearch (BM25) vs Pinecone (dense vector) matches, observe RRF fusion scores, and review Gemini answer generation with confidence metrics.
+   - **Retrieval Playground (`/playground`)**: A dedicated testing interface allowing sellers and engineers to run ad-hoc queries, inspect Algolia (sparse) vs Pinecone (dense vector) matches, observe RRF fusion scores, and review Gemini answer generation with confidence metrics.
    - **Demo Sample Documents (`/sample_docs/`)**: Multi-format test documents (`.md`, `.pdf`, `.json`, `.csv`, `.docx`, `.txt`) are bundled in the web app's `public/` directory for instant single-click demo downloads on any machine.
 
 ## Consequences
 
 ### Positive
 - **Optimal Retrieval Precision**: 300–500 token chunks prevent vector dilution while giving Gemini 2.5 Flash enough context for complete answers.
-- **100% Idempotent Multi-Store Sync**: Deterministic hashing and atomic tenant pruning ensure zero record drift across PostgreSQL, Elastic Cloud, and Pinecone.
+- **100% Idempotent Multi-Store Sync**: Deterministic hashing and atomic tenant pruning ensure zero record drift across PostgreSQL, Algolia Cloud, and Pinecone.
 - **Zero-Friction Ingestion**: Sellers simply drop files into the UI without needing to configure or tag categories manually.
 - **Real-Time Retrieval Transparency**: The Playground enables immediate inspection of retrieval scoring and source passage ranking.
-- **Rich Citation Lineage**: Every vector in Pinecone and document in Elasticsearch retains `source_file`, `page_number`, `section_title`, and `chunk_index` for granular citations in generated responses.
-- **Instant Keyword & Semantic Dual-Hydration**: Elasticsearch serves document text directly from its `_source` store with zero database round-trips.
+- **Rich Citation Lineage**: Every vector in Pinecone and document in Algolia retains `source_file`, `page_number`, `section_title`, and `chunk_index` for granular citations in generated responses.
+- **Instant Keyword & Semantic Dual-Hydration**: Algolia serves document text directly from its index store with zero database round-trips.
 
 ### Negative / Trade-offs
-- Re-indexing entire knowledge bases requires re-uploading source documents or exporting raw documents directly from Elasticsearch.
-
+- Re-indexing entire knowledge bases requires re-uploading source documents or exporting raw documents directly from Algolia.

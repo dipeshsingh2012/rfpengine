@@ -29,7 +29,7 @@ from app.models.schemas import (
 from app.services.document_parser_service import DocumentParserService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/knowledge-base", tags=["Knowledge Base"])
+router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
 
 
 @router.get("", response_model=List[KBEntryResponse])
@@ -73,17 +73,17 @@ async def list_knowledge_base_entries(
                 }
                 for e in pg_entries
             ]
-    except Exception as pg_err:
-        logger.warning("PostgreSQL list query failed, attempting Elasticsearch fallback: %s", pg_err)
+    except Exception as db_err:
+        logger.warning("PostgreSQL list query error: %s", db_err)
 
-    # 2. Fallback: Elasticsearch
+    # 2. Fallback: Algolia
     if not docs:
-        es_service = getattr(request.app.state, "elasticsearch", None)
-        if es_service:
+        algolia_service = getattr(request.app.state, "algolia", None)
+        if algolia_service and algolia_service.is_configured():
             try:
-                docs = await es_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
-            except Exception as es_err:
-                logger.warning("Elasticsearch list fallback failed: %s", es_err)
+                docs = await algolia_service.list_documents(tenant_id=tenant_id, limit=limit, offset=offset)
+            except Exception as alg_err:
+                logger.warning("Algolia list fallback failed: %s", alg_err)
 
     return [
         KBEntryResponse(
@@ -109,7 +109,7 @@ async def get_knowledge_base_entry(
     db: AsyncSession = Depends(get_db_session),
 ) -> KBEntryResponse:
     """
-    Retrieves a knowledge entry from PostgreSQL (primary), falling back to Elasticsearch.
+    Retrieves a knowledge entry from PostgreSQL (primary), falling back to Algolia.
     """
     # 1. Primary: PostgreSQL
     try:
@@ -131,10 +131,10 @@ async def get_knowledge_base_entry(
     except Exception as pg_err:
         logger.warning("PostgreSQL get failed for %s: %s", entry_id, pg_err)
 
-    # 2. Fallback: Elasticsearch
-    es_service = getattr(request.app.state, "elasticsearch", None)
-    if es_service:
-        doc = await es_service.get_document(entry_id)
+    # 2. Fallback: Algolia
+    algolia_service = getattr(request.app.state, "algolia", None)
+    if algolia_service and algolia_service.is_configured():
+        doc = await algolia_service.get_document(entry_id)
         if doc:
             return KBEntryResponse(
                 id=doc["id"],
@@ -178,11 +178,11 @@ async def create_knowledge_base_entry(
     except Exception as pg_err:
         logger.error("Failed to insert KBEntry in PostgreSQL: %s", pg_err)
 
-    # 2. Index in Elasticsearch (BM25 Lexical Search)
-    es_service = getattr(request.app.state, "elasticsearch", None)
-    if es_service:
+    # 2. Index in Algolia (Sparse Lexical Search)
+    algolia_service = getattr(request.app.state, "algolia", None)
+    if algolia_service and algolia_service.is_configured():
         try:
-            await es_service.index_document(
+            await algolia_service.index_document(
                 doc_id=doc_id,
                 tenant_id=payload.tenant_id,
                 question=title,
@@ -190,8 +190,8 @@ async def create_knowledge_base_entry(
                 category=payload.category,
                 metadata=payload.metadata or {},
             )
-        except Exception as es_err:
-            logger.warning("Elasticsearch index_document failed for %s: %s", doc_id, es_err)
+        except Exception as alg_err:
+            logger.warning("Algolia index_document failed for %s: %s", doc_id, alg_err)
 
     # 3. Vectorize and index in Pinecone (Dense Vector Search)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
@@ -239,13 +239,13 @@ async def batch_import_knowledge_base(
     """
     Batch indexes knowledge entries across PostgreSQL, Elastic Cloud, and Pinecone.
     """
-    es_service = getattr(request.app.state, "elasticsearch", None)
+    algolia_service = getattr(request.app.state, "algolia", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
     created_responses: List[KBEntryResponse] = []
     pg_models: List[KBEntry] = []
-    es_docs: List[Dict[str, Any]] = []
+    alg_docs: List[Dict[str, Any]] = []
     embed_prompts: List[str] = []
     doc_ids: List[str] = []
 
@@ -266,7 +266,7 @@ async def batch_import_knowledge_base(
             )
         )
 
-        es_docs.append({
+        alg_docs.append({
             "id": doc_id,
             "tenant_id": payload.tenant_id,
             "title": title,
@@ -300,12 +300,12 @@ async def batch_import_knowledge_base(
     except Exception as pg_err:
         logger.error("PostgreSQL batch insert failed: %s", pg_err)
 
-    # 2. Bulk Index into Elasticsearch
-    if es_service:
+    # 2. Bulk Index into Algolia
+    if algolia_service and algolia_service.is_configured():
         try:
-            await es_service.bulk_index_documents(es_docs)
-        except Exception as es_err:
-            logger.warning("Elasticsearch bulk index failed: %s", es_err)
+            await algolia_service.bulk_index_documents(alg_docs)
+        except Exception as alg_err:
+            logger.warning("Algolia bulk index failed: %s", alg_err)
 
     # 3. Bulk Vector Upsert into Pinecone
     if pinecone_service and pinecone_service.is_configured() and hybrid_search:
@@ -374,13 +374,13 @@ async def upload_knowledge_base_file(
             detail="Could not extract any valid knowledge records or chunks from the uploaded file.",
         )
 
-    es_service = getattr(request.app.state, "elasticsearch", None)
+    algolia_service = getattr(request.app.state, "algolia", None)
     pinecone_service = getattr(request.app.state, "pinecone", None)
     hybrid_search = getattr(request.app.state, "hybrid_search", None)
 
     created_responses: List[KBEntryResponse] = []
     pg_models: List[KBEntry] = []
-    es_docs: List[Dict[str, Any]] = []
+    alg_docs: List[Dict[str, Any]] = []
     embed_prompts: List[str] = []
     doc_ids: List[str] = []
 
@@ -401,7 +401,7 @@ async def upload_knowledge_base_file(
             )
         )
 
-        es_docs.append({
+        alg_docs.append({
             "id": doc_id,
             "tenant_id": entry.tenant_id,
             "title": title,
@@ -437,12 +437,12 @@ async def upload_knowledge_base_file(
     except Exception as pg_err:
         logger.warning("PostgreSQL bulk insert failed for uploaded file '%s': %s", file.filename, pg_err)
 
-    # 2b. Bulk Index into Elastic Cloud
-    if es_service:
+    # 2b. Bulk Index into Algolia
+    if algolia_service and algolia_service.is_configured():
         try:
-            await es_service.bulk_index_documents(es_docs)
-        except Exception as es_err:
-            logger.warning("Elasticsearch bulk indexing error: %s", es_err)
+            await algolia_service.bulk_index_documents(alg_docs)
+        except Exception as alg_err:
+            logger.warning("Algolia bulk indexing error: %s", alg_err)
 
     # 2c. Batch Embed & Bulk Upsert into Pinecone Serverless
     if pinecone_service and pinecone_service.is_configured() and hybrid_search:
@@ -501,13 +501,13 @@ async def delete_knowledge_base_entry(
     except Exception as pg_err:
         logger.warning("PostgreSQL delete failed for %s: %s", entry_id, pg_err)
 
-    # 2. Delete from Elasticsearch
-    es_service = getattr(request.app.state, "elasticsearch", None)
-    if es_service:
+    # 2. Delete from Algolia
+    algolia_service = getattr(request.app.state, "algolia", None)
+    if algolia_service and algolia_service.is_configured():
         try:
-            await es_service.delete_document(entry_id)
-        except Exception as es_err:
-            logger.warning("Elasticsearch delete failed for %s: %s", entry_id, es_err)
+            await algolia_service.delete_document(entry_id)
+        except Exception as alg_err:
+            logger.warning("Algolia delete failed for %s: %s", entry_id, alg_err)
 
     # 3. Delete from Pinecone
     pinecone_service = getattr(request.app.state, "pinecone", None)

@@ -10,7 +10,7 @@ from google.oauth2 import service_account
 
 from app.core.config import Settings
 from app.models.schemas import SearchRequest, SearchResponse, Source
-from app.services.elasticsearch_service import ElasticsearchService
+from app.services.algolia_service import AlgoliaService
 from app.services.pinecone_service import PineconeService
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def reciprocal_rank_fusion(
     golden_qa_boost: float = 1.75,
 ) -> List[Dict[str, Any]]:
     """
-    Combines ranked results from sparse (Elasticsearch BM25) and dense (Pinecone vector) retrievers using Reciprocal Rank Fusion.
+    Combines ranked results from sparse (Algolia) and dense (Pinecone vector) retrievers using Reciprocal Rank Fusion.
     Applies an Authority Multiplier (golden_qa_boost) to SME-approved Golden Q&A passages per ADR 0019.
     """
     fused: Dict[str, Dict[str, Any]] = {}
@@ -73,11 +73,11 @@ class HybridSearchService:
     def __init__(
         self,
         settings: Settings,
-        es_service: ElasticsearchService,
+        algolia_service: AlgoliaService,
         pinecone_service: PineconeService,
     ):
         self.settings = settings
-        self.es_service = es_service
+        self.algolia_service = algolia_service
         self.pinecone_service = pinecone_service
         self.genai_client: Optional[genai.Client] = None
 
@@ -154,10 +154,14 @@ class HybridSearchService:
         return [None for _ in texts]
 
     async def search(self, request: SearchRequest) -> SearchResponse:
-        sparse_task = self.es_service.search_sparse(
-            tenant_id=request.tenant_id,
-            query=request.question,
-            top_k=request.top_k,
+        sparse_task = (
+            self.algolia_service.search_sparse(
+                tenant_id=request.tenant_id,
+                query=request.question,
+                top_k=request.top_k,
+            )
+            if self.algolia_service and self.algolia_service.is_configured()
+            else asyncio.sleep(0, result=[])
         )
 
         embedding = None

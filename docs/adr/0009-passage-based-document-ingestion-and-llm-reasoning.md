@@ -1,7 +1,7 @@
 # ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning
 
 * **Status**: Accepted
-* **Date**: 2026-08-28
+* **Date**: 2026-08-28 (Updated 2026-09-17)
 * **Deciders**: Engineering Team
 
 ## Context
@@ -27,9 +27,9 @@ All document formats (PDF, DOCX, Markdown, TXT, CSV, JSON) are chunked into cohe
 - **`metadata`**: Provenance lineage including `source_file`, `page_number`, `section`, `chunk_index`, and file format.
 
 ### 2. Dual-Engine Retrieval Alignment
-- **Elasticsearch (Sparse BM25)**: Matches the buyer's query across text fields with boosted title weighting: `["title^2", "content"]`.
+- **Algolia Cloud (Sparse Keyword Search)**: Matches the buyer's query across searchable attributes with title and content relevance.
 - **Pinecone Serverless (Dense Vectors)**: Generates 768-dimensional normalized embeddings via Google Cloud Vertex AI `text-embedding-004` on formatted passage text (`f"Title: {title}\n\nContent: {content}"`).
-- **Reciprocal Rank Fusion (RRF)**: Merges sparse BM25 keyword matches with dense semantic matches to produce top-ranked passage candidates.
+- **Reciprocal Rank Fusion (RRF)**: Merges sparse keyword matches with dense semantic matches to produce top-ranked passage candidates.
 
 ### 3. LLM Reasoning & Grounded Synthesis
 - The user's RFP requirement or question is passed to **Gemini 2.5 Flash** alongside the top-ranked documentation passages.
@@ -49,4 +49,3 @@ All document formats (PDF, DOCX, Markdown, TXT, CSV, JSON) are chunked into cohe
 
 ### Negative / Trade-offs
 - Answering relies on LLM inference latency at search time rather than instant static lookup. This is mitigated by using Gemini 2.5 Flash with sub-second generation times.
-

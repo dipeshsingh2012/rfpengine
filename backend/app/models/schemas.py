@@ -20,7 +20,7 @@ class Source(BaseModel):
     category: Optional[str] = None
     is_golden_qa: Optional[bool] = False
     score: float = 0.0
-    source_type: Optional[str] = "hybrid"  # "elasticsearch", "pinecone", "hybrid"
+    source_type: Optional[str] = "hybrid"  # "algolia", "pinecone", "hybrid"
     source_file: Optional[str] = None
     page_number: Optional[int] = None
     metadata: Optional[Dict[str, Any]] = None

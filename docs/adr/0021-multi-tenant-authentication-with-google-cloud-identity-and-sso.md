@@ -30,7 +30,7 @@ We adopt a **Dual-Track Multi-Tenant Authentication Architecture** powered by **
   - `firebase.tenant`: The tenant identifier.
   - `sub / uid`: The unique user ID.
   - `role`: Enterprise RBAC role (`viewer`, `editor`, `compliance_officer`, `admin`).
-- Automatically binds `request.state.tenant_id` to all downstream database transactions, Elasticsearch queries, and Pinecone vector lookups.
+- Automatically binds `request.state.tenant_id` to all downstream database transactions, Algolia queries, and Pinecone vector lookups.
 
 ### 3. Self-Service Tenant SSO Configuration
 - Tenant administrators configure SAML/OIDC metadata directly through the RFPEngine Admin Portal (`/settings/sso`).

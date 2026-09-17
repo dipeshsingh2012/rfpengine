@@ -11,8 +11,14 @@ resource "google_secret_manager_secret_iam_member" "db_url_access" {
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
-resource "google_secret_manager_secret_iam_member" "elasticsearch_key_access" {
-  secret_id = google_secret_manager_secret.elasticsearch_api_key.id
+resource "google_secret_manager_secret_iam_member" "algolia_app_id_access" {
+  secret_id = google_secret_manager_secret.algolia_app_id.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "algolia_api_key_access" {
+  secret_id = google_secret_manager_secret.algolia_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }

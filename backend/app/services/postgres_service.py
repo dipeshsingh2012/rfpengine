@@ -288,14 +288,14 @@ DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
         "summary": "1-click promotion of verified, SME-approved answers directly into the canonical knowledge base with cryptographic provenance.",
         "problem_statement": "SMEs spend 15+ hours each month repeatedly correcting the same standard compliance answers across different customer RFPs because edits stay trapped in individual workspaces.",
         "user_story": "As a Security SME or Legal Counsel, I want to promote my approved answer to the canonical knowledge base with one click, so that future AI drafts automatically reuse my vetted phrasing.",
-        "success_metrics": ["0 manual copy-pasting required from completed proposals to knowledge base", "100% provenance tracking (who approved, when, for which client RFP)", "< 1.5s dual-index sync time into Elasticsearch and Pinecone"],
+        "success_metrics": ["0 manual copy-pasting required from completed proposals to knowledge base", "100% provenance tracking (who approved, when, for which client RFP)", "< 1.5s dual-index sync time into Algolia and Pinecone"],
         "acceptance_criteria": [
             "Given a question with review_status == 'Approved' by Security SME, Legal Counsel, or Approver.",
             "When the user clicks [⭐ Promote to Knowledge Base] in the review drawer or question card.",
             "Then a new KBEntry is created with category 'Golden Q&A' and metadata linking back to the origin workspace.",
             "And an audit badge '⭐ Promoted to Knowledge Base' appears on the question card."
         ],
-        "technical_architecture": "FastAPI endpoint + PostgreSQL KBEntry with origin_workspace_id + Dual-sync to Pinecone namespace and Elasticsearch.",
+        "technical_architecture": "FastAPI endpoint + PostgreSQL KBEntry with origin_workspace_id + Dual-sync to Pinecone namespace and Algolia.",
         "rice_reach": 90, "rice_impact": 4, "rice_confidence": 95, "rice_effort": 2, "rice_score": 171.0,
         "upvotes": 92, "tags": ["Feedback Loop", "Golden Q&A", "Knowledge Sync", "RICE P0"]
     },

@@ -6,7 +6,7 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 
 | ADR | Title | Status | Date |
 | :--- | :--- | :--- | :--- |
-| [0001](0001-hybrid-retrieval-with-elasticsearch-and-pinecone.md) | Hybrid Search with Elasticsearch (Sparse BM25) and Pinecone (Dense Vector) via Reciprocal Rank Fusion | Accepted | 2026-08-28 |
+| [0001](0001-hybrid-retrieval-with-algolia-and-pinecone.md) | Hybrid Search with Algolia (Sparse) and Pinecone (Dense Vector) via Reciprocal Rank Fusion | Accepted | 2026-08-28 |
 | [0002](0002-relational-persistence-with-postgresql.md) | Relational Persistence with PostgreSQL for Canonical Records and Review Tracking | Accepted | 2026-08-28 |
 | [0003](0003-human-in-the-loop-governance-and-extension-safety.md) | Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety | Accepted | 2026-08-28 |
 | [0004](0004-decoupled-seller-workspace-and-browser-extension.md) | Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture | Accepted | 2026-08-28 |
@@ -27,4 +27,4 @@ This directory contains Architecture Decision Records (ADRs) for **RFPEngine**.
 | [0019](0019-closed-loop-ai-feedback-architecture.md) | Closed-Loop AI Feedback Architecture: Golden Q&A Promotion, Edit Drift Analytics, and In-Context Exemplar Learning | Accepted | 2026-08-30 |
 | [0020](0020-autonomous-5-agent-sdlc-governance.md) | Autonomous 5-Agent SDLC Governance & Branching Architecture | Accepted | 2026-08-30 |
 | [0021](0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md) | Multi-Tenant B2B Authentication Architecture via Google Cloud Identity Platform and Dual-Track SSO | Accepted | 2026-09-01 |
-| [0022](0022-model-context-protocol-mcp-integration-for-ide-and-chat.md) | Model Context Protocol (MCP) Integration for IDEs, Chat Assistants, and Autonomous Fleet Swarms | Accepted | 2026-09-01 |
+| [0022](0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md) | Swap Elasticsearch with Algolia for Sparse Retrieval & Text Store | Accepted | 2026-09-17 |

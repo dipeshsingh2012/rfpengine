@@ -19,7 +19,8 @@ from app.services.gcp_secret_service import GCPSecretService
 
 REQUIRED_PROJECT_SECRETS = [
     ("DATABASE_URL", "PostgreSQL database connection string (Neon)"),
-    ("ELASTICSEARCH_API_KEY", "Elastic Cloud API key for BM25 indexing"),
+    ("ALGOLIA_APP_ID", "Algolia Application ID"),
+    ("ALGOLIA_API_KEY", "Algolia API key for sparse keyword indexing"),
     ("PINECONE_API_KEY", "Pinecone API Key for dense vector similarity search"),
 ]
 
@@ -59,12 +60,13 @@ async def sync_secrets(service: GCPSecretService):
     print("=" * 70)
 
     if not service.is_configured():
-        print("❌ GCP Secret Manager is not configured. Set GCP_PROJECT_ID in .env")
+        print("❌ GCP Secret Manager is not configured. Set GCP_PROJECT_ID in environment")
         return
 
     secret_values = {
         "database-url": settings.database_url,
-        "elasticsearch-api-key": settings.elasticsearch_api_key,
+        "algolia-app-id": settings.algolia_app_id,
+        "algolia-api-key": settings.algolia_api_key,
         "pinecone-api-key": settings.pinecone_api_key,
     }
 

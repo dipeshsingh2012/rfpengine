@@ -1,7 +1,7 @@
 # ADR 0019: Closed-Loop AI Feedback Architecture & Continuous Learning Loop
 
 * **Status**: Accepted
-* **Date**: 2026-08-30
+* **Date**: 2026-08-30 (Updated 2026-09-17)
 * **Deciders**: Product & Engineering Team
 * **Related Issues / PRDs**: `EPIC-AI-FEEDBACK-LOOP`, `FEAT-FEEDBACK-L1`, `FEAT-FEEDBACK-L2`, `FEAT-FEEDBACK-L3`
 
@@ -34,7 +34,7 @@ flowchart TD
     subgraph Level_1 ["Level 1: Curated Promotion (FEAT-FEEDBACK-L1)"]
         ApprovedAnswer -->|1-Click Promote| PromoteAction["⭐ Promote to Knowledge Base"]
         PromoteAction --> KBEntry["KBEntry (category: 'Golden Q&A')<br/>+ Provenance Metadata"]
-        KBEntry --> DualSync["Dual Vector & BM25 Indexing<br/>(Pinecone + Elasticsearch + PostgreSQL)"]
+        KBEntry --> DualSync["Dual Vector & Sparse Indexing<br/>(Pinecone + Algolia + PostgreSQL)"]
     end
 
     subgraph Level_2 ["Level 2: Drift Telemetry (FEAT-FEEDBACK-L2)"]
@@ -62,7 +62,7 @@ flowchart TD
   1. Once a question reaches status `Approved` in the review queue, an interactive `[ ⭐ Promote to KB ]` action appears.
   2. Invokes `POST /api/v1/workspaces/{workspace_id}/questions/{question_index}/promote`.
   3. Creates or updates a `KBEntry` under `category: "Golden Q&A"` with provenance metadata (`origin_workspace_id`, `approved_by_role`, `is_golden_qa: true`, `promoted_at`).
-  4. Synchronizes dense embeddings (768-dim) into Pinecone and BM25 index in Elasticsearch.
+  4. Synchronizes dense embeddings (768-dim) into Pinecone and sparse index in Algolia.
   5. Renders a persistent `⭐ Promoted to Knowledge Base` audit badge on the question card.
 
 ### Level 2: Edit-Distance Telemetry & Stale Document Drift Detector (`FEAT-FEEDBACK-L2`)
@@ -138,4 +138,3 @@ promoted_kb_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 ### Considerations & Mitigations
 * **Knowledge Base Growth**: Over time, hundreds of Golden Q&As may be promoted. Level 2 drift analytics and deduplication filters ensure obsolete entries are superseded.
 * **Role-Based Promotion Permissions**: Only verified roles (`Security SME`, `Legal reviewer`, `Final approver`) are permitted to promote entries to canonical status.
-

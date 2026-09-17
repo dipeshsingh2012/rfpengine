@@ -3,7 +3,7 @@
 [![Autonomous SDLC: Agentic Fleet](https://img.shields.io/badge/Autonomous%20SDLC-Agentic%20Fleet%20v1-blueviolet?logo=github)](https://github.com/marketplace/actions/agentic-fleet-autonomous-5-agent-sdlc)
 [![CI Test Suite](https://github.com/dipeshsingh2012/rfpengine/actions/workflows/ci.yml/badge.svg)](https://github.com/dipeshsingh2012/rfpengine/actions)
 
-**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Elasticsearch** for BM25 keyword matching and **Pinecone Serverless** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages cloud secrets via **GCP Secret Manager**, drafts grounded responses with **Google Cloud Vertex AI** (`gemini-2.5-flash` & `text-embedding-004`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
+**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Algolia** for sparse keyword matching and **Pinecone Serverless** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages cloud secrets via **GCP Secret Manager**, drafts grounded responses with **Google Cloud Vertex AI** (`gemini-2.5-flash` & `text-embedding-004`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
 
 ---
 
@@ -27,16 +27,16 @@ flowchart TD
         HS[HybridSearchService]
         RRF[Reciprocal Rank Fusion (RRF)]
         PG_SVC[PostgresService]
-        ES_SVC[ElasticsearchService]
+        ALG_SVC[AlgoliaService]
         PC_SVC[PineconeService]
     end
 
     subgraph Security ["Secrets Management"]
-        GSM[GCP Secret Manager\n(Database URL, Elastic & Pinecone Keys)]
+        GSM[GCP Secret Manager\n(Database URL, Algolia & Pinecone Keys)]
     end
 
     subgraph SearchIndexes ["Search & Chunk Storage (Dual Index)"]
-        ES[(Elasticsearch 8 / Elastic Cloud\nBM25 Sparse Keyword Match\n+ Full Chunk Text Store)]
+        ALG[(Algolia Cloud Search Index\nSparse Keyword Match\n+ Full Chunk Text Store)]
         PC[(Pinecone Serverless\n768-dim Dense Vector k-NN\nCosine Metric + Metadata)]
         VAI[Google Cloud Vertex AI\ntext-embedding-004 & gemini-2.5-flash]
     end
@@ -75,7 +75,8 @@ flowchart TD
 
 Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.md) directory:
 
-- [ADR 0001: Hybrid Search with Elasticsearch and Pinecone via Reciprocal Rank Fusion](docs/adr/0001-hybrid-retrieval-with-elasticsearch-and-pinecone.md)
+- [ADR 0001: Hybrid Search with Algolia and Pinecone via Reciprocal Rank Fusion](docs/adr/0001-hybrid-retrieval-with-algolia-and-pinecone.md)
+- [ADR 0022: Swap Elasticsearch with Algolia for Sparse Retrieval](docs/adr/0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md)
 - [ADR 0002: Relational Persistence with PostgreSQL for Canonical Records and Review Tracking](docs/adr/0002-relational-persistence-with-postgresql.md)
 - [ADR 0003: Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety](docs/adr/0003-human-in-the-loop-governance-and-extension-safety.md)
 - [ADR 0004: Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture](docs/adr/0004-decoupled-seller-workspace-and-browser-extension.md)
@@ -253,12 +254,10 @@ EMBEDDING_DIMENSION=768
 # Neon PostgreSQL Database
 DATABASE_URL=postgresql://neondb_owner:your_password@ep-rapid-truth-aqw82ysi-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require
 
-# Elasticsearch / Elastic Cloud Configuration
-ELASTICSEARCH_URL=http://localhost:9200
-# For Elastic Cloud (supply API key):
-# ELASTICSEARCH_URL=https://my-deployment.es.us-central1.gcp.elastic.cloud:443
-# ELASTICSEARCH_API_KEY=your_elastic_api_key
-ELASTICSEARCH_INDEX=rfp_knowledge_base
+# Algolia Cloud Configuration
+ALGOLIA_APP_ID=your_algolia_app_id
+ALGOLIA_API_KEY=your_algolia_api_key
+ALGOLIA_INDEX_NAME=rfp_knowledge_base
 
 # Pinecone Serverless Configuration
 PINECONE_API_KEY=pcsk_...
@@ -272,7 +271,7 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 PORT=8000
 ```
 
-### 2. Start Local Elasticsearch (Optional if using Elastic Cloud)
+### 2. Start Local PostgreSQL Database
 
 ```bash
 docker-compose up -d
@@ -355,19 +354,19 @@ All cloud infrastructure — including **Google Cloud Secret Manager secrets**, 
 
 ### Managing Secrets with Terraform & GCP Secret Manager
 
-All sensitive credentials (`DATABASE_URL`, `ELASTICSEARCH_API_KEY`, `PINECONE_API_KEY`) are declared as sensitive variables in Terraform, securely provisioned in **Google Cloud Secret Manager**, and automatically injected into Cloud Run at container boot via `version = "latest"`. Google Cloud Vertex AI (Gemini 2.5 Flash and `text-embedding-004`) authenticates natively using the Cloud Run Service Account (`roles/aiplatform.user`).
+All sensitive credentials (`DATABASE_URL`, `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `PINECONE_API_KEY`) are declared as sensitive variables in Terraform, securely provisioned in **Google Cloud Secret Manager**, and automatically injected into Cloud Run at container boot via `version = "latest"`. Google Cloud Vertex AI (Gemini 2.5 Flash and `text-embedding-004`) authenticates natively using the Cloud Run Service Account (`roles/aiplatform.user`).
 
 #### 1. How to Update or Rotate an Existing Secret
 
-When you update credentials (e.g. rotating a Neon database password, Elastic Cloud API Key, or Pinecone API key):
+When you update credentials (e.g. rotating a Neon database password, Algolia API Key, or Pinecone API key):
 
 1. Open your local `terraform/terraform.tfvars` file (which is gitignored):
    ```hcl
    # terraform/terraform.tfvars
-   database_url          = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
-   elasticsearch_url     = "https://ba084bb1a22b44618a61af41fbedc84b.us-central1.gcp.cloud.es.io:443"
-   elasticsearch_api_key = "NEW_ELASTIC_API_KEY"
-   pinecone_api_key      = "NEW_PINECONE_KEY..."
+   database_url     = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
+   algolia_app_id   = "YOUR_ALGOLIA_APP_ID"
+   algolia_api_key  = "NEW_ALGOLIA_API_KEY"
+   pinecone_api_key = "NEW_PINECONE_KEY..."
    ```
 
 2. **Preview the Changes**:
@@ -500,10 +499,10 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
 | Route Path | Page / View Name | Primary Features & User Workflows |
 | :--- | :--- | :--- |
 | **`GET /`** | **Overview & Importer** | • Import buyer questionnaires via URL or file upload (`.csv`, `.json`, `.pdf`, `.docx`)<br>• Quick-start with pre-configured starter questions<br>• Summary dashboard of recent RFP projects |
-| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gemini-2.5-flash`)<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
+| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gemini-2.5-flash`) stream<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Algolia (Sparse) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
 | **`GET /review/:id`** | **Question Review & Governance** | • Multi-question review queue with role switcher (`Proposal manager`, `Security SME`, `Legal reviewer`, `Final approver`)<br>• Approval state machine badges (`Draft`, `SME review`, `Approved by SME`, `Legal review`, `Approved by Legal`, `Final approved`, `Rejected`)<br>• Question search and filtering<br>• Export approved answers to CSV or automated handoff to buyer form |
 | **`GET /knowledge-base`** | **Knowledge Base Ingestion** | • Drag-and-drop multi-format file uploader (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`)<br>• 300–500 token chunking with automatic taxonomy categorization<br>• Single-click demo sample downloads (`/sample_docs/`)<br>• Clean table of indexed knowledge chunks with single-click deletion |
-| **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Elasticsearch (BM25) and Pinecone (Dense Vectors)<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection and hit breakdown<br>• Live AI answer generation (`gemini-2.5-flash`) with radial confidence scoring<br>• Quick-click sample test questions for live demonstrations |
+| **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Algolia (Sparse) and Pinecone (Dense Vectors)<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection and hit breakdown<br>• Live AI answer generation (`gemini-2.5-flash`) with radial confidence scoring<br>• Quick-click sample test questions for live demonstrations |
 
 ---
 
@@ -517,7 +516,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 
 ### 2. Secret Propagation Pipeline
 - **Zero-Secret Docker Images**: `.env` and `.env.local` are excluded from Docker builds via `.dockerignore`.
-- **GCP Secret Manager**: Single source of truth for production secrets (`DATABASE_URL`, `ELASTICSEARCH_API_KEY`, `PINECONE_API_KEY`).
+- **GCP Secret Manager**: Single source of truth for production secrets (`DATABASE_URL`, `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `PINECONE_API_KEY`).
 - **Cloud Run Boot Injection**: Secrets are mounted directly into container memory via Terraform `secret_key_ref` definitions.
 - **CLI Sync Tool**: Run `npm run secrets:sync` to push updated keys from local `.env` to GCP Secret Manager.
 
@@ -532,7 +531,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 
 ### 1. Hybrid Search & Answer Generation
 - **`POST /api/v1/search`**
-  - Concurrently queries Elasticsearch (BM25) and Pinecone (dense vector k-NN).
+  - Concurrently queries Algolia (sparse) and Pinecone (dense vector k-NN).
   - Merges hits with Reciprocal Rank Fusion (RRF).
   - Drafts grounded answer with Google Cloud Vertex AI `gemini-2.5-flash`.
   - **Request Body**:
@@ -545,12 +544,12 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
     ```
 
 ### 2. Knowledge Base Management & Ingestion
-- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into PostgreSQL (System of Record), Elasticsearch (BM25 + text storage), and Pinecone (dense vectors).
+- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into PostgreSQL (System of Record), Algolia (sparse + text storage), and Pinecone (dense vectors).
 - **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records from PostgreSQL with pagination.
 - **`GET /api/v1/knowledge-base/{id}`**: Get a specific knowledge record.
-- **`POST /api/v1/knowledge-base`**: Create a single record across PostgreSQL, Elasticsearch, and Pinecone.
-- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records across PostgreSQL, Elasticsearch, and Pinecone.
-- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record synchronously from PostgreSQL, Elasticsearch, and Pinecone.
+- **`POST /api/v1/knowledge-base`**: Create a single record across PostgreSQL, Algolia, and Pinecone.
+- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records across PostgreSQL, Algolia, and Pinecone.
+- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record synchronously from PostgreSQL, Algolia, and Pinecone.
 
 ### 3. Workspaces & Review Persistence (PostgreSQL)
 - **`POST /api/v1/workspaces`**: Save an imported questionnaire workspace and its questions to PostgreSQL.
@@ -558,14 +557,14 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 - **`PATCH /api/v1/workspaces/{id}/questions/{question_index}`**: Update review status, assigned role, or edited answer for a specific question.
 
 ### 4. Health & Diagnostics
-- **`GET /health`** / **`GET /api/health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Elasticsearch (Elastic Cloud 9.5.2), Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
+- **`GET /health`** / **`GET /api/health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Algolia Cloud, Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
 
 ---
 
 ## Project Structure
 
 ```text
-├── docker-compose.yml              # Local Elasticsearch container
+├── docker-compose.yml              # Local PostgreSQL container
 ├── terraform/                      # Infrastructure as Code (GCP & Cloud Run)
 │   ├── main.tf                     # Provider & GCP API enablement
 │   ├── variables.tf                # Parameter declarations
@@ -577,11 +576,11 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 ├── docs/
 │   └── adr/                        # Architecture Decision Records
 │       ├── README.md               # ADR Index
-│       ├── 0001-hybrid-retrieval-with-elasticsearch-and-pinecone.md
+│       ├── 0001-hybrid-retrieval-with-algolia-and-pinecone.md
 │       ├── 0002-relational-persistence-with-postgresql.md
 │       ├── 0003-human-in-the-loop-governance-and-extension-safety.md
 │       ├── 0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md
-│       └── 0022-model-context-protocol-mcp-integration-for-ide-and-chat.md
+│       └── 0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md
 ├── backend/
 │   ├── Dockerfile                  # Production container for Cloud Run
 │   ├── alembic/                    # Database migration versions
@@ -603,7 +602,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │   │   │   └── schemas.py          # Pydantic request/response schemas
 │   │   ├── services/
 │   │   │   ├── document_parser_service.py # Multi-format parser & 300-500 token chunker
-│   │   │   ├── elasticsearch_service.py   # Elasticsearch BM25 search & text store
+│   │   │   ├── algolia_service.py         # Algolia search & text store
 │   │   │   ├── gcp_secret_service.py      # Google Cloud Secret Manager client
 │   │   │   ├── pinecone_service.py        # Pinecone dense vector similarity search
 │   │   │   ├── postgres_service.py        # PostgreSQL database operations

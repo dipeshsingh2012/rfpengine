@@ -37,21 +37,21 @@ async def health_check(
             details=f"PostgreSQL connection failed: {type(exc).__name__}",
         )
 
-    # 2. Elasticsearch check
-    es_service = getattr(request.app.state, "elasticsearch", None)
-    if es_service:
-        es_start = time.perf_counter()
-        es_status = await es_service.health_check()
-        es_latency = (time.perf_counter() - es_start) * 1000
-        services["elasticsearch"] = HealthServiceStatus(
-            status=es_status.get("status", "unknown"),
-            latency_ms=round(es_latency, 2) if es_status.get("status") == "ok" else None,
-            details=str(es_status.get("details") or f"ES Version: {es_status.get('version')}"),
+    # 2. Algolia check
+    algolia_service = getattr(request.app.state, "algolia", None)
+    if algolia_service and algolia_service.is_configured():
+        alg_start = time.perf_counter()
+        alg_status = await algolia_service.health_check()
+        alg_latency = (time.perf_counter() - alg_start) * 1000
+        services["algolia"] = HealthServiceStatus(
+            status=alg_status.get("status", "unknown"),
+            latency_ms=round(alg_latency, 2) if alg_status.get("status") == "ok" else None,
+            details=str(alg_status.get("details") or f"Index: {alg_status.get('index_name')}"),
         )
     else:
-        services["elasticsearch"] = HealthServiceStatus(
-            status="uninitialized",
-            details="Elasticsearch service is not initialized",
+        services["algolia"] = HealthServiceStatus(
+            status="unconfigured",
+            details="Algolia service is unconfigured or not initialized",
         )
 
     # 3. Pinecone check
