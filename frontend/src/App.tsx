@@ -1274,6 +1274,22 @@ function App() {
     );
   }
 
+  // Active navigation states for sidebar
+  const isKBModalOpen = showKBModal;
+  const isActivityOpen = showActivityModal;
+
+  const isKbActive = !isActivityOpen && (route === "/knowledge-base" || (isKBModalOpen && kbModalTab === "upload"));
+  const isPlaygroundActive = !isActivityOpen && (route === "/playground" || (isKBModalOpen && kbModalTab === "playground"));
+  const isActivityActive = isActivityOpen;
+  const isResponsesActive = !isKBModalOpen && !isActivityOpen && (
+    route.startsWith("/response") || 
+    route.startsWith("/review") || 
+    (route !== "/" && route !== "/knowledge-base" && route !== "/playground")
+  );
+  const isOverviewActive = !isKBModalOpen && !isActivityOpen && route === "/";
+
+  const activeResponseId = responseIdFromPath(route) || reviewIdFromPath(route) || responseId || "demo";
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1363,26 +1379,50 @@ function App() {
         <div className="sidebar-section">
           <p className="eyebrow">Workspace</p>
           <nav>
-            <button className="nav-item active" onClick={() => navigate("/")}>
+            <button
+              className={`nav-item ${isOverviewActive ? "active" : ""}`}
+              onClick={() => {
+                setShowKBModal(false);
+                setShowActivityModal(false);
+                setMobileNavOpen(false);
+                navigate("/");
+              }}
+            >
               <LayoutGrid size={17} /> Overview
             </button>
-            <button className="nav-item" onClick={() => navigate(`/response/workspace/${responseId || "demo"}`)}>
+            <button
+              className={`nav-item ${isResponsesActive ? "active" : ""}`}
+              onClick={() => {
+                setShowKBModal(false);
+                setShowActivityModal(false);
+                setMobileNavOpen(false);
+                const targetId = activeResponseId;
+                setResponseId(targetId);
+                navigate(`/response/workspace/${targetId}`);
+              }}
+            >
               <FileText size={17} /> Responses{" "}
-              <span className="nav-count">12</span>
+              <span className="nav-count">{recentRFPs.length > 0 ? recentRFPs.length : 12}</span>
             </button>
             <button
-              className={`nav-item ${route === "/knowledge-base" && showKBModal && kbModalTab === "upload" ? "active" : ""}`}
+              className={`nav-item ${isKbActive ? "active" : ""}`}
               onClick={() => {
+                setShowActivityModal(false);
+                setMobileNavOpen(false);
                 setKbModalTab("upload");
+                setShowKBModal(true);
                 navigate("/knowledge-base");
               }}
             >
               <FolderOpen size={17} /> Knowledge base
             </button>
             <button
-              className={`nav-item ${route === "/playground" || (showKBModal && kbModalTab === "playground") ? "active" : ""}`}
+              className={`nav-item ${isPlaygroundActive ? "active" : ""}`}
               onClick={() => {
+                setShowActivityModal(false);
+                setMobileNavOpen(false);
                 setKbModalTab("playground");
+                setShowKBModal(true);
                 navigate("/playground");
               }}
             >
@@ -1394,6 +1434,7 @@ function App() {
               rel="noopener noreferrer"
               className="nav-item"
               style={{ textDecoration: "none" }}
+              onClick={() => setMobileNavOpen(false)}
             >
               <TrendingUp size={17} /> Product Roadmap
               <span
@@ -1411,8 +1452,12 @@ function App() {
               </span>
             </a>
             <button
-              className={`nav-item ${showActivityModal ? "active" : ""}`}
-              onClick={() => setShowActivityModal(true)}
+              className={`nav-item ${isActivityActive ? "active" : ""}`}
+              onClick={() => {
+                setShowKBModal(false);
+                setShowActivityModal(true);
+                setMobileNavOpen(false);
+              }}
             >
               <History size={17} /> Activity
             </button>
@@ -1421,17 +1466,29 @@ function App() {
         <div className="sidebar-section recent-section">
           <p className="eyebrow">
             Recent RFPs{" "}
-            <button className="tiny-action" title="Add RFP" onClick={() => navigate("/")}>
+            <button
+              className="tiny-action"
+              title="Add RFP"
+              onClick={() => {
+                setShowKBModal(false);
+                setShowActivityModal(false);
+                setMobileNavOpen(false);
+                navigate("/");
+              }}
+            >
               <Plus size={14} />
             </button>
           </p>
           {recentRFPs.map((rfp) => {
-            const isSelected = (responseId || "demo") === rfp.id;
+            const isSelected = isResponsesActive && activeResponseId === rfp.id;
             return (
               <button
                 key={rfp.id}
                 className={`recent-item ${isSelected ? "selected" : ""}`}
                 onClick={() => {
+                  setShowKBModal(false);
+                  setShowActivityModal(false);
+                  setMobileNavOpen(false);
                   setResponseId(rfp.id);
                   navigate(`/response/workspace/${rfp.id}`);
                 }}
