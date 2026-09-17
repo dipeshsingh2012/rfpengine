@@ -296,13 +296,7 @@ function App() {
   const [responseId, setResponseId] = useState(() =>
     responseIdFromPath(window.location.pathname),
   );
-  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>(() => {
-    try {
-      const stored = localStorage.getItem("rfpengine.recent_rfps");
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return DEFAULT_RECENT_RFPS;
-  });
+  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>(DEFAULT_RECENT_RFPS);
 
   // Send for Review & Governance State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -342,6 +336,25 @@ function App() {
     }
     checkHealth();
   }, [activeApiBase]);
+
+  useEffect(() => {
+    async function fetchRecentHistory() {
+      try {
+        const res = await fetch(`${activeApiBase}/v1/responses/history`, {
+          headers: { "X-Tenant-ID": tenantId },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.history && Array.isArray(data.history) && data.history.length > 0) {
+            setRecentRFPs(data.history);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch recent RFPs from backend:", e);
+      }
+    }
+    fetchRecentHistory();
+  }, [activeApiBase, tenantId]);
 
   // Knowledge Base State
   const [showKBModal, setShowKBModal] = useState(false);
@@ -572,12 +585,28 @@ function App() {
     };
     setRecentRFPs((prev) => {
       const filtered = prev.filter((item) => item.id !== id && item.title !== source);
-      const updated = [newRfpItem, ...filtered].slice(0, 5);
-      try {
-        localStorage.setItem("rfpengine.recent_rfps", JSON.stringify(updated));
-      } catch {}
-      return updated;
+      return [newRfpItem, ...filtered].slice(0, 5);
     });
+
+    try {
+      fetch(`${activeApiBase}/v1/responses/history`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify(newRfpItem),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.history && Array.isArray(data.history)) {
+            setRecentRFPs(data.history);
+          }
+        }
+      }).catch((e) => console.warn("Failed to sync recent RFP to backend history:", e));
+    } catch (e) {
+      console.warn("Failed to post recent RFP to backend:", e);
+    }
 
     setSourceStatus(
       `${source} · ${questions.length} question${questions.length === 1 ? "" : "s"} detected`,

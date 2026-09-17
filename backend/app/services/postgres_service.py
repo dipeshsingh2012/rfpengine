@@ -684,6 +684,21 @@ class PostgresService:
         return result.scalars().first()
 
     @staticmethod
+    async def list_workspaces(
+        session: AsyncSession,
+        tenant_id: str,
+        limit: int = 10,
+    ) -> List[ResponseWorkspace]:
+        result = await session.execute(
+            select(ResponseWorkspace)
+            .where(ResponseWorkspace.tenant_id == tenant_id)
+            .options(selectinload(ResponseWorkspace.reviews))
+            .order_by(ResponseWorkspace.updated_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def update_question_review(
         session: AsyncSession,
         workspace_id: str,
