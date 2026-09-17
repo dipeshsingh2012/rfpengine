@@ -958,48 +958,16 @@ function App() {
           <p className="breadcrumb">
             Responses <span>/</span> New response
           </p>
-          <h1>Review your questionnaire</h1>
-          <section className="import-source panel">
-            <div className="source-input-row">
-              <div className="source-url-field">
-                <Link size={16} />
-                <input
-                  value={formUrl}
-                  onChange={(event) => setFormUrl(event.target.value)}
-                  placeholder="https://buyer.example/questionnaire"
-                />
-                <button
-                  className="source-button"
-                  onClick={loadFormUrl}
-                  disabled={!formUrl.trim()}
-                >
-                  Load URL
-                </button>
-              </div>
-              <label className="upload-form-button">
-                <Upload size={15} /> Upload HTML, JSON, or CSV
-                <input
-                  type="file"
-                  accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
-                  onChange={loadFormFile}
-                />
-              </label>
-            </div>
-            <p className="source-status">
-              <span className="status-dot" /> {sourceStatus}
-            </p>
-          </section>
           <section className="import-questions panel">
             <div className="import-question-heading">
               <div>
-                <p className="eyebrow">02 / Detected questions</p>
+                <p className="eyebrow">Detected questions</p>
                 <h2>
                   {detectedQuestions.length
-                    ? `${detectedQuestions.length} questions ready`
+                    ? "Questions overview"
                     : "No questions detected"}
                 </h2>
               </div>
-              <span className="source-count">Review before continuing</span>
             </div>
             {detectedQuestions.length ? (
               <div className="import-question-list">
@@ -1288,7 +1256,7 @@ function App() {
                     className="primary-button"
                     onClick={async () => {
                       const id = await loadFormUrl();
-                      if (id) openImport(id);
+                      if (id) openWorkspace();
                     }}
                     disabled={!formUrl.trim()}
                   >
@@ -1311,7 +1279,7 @@ function App() {
                     accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
                     onChange={async (event) => {
                       const id = await loadFormFile(event);
-                      if (id) openImport(id);
+                      if (id) openWorkspace();
                     }}
                   />
                 </label>
