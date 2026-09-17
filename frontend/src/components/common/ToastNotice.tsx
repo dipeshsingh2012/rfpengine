@@ -33,3 +33,4 @@ export const ToastNotice: React.FC<ToastNoticeProps> = ({ message }) => {
     </div>
   );
 };
+

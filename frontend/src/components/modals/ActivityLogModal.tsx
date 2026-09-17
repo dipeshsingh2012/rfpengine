@@ -179,3 +179,4 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
     </div>
   );
 };
+

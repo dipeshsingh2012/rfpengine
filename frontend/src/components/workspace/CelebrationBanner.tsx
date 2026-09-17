@@ -50,3 +50,4 @@ export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
     </div>
   );
 };
+

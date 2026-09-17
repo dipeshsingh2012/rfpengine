@@ -36,3 +36,4 @@ export const WorkspaceBottomStrip: React.FC<WorkspaceBottomStripProps> = ({
     </div>
   );
 };
+

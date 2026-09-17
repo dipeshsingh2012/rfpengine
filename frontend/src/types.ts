@@ -188,3 +188,4 @@ export const starterQuestions = [
   "What FAA waivers and Beyond Visual Line of Sight (BVLOS) authorizations are held?",
   "What is the guaranteed latency SLA and failover mechanism for remote pilot teleoperation?",
 ];
+

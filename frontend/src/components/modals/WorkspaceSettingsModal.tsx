@@ -529,3 +529,4 @@ export const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
     </div>
   );
 };
+

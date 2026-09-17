@@ -75,3 +75,4 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
     </section>
   );
 };
+

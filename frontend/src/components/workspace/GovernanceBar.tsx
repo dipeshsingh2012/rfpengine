@@ -116,3 +116,4 @@ export const GovernanceBar: React.FC<GovernanceBarProps> = ({
     </div>
   );
 };
+

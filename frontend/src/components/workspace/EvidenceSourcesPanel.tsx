@@ -48,3 +48,4 @@ export const EvidenceSourcesPanel: React.FC<EvidenceSourcesPanelProps> = ({
     </aside>
   );
 };
+

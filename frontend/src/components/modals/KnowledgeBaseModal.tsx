@@ -496,3 +496,4 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
     </div>
   );
 };
+
