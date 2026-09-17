@@ -22,6 +22,7 @@ interface SidebarProps {
   recentRFPs: RecentRFPItem[];
   activeResponseId: string;
   onNavigateHome: () => void;
+  onNavigateResponses: () => void;
   onSelectRFP: (id: string) => void;
   onOpenKB: (tab: "upload" | "playground") => void;
   onOpenActivity: () => void;
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   recentRFPs,
   activeResponseId,
   onNavigateHome,
+  onNavigateResponses,
   onSelectRFP,
   onOpenKB,
   onOpenActivity,
@@ -51,10 +53,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   kbTotalSources,
 }) => {
   return (
-    <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
+    <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
       <div className="sidebar-section">
-        <p className="eyebrow">Workspace</p>
-        <nav>
+        <p className="eyebrow">Workspaces</p>
+        <nav className="nav-list">
           <button
             className={`nav-item ${isOverviewActive ? "active" : ""}`}
             onClick={() => {
@@ -68,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className={`nav-item ${isResponsesActive ? "active" : ""}`}
             onClick={() => {
               setMobileNavOpen(false);
-              onSelectRFP(activeResponseId);
+              onNavigateResponses();
             }}
           >
             <FileText size={17} /> Responses{" "}

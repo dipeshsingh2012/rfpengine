@@ -9,6 +9,8 @@ import {
   ReviewerRole,
   RecentRFPItem,
   DEFAULT_RECENT_RFPS,
+  WorkspaceSummaryItem,
+  WorkspaceDetailResponse,
   ActivityLogItem,
   DEFAULT_ACTIVITY_LOGS,
   starterQuestions,
@@ -23,6 +25,7 @@ import {
 } from "./utils/helpers";
 import { Topbar } from "./components/layout/Topbar";
 import { Sidebar } from "./components/layout/Sidebar";
+import { ResponsesDashboard } from "./components/responses/ResponsesDashboard";
 import { HomeWelcomeView } from "./components/workspace/HomeWelcomeView";
 import { ReviewImportPage } from "./components/workspace/ReviewImportPage";
 import { QuestionnaireWorkspace } from "./components/workspace/QuestionnaireWorkspace";
@@ -82,13 +85,11 @@ export function App() {
     () => import.meta.env.VITE_APP_ENV || "local",
   );
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
-  const [activeApiBase, setActiveApiBase] = useState<string>(() => {
-    const saved = localStorage.getItem("rfpengine.custom_api_url");
-    if (saved) {
-      return saved;
-    }
-    return apiBaseUrl;
-  });
+  const [activeApiBase, setActiveApiBase] = useState<string>(apiBaseUrl);
+
+  // Responses Dashboard State (PostgreSQL backed, no localStorage)
+  const [workspaceSummaries, setWorkspaceSummaries] = useState<WorkspaceSummaryItem[]>([]);
+  const [isWorkspacesLoading, setIsWorkspacesLoading] = useState(false);
 
   // Workspace Settings State
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -133,15 +134,8 @@ export function App() {
     setTimeout(() => setToastNotice(null), 3500);
   }
 
-  // Golden Q&A Promotion tracking
-  const [promotedQuestions, setPromotedQuestions] = useState<Record<string, boolean>>(() => {
-    try {
-      const stored = localStorage.getItem("rfpengine.promoted_questions");
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Golden Q&A Promotion tracking (in-memory & PostgreSQL backed, no localStorage)
+  const [promotedQuestions, setPromotedQuestions] = useState<Record<string, boolean>>({});
 
   function logActivity(action: string, details: string, type: ActivityLogItem["type"]) {
     const newEntry: ActivityLogItem = {
@@ -239,7 +233,73 @@ export function App() {
       }
     }
     fetchRecentHistory();
-  }, [activeApiBase, tenantId]);
+    fetchWorkspaceSummaries();
+  }, [activeApiBase, tenantId, route]);
+
+  async function fetchWorkspaceSummaries() {
+    setIsWorkspacesLoading(true);
+    try {
+      const res = await fetch(`${activeApiBase}/v1/responses/workspaces`, {
+        headers: { "X-Tenant-ID": tenantId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaceSummaries(data);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch workspace summaries from PostgreSQL:", e);
+    } finally {
+      setIsWorkspacesLoading(false);
+    }
+  }
+
+  async function handleDuplicateWorkspace(id: string) {
+    try {
+      const res = await fetch(`${activeApiBase}/v1/responses/workspaces/${id}/duplicate`, {
+        method: "POST",
+        headers: { "X-Tenant-ID": tenantId },
+      });
+      if (res.ok) {
+        showToast("Questionnaire duplicated in PostgreSQL");
+        await fetchWorkspaceSummaries();
+        const historyRes = await fetch(`${activeApiBase}/v1/responses/history`, {
+          headers: { "X-Tenant-ID": tenantId },
+        });
+        if (historyRes.ok) {
+          const data = await historyRes.json();
+          if (data.history) setRecentRFPs(data.history);
+        }
+      } else {
+        showToast("Failed to duplicate questionnaire");
+      }
+    } catch (e) {
+      showToast("Network error duplicating questionnaire");
+    }
+  }
+
+  async function handleDeleteWorkspace(id: string) {
+    try {
+      const res = await fetch(`${activeApiBase}/v1/responses/workspaces/${id}`, {
+        method: "DELETE",
+        headers: { "X-Tenant-ID": tenantId },
+      });
+      if (res.ok) {
+        showToast("Questionnaire permanently deleted from PostgreSQL");
+        await fetchWorkspaceSummaries();
+        const historyRes = await fetch(`${activeApiBase}/v1/responses/history`, {
+          headers: { "X-Tenant-ID": tenantId },
+        });
+        if (historyRes.ok) {
+          const data = await historyRes.json();
+          if (data.history) setRecentRFPs(data.history);
+        }
+      } else {
+        showToast("Failed to delete questionnaire");
+      }
+    } catch (e) {
+      showToast("Network error deleting questionnaire");
+    }
+  }
 
   async function fetchWorkspaceSettings() {
     try {
@@ -464,44 +524,50 @@ export function App() {
 
     const id = responseIdFromPath(route) || reviewIdFromPath(route);
     if (!id) return;
-    const saved = localStorage.getItem(`rfpengine.response.${id}`);
-    if (!saved) return;
-    const stored = JSON.parse(saved) as {
-      questions: string[];
-      sourceMode: SourceMode;
-      sourceLabel: string;
-      sourceUrl?: string;
-      answers: Record<string, string>;
-      reviewStatuses?: Record<string, string>;
-    };
     setResponseId(id);
-    setDetectedQuestions(stored.questions);
-    setSourceMode(stored.sourceMode);
-    setSourceLabel(stored.sourceLabel);
-    setFormUrl(stored.sourceUrl || "");
-    setAnswersByQuestion(stored.answers);
-    setReviewStatusByQuestion(stored.reviewStatuses || {});
-    if (stored.questions[0]) {
-      setQuestion(stored.questions[0]);
-      setAnswer(stored.answers[stored.questions[0]] || "");
-    }
-  }, [route]);
 
-  function loadQuestions(questions: string[], source: string, mode: SourceMode) {
+    // Hydrate workspace details directly from PostgreSQL (no localStorage)
+    fetch(`${activeApiBase}/v1/responses/workspaces/${id}`, {
+      headers: { "X-Tenant-ID": tenantId },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: WorkspaceDetailResponse | null) => {
+        if (data && data.questions && data.questions.length > 0) {
+          const qList = data.questions.map((q) => q.question_text);
+          const ansMap: Record<string, string> = {};
+          const statusMap: Record<string, string> = {};
+          const promotedMap: Record<string, boolean> = {};
+
+          data.questions.forEach((q) => {
+            if (q.final_answer || q.suggested_answer) {
+              ansMap[q.question_text] = q.final_answer || q.suggested_answer || "";
+            }
+            if (q.review_status) {
+              statusMap[q.question_text] = q.review_status;
+            }
+            if (q.is_promoted_to_kb) {
+              promotedMap[q.question_text] = true;
+            }
+          });
+
+          setDetectedQuestions(qList);
+          setSourceMode(data.source_mode || "upload");
+          setSourceLabel(data.title);
+          setFormUrl(data.source_url || "");
+          setAnswersByQuestion(ansMap);
+          setReviewStatusByQuestion(statusMap);
+          setPromotedQuestions(promotedMap);
+          if (qList[0]) {
+            setQuestion(qList[0]);
+            setAnswer(ansMap[qList[0]] || "");
+          }
+        }
+      })
+      .catch((err) => console.warn("Failed to load workspace from PostgreSQL:", err));
+  }, [route, activeApiBase, tenantId]);
+
+  async function loadQuestions(questions: string[], source: string, mode: SourceMode) {
     const id = `${mode}-${Date.now().toString(36)}`;
-    localStorage.setItem(
-      `rfpengine.response.${id}`,
-      JSON.stringify({
-        id,
-        questions,
-        sourceMode: mode,
-        sourceLabel: source,
-        sourceUrl: mode === "url" ? formUrl : "",
-        answers: {},
-        reviewStatuses: {},
-      }),
-    );
-    localStorage.setItem("rfpengine.latest", id);
     setResponseId(id);
     setDetectedQuestions(questions);
     setSourceMode(mode);
@@ -526,26 +592,30 @@ export function App() {
       "import",
     );
 
+    // Persist directly to PostgreSQL database (zero localStorage)
     try {
-      fetch(`${activeApiBase}/v1/responses/history`, {
+      await fetch(`${activeApiBase}/v1/responses/workspaces`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Tenant-ID": tenantId,
         },
-        body: JSON.stringify(newRfpItem),
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            if (data.history && Array.isArray(data.history)) {
-              setRecentRFPs(data.history);
-            }
-          }
-        })
-        .catch((e) => console.warn("Failed to sync recent RFP to backend history:", e));
+        body: JSON.stringify({
+          id,
+          tenant_id: tenantId,
+          title: source || "Uploaded Questionnaire",
+          source_mode: mode,
+          source_url: mode === "url" ? formUrl : "",
+          questions: questions.map((qText, idx) => ({
+            question_index: idx,
+            question_text: qText,
+            review_status: "Draft",
+          })),
+        }),
+      });
+      await fetchWorkspaceSummaries();
     } catch (e) {
-      console.warn("Failed to post recent RFP to backend:", e);
+      console.warn("Failed to persist new workspace to PostgreSQL:", e);
     }
 
     setSourceStatus(
@@ -596,9 +666,7 @@ export function App() {
   }
 
   function openImport(id?: string) {
-    navigate(
-      `/review/${id || responseId || localStorage.getItem("rfpengine.latest") || "demo"}`,
-    );
+    navigate(`/review/${id || responseId || "demo"}`);
   }
 
   function openWorkspace() {
@@ -621,53 +689,66 @@ export function App() {
           ? detectedQuestions
           : [question];
 
-    let targetStatus = "SME review";
-    if (reviewTargetRole === "Legal reviewer") targetStatus = "Legal review";
-    if (reviewTargetRole === "Final approver") targetStatus = "Ready for Final Approval";
-
     const nextStatuses = { ...reviewStatusByQuestion };
     const nextComments = { ...reviewCommentsByQuestion };
 
     targetQuestions.forEach((q) => {
-      nextStatuses[q] = targetStatus;
+      nextStatuses[q] = `In Review (${reviewTargetRole})`;
       if (reviewInstructions.trim()) {
-        nextComments[q] = `[${reviewTargetRole} Note]: ${reviewInstructions.trim()}`;
+        nextComments[q] = `Instructions for ${reviewTargetRole}: ${reviewInstructions.trim()}`;
       }
     });
 
     setReviewStatusByQuestion(nextStatuses);
-    saveReviewStatuses(nextStatuses);
     setReviewCommentsByQuestion(nextComments);
+    saveReviewStatuses(nextStatuses);
+
+    // Also persist via API to PostgreSQL
+    fetch(`${activeApiBase}/v1/responses/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: `In Review (${reviewTargetRole})`,
+        workspace_id: responseId || "demo",
+        instructions: reviewInstructions,
+        role: reviewTargetRole,
+      }),
+    }).catch((e) => console.warn("Review API background sync:", e));
+
+    logActivity(
+      `Dispatched to ${reviewTargetRole}`,
+      `${targetQuestions.length} question(s) routed for review with notes: "${reviewInstructions || "Standard compliance check"}"`,
+      "review",
+    );
 
     showToast(
-      `Dispatched ${targetQuestions.length} draft${targetQuestions.length === 1 ? "" : "s"} to ${reviewTargetRole}!`,
+      `Routed ${targetQuestions.length} question(s) to ${reviewTargetRole} for review!`,
     );
     setShowReviewModal(false);
   }
 
-  async function handlePromoteToKnowledgeBase(itemText: string, index = 0) {
-    const itemAnswer = answersByQuestion[itemText] || (itemText === question ? answer : "");
-    if (!itemAnswer.trim()) {
-      showToast("Cannot promote an empty answer to Knowledge Base.");
-      return;
-    }
-
+  async function handlePromoteToKnowledgeBase(itemText: string, index: number) {
+    const itemAnswer = answersByQuestion[itemText] || answer;
     try {
       if (responseId && responseId !== "demo") {
-        const res = await fetch(
-          `${activeApiBase}/v1/workspaces/${responseId}/questions/${index}/promote`,
+        await fetch(
+          `${activeApiBase}/v1/responses/workspaces/${responseId}/questions/${index}/promote`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "X-Tenant-ID": tenantId,
+            },
+            body: JSON.stringify({ category: "Golden Q&A" }),
           },
         );
-        if (!res.ok) {
-          throw new Error(`Promotion failed with HTTP ${res.status}`);
-        }
       } else {
-        await fetch(`${activeApiBase}/v1/knowledge-base`, {
+        await fetch(`${activeApiBase}/v1/knowledge-base/entries`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Tenant-ID": tenantId,
+          },
           body: JSON.stringify({
             tenant_id: tenantId,
             question: itemText,
@@ -684,7 +765,6 @@ export function App() {
 
       const nextPromoted = { ...promotedQuestions, [itemText]: true };
       setPromotedQuestions(nextPromoted);
-      localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
       logActivity(
         "Promoted Golden Q&A to Knowledge Base",
         `Promoted answer for "${itemText}" to canonical Knowledge Base`,
@@ -695,7 +775,6 @@ export function App() {
       console.warn("Promotion API fallback:", err);
       const nextPromoted = { ...promotedQuestions, [itemText]: true };
       setPromotedQuestions(nextPromoted);
-      localStorage.setItem("rfpengine.promoted_questions", JSON.stringify(nextPromoted));
       logActivity(
         "Promoted Golden Q&A to Knowledge Base",
         `Promoted answer for "${itemText}" to canonical Knowledge Base`,
@@ -897,18 +976,37 @@ export function App() {
     URL.revokeObjectURL(link.href);
   }
 
+  async function persistWorkspaceToDb(
+    nextAnswers?: Record<string, string>,
+    nextStatuses?: Record<string, string>,
+  ) {
+    if (!responseId || responseId === "demo") return;
+    try {
+      await fetch(`${activeApiBase}/v1/responses/workspaces/${responseId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify({
+          answers: nextAnswers,
+          review_statuses: nextStatuses,
+        }),
+      });
+      fetchWorkspaceSummaries();
+    } catch (e) {
+      console.warn("Failed to persist workspace update to PostgreSQL:", e);
+    }
+  }
+
   function saveAnswers(nextAnswers: Record<string, string>) {
-    if (!responseId) return;
-    const key = `rfpengine.response.${responseId}`;
-    const saved = JSON.parse(localStorage.getItem(key) || "{}");
-    localStorage.setItem(key, JSON.stringify({ ...saved, answers: nextAnswers }));
+    setAnswersByQuestion(nextAnswers);
+    persistWorkspaceToDb(nextAnswers, reviewStatusByQuestion);
   }
 
   function saveReviewStatuses(nextStatuses: Record<string, string>) {
-    if (!responseId) return;
-    const key = `rfpengine.response.${responseId}`;
-    const saved = JSON.parse(localStorage.getItem(key) || "{}");
-    localStorage.setItem(key, JSON.stringify({ ...saved, reviewStatuses: nextStatuses }));
+    setReviewStatusByQuestion(nextStatuses);
+    persistWorkspaceToDb(answersByQuestion, nextStatuses);
   }
 
   async function generateAnswer() {
@@ -1003,6 +1101,7 @@ export function App() {
     return (
       <ReviewImportPage
         onNavigateHome={() => navigate("/")}
+        onNavigateResponses={() => navigate("/responses")}
         formUrl={formUrl}
         setFormUrl={setFormUrl}
         loadFormUrl={loadFormUrl}
@@ -1027,8 +1126,8 @@ export function App() {
   const isResponsesActive =
     !isKBModalOpen &&
     !isActivityOpen &&
-    (route.startsWith("/response") ||
-      route.startsWith("/review") ||
+    (route === "/responses" ||
+      route.startsWith("/response") ||
       (route !== "/" && route !== "/knowledge-base" && route !== "/playground"));
   const isOverviewActive = !isKBModalOpen && !isActivityOpen && route === "/";
 
@@ -1074,6 +1173,11 @@ export function App() {
           setShowActivityModal(false);
           navigate("/");
         }}
+        onNavigateResponses={() => {
+          setShowKBModal(false);
+          setShowActivityModal(false);
+          navigate("/responses");
+        }}
         onSelectRFP={(id) => {
           setShowKBModal(false);
           setShowActivityModal(false);
@@ -1105,9 +1209,36 @@ export function App() {
             loadFormFile={loadFormFile}
             openImport={openImport}
           />
+        ) : route === "/responses" ? (
+          <ResponsesDashboard
+            workspaces={workspaceSummaries}
+            isLoading={isWorkspacesLoading}
+            onSelectWorkspace={(id) => {
+              setResponseId(id);
+              navigate(`/response/workspace/${id}`);
+            }}
+            onDuplicateWorkspace={handleDuplicateWorkspace}
+            onDeleteWorkspace={handleDeleteWorkspace}
+            onExportWorkspace={(ws) => {
+              const rows = [
+                ["ID", "Title", "Source", "Status", "Total Questions", "Approved", "Completion"],
+                [ws.id, ws.title, ws.source_mode, ws.status, ws.total_questions, ws.approved_count, `${ws.completion_percentage}%`],
+              ];
+              const link = document.createElement("a");
+              link.href = URL.createObjectURL(
+                new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" }),
+              );
+              link.download = `${ws.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`;
+              link.click();
+              URL.revokeObjectURL(link.href);
+            }}
+            onNewQuestionnaire={() => navigate("/")}
+            onRefresh={fetchWorkspaceSummaries}
+          />
         ) : (
           <QuestionnaireWorkspace
             onNavigateHome={() => navigate("/")}
+            onNavigateResponses={() => navigate("/responses")}
             onOpenImport={openImport}
             responseId={responseId}
             sourceMode={sourceMode}

@@ -3,6 +3,7 @@ import { Link, Upload, Check, ArrowUpRight } from "lucide-react";
 
 interface ReviewImportPageProps {
   onNavigateHome: () => void;
+  onNavigateResponses?: () => void;
   formUrl: string;
   setFormUrl: (url: string) => void;
   loadFormUrl: () => Promise<string | void>;
@@ -14,6 +15,7 @@ interface ReviewImportPageProps {
 
 export const ReviewImportPage: React.FC<ReviewImportPageProps> = ({
   onNavigateHome,
+  onNavigateResponses,
   formUrl,
   setFormUrl,
   loadFormUrl,
@@ -35,7 +37,7 @@ export const ReviewImportPage: React.FC<ReviewImportPageProps> = ({
       </header>
       <main className="import-main">
         <p className="breadcrumb">
-          <span style={{ cursor: "pointer" }} onClick={onNavigateHome}>
+          <span style={{ cursor: "pointer" }} onClick={onNavigateResponses || onNavigateHome}>
             Responses
           </span>{" "}
           <span>/</span> New response

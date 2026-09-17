@@ -79,6 +79,50 @@ export interface RecentRFPItem {
   questionsCount?: number;
 }
 
+export interface WorkspaceSummaryItem {
+  id: string;
+  tenant_id: string;
+  title: string;
+  source_mode: "url" | "upload" | "extension";
+  source_url?: string | null;
+  total_questions: number;
+  approved_count: number;
+  in_review_count: number;
+  changes_requested_count: number;
+  draft_count: number;
+  completion_percentage: number;
+  status: "Draft" | "In Review" | "Changes Requested" | "Approved";
+  assigned_roles: string[];
+  created_at: string;
+  updated_at: string;
+  color?: string;
+}
+
+export interface WorkspaceQuestionItem {
+  id?: string;
+  question_index: number;
+  question_text: string;
+  suggested_answer?: string | null;
+  final_answer?: string | null;
+  review_status: string;
+  assigned_role?: string | null;
+  confidence_score?: number | null;
+  sources?: any[] | null;
+  is_promoted_to_kb?: boolean;
+  promoted_kb_id?: string | null;
+}
+
+export interface WorkspaceDetailResponse {
+  id: string;
+  tenant_id: string;
+  title: string;
+  source_mode: SourceMode;
+  source_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  questions: WorkspaceQuestionItem[];
+}
+
 export const DEFAULT_RECENT_RFPS: RecentRFPItem[] = [
   { id: "demo", title: "Northstar security review", editedAt: "8 min ago", color: "blue", questionsCount: 12 },
   { id: "grove-rfp", title: "Grove procurement RFP", editedAt: "Yesterday", color: "orange", questionsCount: 8 },

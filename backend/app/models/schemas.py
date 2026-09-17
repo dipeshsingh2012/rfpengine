@@ -163,6 +163,37 @@ class WorkspaceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WorkspaceSummaryResponse(BaseModel):
+    id: str
+    tenant_id: str
+    title: str
+    source_mode: str
+    source_url: Optional[str] = None
+    total_questions: int
+    approved_count: int
+    in_review_count: int
+    changes_requested_count: int
+    draft_count: int
+    completion_percentage: float
+    status: str
+    assigned_roles: List[str]
+    created_at: datetime
+    updated_at: datetime
+    color: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkspaceUpdatePayload(BaseModel):
+    title: Optional[str] = None
+    source_mode: Optional[str] = None
+    source_url: Optional[str] = None
+    answers: Optional[Dict[str, str]] = None
+    review_statuses: Optional[Dict[str, str]] = None
+    questions: Optional[List[QuestionReviewItem]] = None
+
+
+
 class QuestionReviewUpdate(BaseModel):
     final_answer: Optional[str] = None
     review_status: Optional[str] = None

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +14,8 @@ from app.models.schemas import (
     KBEntryUpdate,
     QuestionReviewItem,
     WorkspaceCreate,
+    WorkspaceSummaryResponse,
+    WorkspaceUpdatePayload,
     RoadmapInitiativeCreate,
     RoadmapInitiativeUpdate,
     WorkspaceSettingsUpdate,
@@ -734,6 +736,189 @@ class PostgresService:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    def calculate_workspace_summary(w: ResponseWorkspace) -> WorkspaceSummaryResponse:
+        total = len(w.reviews) if w.reviews else 0
+        approved = sum(1 for r in (w.reviews or []) if r.review_status == "Approved")
+        in_review = sum(1 for r in (w.reviews or []) if r.review_status == "In Review")
+        changes_req = sum(1 for r in (w.reviews or []) if r.review_status == "Changes Requested")
+        drafts = sum(1 for r in (w.reviews or []) if r.review_status in ("Draft", None, ""))
+        pct = round((approved / total) * 100, 1) if total > 0 else 0.0
+
+        if total > 0 and approved == total:
+            status = "Approved"
+        elif changes_req > 0:
+            status = "Changes Requested"
+        elif in_review > 0:
+            status = "In Review"
+        else:
+            status = "Draft"
+
+        roles = sorted(list({r.assigned_role for r in (w.reviews or []) if r.assigned_role}))
+        color = "blue" if w.source_mode == "url" else ("green" if w.title.lower().endswith(".csv") else "orange")
+
+        return WorkspaceSummaryResponse(
+            id=w.id,
+            tenant_id=w.tenant_id,
+            title=w.title,
+            source_mode=w.source_mode,
+            source_url=w.source_url,
+            total_questions=total,
+            approved_count=approved,
+            in_review_count=in_review,
+            changes_requested_count=changes_req,
+            draft_count=drafts,
+            completion_percentage=pct,
+            status=status,
+            assigned_roles=roles,
+            created_at=w.created_at,
+            updated_at=w.updated_at,
+            color=color,
+        )
+
+    @staticmethod
+    async def list_workspace_summaries(
+        session: AsyncSession,
+        tenant_id: str,
+        limit: int = 50,
+        search: Optional[str] = None,
+        status_filter: Optional[str] = None,
+    ) -> List[WorkspaceSummaryResponse]:
+        query = (
+            select(ResponseWorkspace)
+            .where(ResponseWorkspace.tenant_id == tenant_id)
+            .options(selectinload(ResponseWorkspace.reviews))
+            .order_by(ResponseWorkspace.updated_at.desc())
+        )
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            query = query.where(
+                or_(
+                    ResponseWorkspace.title.ilike(term),
+                    ResponseWorkspace.source_url.ilike(term),
+                )
+            )
+        if limit:
+            query = query.limit(limit)
+
+        result = await session.execute(query)
+        workspaces = list(result.scalars().all())
+
+        summaries = [PostgresService.calculate_workspace_summary(w) for w in workspaces]
+        if status_filter and status_filter.lower() != "all":
+            summaries = [s for s in summaries if s.status.lower() == status_filter.lower()]
+
+        return summaries
+
+    @staticmethod
+    async def delete_workspace(
+        session: AsyncSession,
+        workspace_id: str,
+        tenant_id: Optional[str] = None,
+    ) -> bool:
+        stmt = select(ResponseWorkspace).where(ResponseWorkspace.id == workspace_id)
+        if tenant_id:
+            stmt = stmt.where(ResponseWorkspace.tenant_id == tenant_id)
+        result = await session.execute(stmt)
+        workspace = result.scalars().first()
+        if not workspace:
+            return False
+        await session.delete(workspace)
+        await session.commit()
+        return True
+
+    @staticmethod
+    async def duplicate_workspace(
+        session: AsyncSession,
+        workspace_id: str,
+        tenant_id: Optional[str] = None,
+    ) -> Optional[ResponseWorkspace]:
+        orig = await PostgresService.get_workspace(session, workspace_id)
+        if not orig:
+            return None
+        if tenant_id and orig.tenant_id != tenant_id:
+            return None
+
+        new_id = f"rfp-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex[:4]}"
+        new_title = f"{orig.title} (Copy)"
+        new_workspace = ResponseWorkspace(
+            id=new_id,
+            tenant_id=orig.tenant_id,
+            title=new_title,
+            source_mode=orig.source_mode,
+            source_url=orig.source_url,
+        )
+        session.add(new_workspace)
+        await session.flush()
+
+        for q in orig.reviews:
+            new_review = QuestionReview(
+                id=str(uuid.uuid4()),
+                workspace_id=new_id,
+                question_index=q.question_index,
+                question_text=q.question_text,
+                suggested_answer=q.suggested_answer,
+                final_answer=q.final_answer,
+                review_status="Draft",
+                assigned_role=q.assigned_role,
+                confidence_score=q.confidence_score,
+                sources_json=q.sources_json,
+                is_promoted_to_kb=False,
+            )
+            session.add(new_review)
+
+        await session.commit()
+        return await PostgresService.get_workspace(session, new_id)
+
+    @staticmethod
+    async def update_workspace_details(
+        session: AsyncSession,
+        workspace_id: str,
+        payload: WorkspaceUpdatePayload,
+        tenant_id: Optional[str] = None,
+    ) -> Optional[ResponseWorkspace]:
+        workspace = await PostgresService.get_workspace(session, workspace_id)
+        if not workspace:
+            return None
+        if tenant_id and workspace.tenant_id != tenant_id:
+            return None
+
+        if payload.title is not None:
+            workspace.title = payload.title
+        if payload.source_mode is not None:
+            workspace.source_mode = payload.source_mode
+        if payload.source_url is not None:
+            workspace.source_url = payload.source_url
+
+        if payload.questions is not None:
+            await session.execute(
+                delete(QuestionReview).where(QuestionReview.workspace_id == workspace.id)
+            )
+            for q in payload.questions:
+                review = QuestionReview(
+                    workspace_id=workspace.id,
+                    question_index=q.question_index,
+                    question_text=q.question_text,
+                    suggested_answer=q.suggested_answer,
+                    final_answer=q.final_answer,
+                    review_status=q.review_status,
+                    assigned_role=q.assigned_role,
+                    confidence_score=q.confidence_score,
+                    sources_json=q.sources,
+                )
+                session.add(review)
+        else:
+            if payload.answers or payload.review_statuses:
+                for rev in workspace.reviews:
+                    q_text = rev.question_text
+                    if payload.answers and q_text in payload.answers:
+                        rev.final_answer = payload.answers[q_text]
+                    if payload.review_statuses and q_text in payload.review_statuses:
+                        rev.review_status = payload.review_statuses[q_text]
+
+        await session.commit()
+        return await PostgresService.get_workspace(session, workspace.id)
 
     @staticmethod
     async def update_question_review(

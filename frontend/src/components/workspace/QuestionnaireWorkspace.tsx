@@ -10,7 +10,8 @@ import { WorkspaceBottomStrip } from "./WorkspaceBottomStrip";
 
 interface QuestionnaireWorkspaceProps {
   onNavigateHome: () => void;
-  onOpenImport: (id?: string) => void;
+  onNavigateResponses?: () => void;
+  onOpenImport: (id: string) => void;
   responseId: string;
   sourceMode: SourceMode;
   sourceLabel: string;
@@ -55,6 +56,7 @@ interface QuestionnaireWorkspaceProps {
 
 export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
   onNavigateHome,
+  onNavigateResponses,
   onOpenImport,
   responseId,
   sourceMode,
@@ -105,7 +107,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
       <div className="page-heading">
         <div>
           <p className="breadcrumb">
-            <span style={{ cursor: "pointer" }} onClick={onNavigateHome}>
+            <span style={{ cursor: "pointer" }} onClick={onNavigateResponses || onNavigateHome}>
               Responses
             </span>{" "}
             <span>/</span>{" "}

@@ -77,7 +77,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             activeApiBase.includes("localhost") || activeApiBase.startsWith("/api")
               ? "https://rfpengine-api-fwwnzie4dq-uc.a.run.app/api"
               : "/api";
-          localStorage.setItem("rfpengine.custom_api_url", nextUrl);
           setActiveApiBase(nextUrl);
         }}
         title={`Active API: ${activeApiBase}\nStatus: ${backendHealth.toUpperCase()}\nClick to toggle Local / Cloud Prod target`}
