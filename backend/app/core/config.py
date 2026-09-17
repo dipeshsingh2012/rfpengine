@@ -66,6 +66,14 @@ class Settings(BaseSettings):
         return self.DATABASE_URL
 
     @property
+    def effective_database_url(self) -> str:
+        return self.DATABASE_URL
+
+    @property
+    def debug(self) -> bool:
+        return self.ENVIRONMENT.lower() in ("development", "dev", "local")
+
+    @property
     def gcp_project_id(self) -> str:
         return self.GCP_PROJECT_ID
 

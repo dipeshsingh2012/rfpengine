@@ -137,3 +137,20 @@ class RoadmapInitiativeModel(Base):
     )
 
 
+class AuditLogModel(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: f"audit-{uuid.uuid4().hex[:10]}")
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False, default="acme-corp")
+    user_role: Mapped[str] = mapped_column(String(64), nullable=False, default="Proposal Drafter")
+    action: Mapped[str] = mapped_column(String(256), nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    event_type: Mapped[str] = mapped_column(String(32), default="import", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        Index("ix_audit_tenant_event", "tenant_id", "event_type"),
+    )
+
+
+

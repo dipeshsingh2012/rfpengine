@@ -255,3 +255,25 @@ class RoadmapInitiativeResponse(RoadmapInitiativeBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# --- Audit Log Schemas ---
+
+class AuditLogCreate(BaseModel):
+    user_role: str = Field(default="Proposal Drafter")
+    action: str = Field(min_length=1)
+    details: str = Field(default="")
+    event_type: str = Field(default="import")
+
+
+class AuditLogItem(BaseModel):
+    id: str
+    tenant_id: str
+    user_role: str
+    action: str
+    details: str
+    event_type: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+

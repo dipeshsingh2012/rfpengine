@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.db_models import KBEntry, QuestionReview, ResponseWorkspace, RoadmapInitiativeModel
+from app.models.db_models import AuditLogModel, KBEntry, QuestionReview, ResponseWorkspace, RoadmapInitiativeModel
 from app.models.schemas import (
     KBEntryBase,
     KBEntryCreate,
@@ -794,4 +794,43 @@ class PostgresService:
         await session.refresh(kb_entry)
         await session.refresh(review)
         return kb_entry, review
+
+    # --- Audit Logging (PostgreSQL) ---
+
+    @staticmethod
+    async def create_audit_log(
+        session: AsyncSession,
+        tenant_id: str,
+        user_role: str,
+        action: str,
+        details: str,
+        event_type: str = "import",
+    ) -> AuditLogModel:
+        log_entry = AuditLogModel(
+            id=f"audit-{uuid.uuid4().hex[:10]}",
+            tenant_id=tenant_id,
+            user_role=user_role,
+            action=action,
+            details=details,
+            event_type=event_type,
+        )
+        session.add(log_entry)
+        await session.commit()
+        await session.refresh(log_entry)
+        return log_entry
+
+    @staticmethod
+    async def list_audit_logs(
+        session: AsyncSession,
+        tenant_id: str,
+        limit: int = 50,
+    ) -> List[AuditLogModel]:
+        result = await session.execute(
+            select(AuditLogModel)
+            .where(AuditLogModel.tenant_id == tenant_id)
+            .order_by(AuditLogModel.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
 

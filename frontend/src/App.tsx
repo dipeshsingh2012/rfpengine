@@ -366,6 +366,24 @@ function App() {
       type,
     };
     setActivityLogs((prev) => [newEntry, ...prev]);
+
+    try {
+      fetch(`${activeApiBase}/v1/responses/audit-logs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify({
+          user_role: role,
+          action,
+          details,
+          event_type: type,
+        }),
+      }).catch((e) => console.warn("Failed to persist audit log to PostgreSQL:", e));
+    } catch (e) {
+      console.warn("Failed to post audit log to backend:", e);
+    }
   }
 
   // Environment & Health State
@@ -396,6 +414,35 @@ function App() {
     }
     checkHealth();
   }, [activeApiBase]);
+
+  useEffect(() => {
+    async function fetchAuditLogs() {
+      try {
+        const res = await fetch(`${activeApiBase}/v1/responses/audit-logs`, {
+          headers: { "X-Tenant-ID": tenantId },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const mapped: ActivityLogItem[] = data.map((l: any) => ({
+              id: l.id,
+              user: l.user_role || "User",
+              action: l.action,
+              details: l.details,
+              timestamp: l.created_at ? new Date(l.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Recently",
+              type: l.event_type as ActivityLogItem["type"],
+            }));
+            setActivityLogs(mapped);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch audit logs from PostgreSQL:", e);
+      }
+    }
+    if (showActivityModal) {
+      fetchAuditLogs();
+    }
+  }, [showActivityModal, activeApiBase, tenantId]);
 
   useEffect(() => {
     async function fetchRecentHistory() {
