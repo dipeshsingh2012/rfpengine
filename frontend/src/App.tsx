@@ -238,8 +238,22 @@ function extractFormQuestions(text: string, fileName: string) {
         field.getAttribute("placeholder") ||
         "",
     )
-    .filter(Boolean);
+    .filter((q) => q.length > 5);
 }
+
+interface RecentRFPItem {
+  id: string;
+  title: string;
+  editedAt: string;
+  color: "blue" | "orange" | "green";
+  questionsCount?: number;
+}
+
+const DEFAULT_RECENT_RFPS: RecentRFPItem[] = [
+  { id: "demo", title: "Northstar security review", editedAt: "8 min ago", color: "blue", questionsCount: 12 },
+  { id: "grove-rfp", title: "Grove procurement RFP", editedAt: "Yesterday", color: "orange", questionsCount: 8 },
+  { id: "meridian-form", title: "Meridian vendor form", editedAt: "Aug 18", color: "green", questionsCount: 15 },
+];
 
 function formatScore(score: number) {
   return `${Math.round(score * 100)}%`;
@@ -282,6 +296,13 @@ function App() {
   const [responseId, setResponseId] = useState(() =>
     responseIdFromPath(window.location.pathname),
   );
+  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>(() => {
+    try {
+      const stored = localStorage.getItem("rfpengine.recent_rfps");
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return DEFAULT_RECENT_RFPS;
+  });
 
   // Send for Review & Governance State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -541,6 +562,23 @@ function App() {
     setSourceMode(mode);
     setSourceLabel(source);
     if (questions[0]) setQuestion(questions[0]);
+
+    const newRfpItem: RecentRFPItem = {
+      id,
+      title: source || "Uploaded Questionnaire",
+      editedAt: "Just now",
+      color: mode === "url" ? "blue" : source.toLowerCase().endsWith(".csv") ? "green" : "orange",
+      questionsCount: questions.length,
+    };
+    setRecentRFPs((prev) => {
+      const filtered = prev.filter((item) => item.id !== id && item.title !== source);
+      const updated = [newRfpItem, ...filtered].slice(0, 5);
+      try {
+        localStorage.setItem("rfpengine.recent_rfps", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     setSourceStatus(
       `${source} · ${questions.length} question${questions.length === 1 ? "" : "s"} detected`,
     );
@@ -1242,33 +1280,27 @@ function App() {
               <Plus size={14} />
             </button>
           </p>
-          <button className="recent-item selected" onClick={() => navigate(`/response/workspace/${responseId || "demo"}`)}>
-            <span className="file-icon blue">
-              <FileText size={15} />
-            </span>
-            <span>
-              <strong>Northstar security review</strong>
-              <small>Edited 8 min ago</small>
-            </span>
-          </button>
-          <button className="recent-item" onClick={() => navigate(`/response/workspace/${responseId || "demo"}`)}>
-            <span className="file-icon orange">
-              <FileText size={15} />
-            </span>
-            <span>
-              <strong>Grove procurement RFP</strong>
-              <small>Edited yesterday</small>
-            </span>
-          </button>
-          <button className="recent-item" onClick={() => navigate(`/response/workspace/${responseId || "demo"}`)}>
-            <span className="file-icon green">
-              <FileText size={15} />
-            </span>
-            <span>
-              <strong>Meridian vendor form</strong>
-              <small>Edited Aug 18</small>
-            </span>
-          </button>
+          {recentRFPs.map((rfp) => {
+            const isSelected = (responseId || "demo") === rfp.id;
+            return (
+              <button
+                key={rfp.id}
+                className={`recent-item ${isSelected ? "selected" : ""}`}
+                onClick={() => {
+                  setResponseId(rfp.id);
+                  navigate(`/response/workspace/${rfp.id}`);
+                }}
+              >
+                <span className={`file-icon ${rfp.color || "blue"}`}>
+                  <FileText size={15} />
+                </span>
+                <span>
+                  <strong>{rfp.title}</strong>
+                  <small>Edited {rfp.editedAt}</small>
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="sidebar-bottom">
           <button className="nav-item" onClick={() => setNotice("Workspace settings are coming soon") }>
