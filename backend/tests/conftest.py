@@ -22,3 +22,30 @@ def settings() -> Settings:
 def app_settings_dict() -> dict[str, Any]:
     """Provides settings as a dictionary for easy comparison in tests."""
     return get_settings().model_dump()
+
+
+def pytest_sessionstart(session):
+    """
+    Ensure database schema is created once per test session if database is reachable.
+    If database is unreachable (e.g. offline unit testing or sandboxed network),
+    safely continue so unit tests can still run without failure.
+    """
+    import asyncio
+    from app.core.db import Base, get_engine, close_db_connection
+    import app.models.db_models  # noqa: F401 - Register all models with Base.metadata
+
+    async def _init_schema():
+        try:
+            engine = get_engine()
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        except Exception:
+            pass
+        finally:
+            await close_db_connection()
+
+    try:
+        asyncio.run(_init_schema())
+    except Exception:
+        pass
+

@@ -76,6 +76,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Initialize Database Schema
+        env:
+          DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/rfpengine"
+          TESTING: "true"
+          ENV: "test"
+          PYTHONPATH: "backend"
+        run: |
+          python backend/scripts/init_services.py
+
       - name: Run Backend Pytest Suite
         env:
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/rfpengine"

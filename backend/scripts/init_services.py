@@ -32,6 +32,10 @@ async def main() -> None:
         logger.info("✓ PostgreSQL tables created successfully.")
     except Exception as exc:
         logger.error("✗ Failed to initialize PostgreSQL tables: %s", exc)
+        raise
+    finally:
+        from app.core.db import close_db_connection
+        await close_db_connection()
 
     # 2. Algolia Index
     logger.info("Step 2: Initializing Algolia index '%s'...", settings.algolia_index_name)

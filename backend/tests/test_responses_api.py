@@ -63,4 +63,3 @@ async def test_update_workspace_settings():
     assert data["company_name"] == "Updated Enterprise Corp"
     assert data["response_tone"] == "thorough"
     assert data["default_top_k"] == 7
-
