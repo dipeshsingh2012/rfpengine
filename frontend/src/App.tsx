@@ -33,6 +33,7 @@ import { ReviewGovernanceModal } from "./components/modals/ReviewGovernanceModal
 import { KnowledgeBaseModal } from "./components/modals/KnowledgeBaseModal";
 import { ActivityLogModal } from "./components/modals/ActivityLogModal";
 import { WorkspaceSettingsModal } from "./components/modals/WorkspaceSettingsModal";
+import { ExportPackageModal, ExportFormat } from "./components/modals/ExportPackageModal";
 import { ToastNotice } from "./components/common/ToastNotice";
 
 const apiBaseUrl = getApiBaseUrl();
@@ -93,6 +94,7 @@ export function App() {
 
   // Workspace Settings State
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"profile" | "ai" | "governance" | "data">("profile");
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>(
     DEFAULT_WORKSPACE_SETTINGS,
@@ -1037,21 +1039,78 @@ export function App() {
     showToast(`Synced ${allQuestions.length} answers to extension and opened form!`);
   }
 
+  async function handleExportPackage(format: ExportFormat) {
+    const allQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
+    const items = allQuestions.map((qText, idx) => ({
+      question_index: idx,
+      section: "General",
+      question_text: qText,
+      answer_text: answersByQuestion[qText] || (qText === question ? answer : ""),
+      review_status: reviewStatusByQuestion[qText] || (isBatchApproved ? "Approved" : "Draft"),
+      assigned_role: role,
+      confidence_score: 0.94,
+      sources: response?.sources || [],
+      comments: reviewCommentsByQuestion[qText] || "",
+    }));
+
+    const payload = {
+      workspace_id: responseId || undefined,
+      tenant_id: tenantId,
+      title: sourceLabel || "RFP Response & Compliance Matrix",
+      format,
+      items,
+    };
+
+    try {
+      showToast(`Generating ${format.toUpperCase()} compliance deliverable...`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/export`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        let errDetail = `Server returned ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson.detail) errDetail = errJson.detail;
+        } catch (_) {}
+        throw new Error(errDetail);
+      }
+
+      const blob = await res.blob();
+      let filename = `${(sourceLabel || "rfp-response").replace(/[^a-z0-9_-]+/gi, "-").toLowerCase()}-export.${format}`;
+      const disposition = res.headers.get("Content-Disposition");
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match?.[1]) filename = match[1];
+      }
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      logActivity(
+        "Exported Compliance Deliverable",
+        `Downloaded ${format.toUpperCase()} package for ${sourceLabel}`,
+        "export",
+      );
+      showToast(`Downloaded ${filename} successfully!`);
+    } catch (err: any) {
+      console.error("Failed to export deliverable:", err);
+      showToast(`Export failed: ${err.message || "Unknown error"}`);
+    }
+  }
+
   function exportAnswers() {
-    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
-    const rows = [
-      "question,answer",
-      ...detectedQuestions.map(
-        (item) => `${escapeCsv(item)},${escapeCsv(answersByQuestion[item] || "")}`,
-      ),
-    ];
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(
-      new Blob([rows.join("\n")], { type: "text/csv" }),
-    );
-    link.download = `${sourceLabel.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "rfpengine-response"}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    setShowExportModal(true);
   }
 
   async function persistWorkspaceToDb(
@@ -1294,18 +1353,39 @@ export function App() {
             }}
             onDuplicateWorkspace={handleDuplicateWorkspace}
             onDeleteWorkspace={handleDeleteWorkspace}
-            onExportWorkspace={(ws) => {
-              const rows = [
-                ["ID", "Title", "Source", "Status", "Total Questions", "Approved", "Completion"],
-                [ws.id, ws.title, ws.source_mode, ws.status, ws.total_questions, ws.approved_count, `${ws.completion_percentage}%`],
-              ];
-              const link = document.createElement("a");
-              link.href = URL.createObjectURL(
-                new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" }),
-              );
-              link.download = `${ws.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`;
-              link.click();
-              URL.revokeObjectURL(link.href);
+            onExportWorkspace={async (ws) => {
+              try {
+                showToast(`Exporting ${ws.title} as Excel compliance matrix...`);
+                const res = await fetch(
+                  `${apiBaseUrl}/api/v1/responses/workspaces/${ws.id}/export?format=xlsx`,
+                  { headers: { "X-Tenant-ID": tenantId } },
+                );
+                if (res.ok) {
+                  const blob = await res.blob();
+                  const link = document.createElement("a");
+                  link.href = URL.createObjectURL(blob);
+                  link.download = `${ws.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-compliance-matrix.xlsx`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(link.href);
+                  showToast(`Downloaded ${ws.title} Excel matrix!`);
+                } else {
+                  throw new Error("Export failed");
+                }
+              } catch (_) {
+                const rows = [
+                  ["ID", "Title", "Source", "Status", "Total Questions", "Approved", "Completion"],
+                  [ws.id, ws.title, ws.source_mode, ws.status, ws.total_questions, ws.approved_count, `${ws.completion_percentage}%`],
+                ];
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(
+                  new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" }),
+                );
+                link.download = `${ws.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+              }
             }}
             onNewQuestionnaire={() => navigate("/")}
             onRefresh={fetchWorkspaceSummaries}
@@ -1338,6 +1418,7 @@ export function App() {
             handleReviewReset={handleReviewReset}
             isAllApproved={isAllApproved}
             exportAnswers={exportAnswers}
+            onOpenExportModal={() => setShowExportModal(true)}
             reviewStatusByQuestion={reviewStatusByQuestion}
             reviewCommentsByQuestion={reviewCommentsByQuestion}
             answersByQuestion={answersByQuestion}
@@ -1422,6 +1503,15 @@ export function App() {
         recentRfpsCount={recentRFPs.length}
         settingsTab={settingsTab}
         setSettingsTab={setSettingsTab}
+      />
+
+      <ExportPackageModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title={sourceLabel}
+        totalQuestions={detectedQuestions.length > 0 ? detectedQuestions.length : 1}
+        approvedCount={approvedCount}
+        onExport={handleExportPackage}
       />
 
       {/* Floating Toast Notification */}

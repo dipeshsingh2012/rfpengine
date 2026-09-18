@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, RefreshCw, Sparkles, ArrowUpRight } from "lucide-react";
+import { Link, RefreshCw, Sparkles, ArrowUpRight, Download } from "lucide-react";
 import { ReviewerRole, SearchResponse, SourceMode } from "../../types";
 import { GovernanceBar } from "./GovernanceBar";
 import { CelebrationBanner } from "./CelebrationBanner";
@@ -35,6 +35,7 @@ interface QuestionnaireWorkspaceProps {
   handleReviewReset: () => void;
   isAllApproved: boolean;
   exportAnswers: () => void;
+  onOpenExportModal?: () => void;
   reviewStatusByQuestion: Record<string, string>;
   reviewCommentsByQuestion: Record<string, string>;
   answersByQuestion: Record<string, string>;
@@ -81,6 +82,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
   handleReviewReset,
   isAllApproved,
   exportAnswers,
+  onOpenExportModal,
   reviewStatusByQuestion,
   reviewCommentsByQuestion,
   answersByQuestion,
@@ -135,6 +137,15 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
           · {sourceLabel}
         </span>
         <div style={{ display: "flex", gap: "8px" }}>
+          {onOpenExportModal && (
+            <button
+              className="outline-button"
+              onClick={onOpenExportModal}
+              title="Export compliance matrix to Excel, Word, or PDF"
+            >
+              <Download size={15} /> Export Deliverable
+            </button>
+          )}
           {!isCsv && (
             <button
               className="outline-button"
@@ -213,6 +224,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
         isCsv={isCsv}
         exportAnswers={exportAnswers}
         openOriginalForm={openOriginalForm}
+        onOpenExportModal={onOpenExportModal}
       />
 
       {detectedQuestions.length > 0 && (
@@ -243,6 +255,16 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
                 <option value="demo-tenant">demo-tenant</option>
               </select>
             </div>
+            {onOpenExportModal && (
+              <button
+                className="outline-button"
+                onClick={onOpenExportModal}
+                title="Export compliance matrix to Excel, Word, or PDF"
+                style={{ padding: "8px 14px" }}
+              >
+                <Download size={15} /> Export Deliverable
+              </button>
+            )}
             <button
               className="primary-button"
               onClick={generateAllAnswers}

@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
+from app.services.compliance_exporter_service import ComplianceExporterService
 from app.services.questionnaire_parser_service import (
     QuestionnaireParserService,
     QuestionnaireParseResult,
@@ -14,6 +15,8 @@ from app.services.questionnaire_parser_service import (
 from app.models.schemas import (
     AuditLogCreate,
     AuditLogItem,
+    ExportItemPayload,
+    ExportRequestPayload,
     QuestionReviewItem,
     WorkspaceCreate,
     WorkspaceResponse,
@@ -428,6 +431,89 @@ async def parse_questionnaire_file(
     except Exception as exc:
         logger.error("Error parsing questionnaire file %s: %s", filename, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(exc)}")
+
+
+@router.post("/export")
+async def export_questionnaire_package(
+    payload: ExportRequestPayload,
+    x_tenant_id: Optional[str] = Header(default=None, alias="X-Tenant-ID"),
+) -> Response:
+    """
+    Exports questionnaire responses into audit-ready .xlsx, .docx, .pdf, or .csv formats.
+    """
+    if x_tenant_id and not payload.tenant_id:
+        payload.tenant_id = x_tenant_id
+
+    try:
+        content, mime, filename = ComplianceExporterService.export(payload)
+        return Response(
+            content=content,
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            },
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.error("Failed to generate export package: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate export: {str(exc)}")
+
+
+@router.get("/workspaces/{workspace_id}/export")
+async def export_workspace_by_id(
+    workspace_id: str,
+    format: str = "xlsx",
+    x_tenant_id: str = Header(alias="X-Tenant-ID", default="acme-corp"),
+    db: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """
+    Loads an existing workspace from PostgreSQL and exports it to .xlsx, .docx, .pdf, or .csv.
+    """
+    ws = await PostgresService.get_workspace(db, workspace_id, tenant_id=x_tenant_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found or unauthorized")
+
+    items = [
+        ExportItemPayload(
+            question_index=r.question_index,
+            section="General",
+            question_text=r.question_text,
+            answer_text=r.final_answer or r.suggested_answer or "",
+            review_status=r.review_status,
+            assigned_role=r.assigned_role,
+            confidence_score=r.confidence_score,
+            sources=r.sources_json,
+            comments="",
+        )
+        for r in (ws.reviews or [])
+    ]
+
+    payload = ExportRequestPayload(
+        workspace_id=ws.id,
+        tenant_id=ws.tenant_id,
+        title=ws.title,
+        format=format,
+        items=items,
+    )
+
+    try:
+        content, mime, filename = ComplianceExporterService.export(payload)
+        return Response(
+            content=content,
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            },
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.error("Failed to export workspace %s: %s", workspace_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to export workspace: {str(exc)}")
+
 
 
 

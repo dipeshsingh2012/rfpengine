@@ -341,3 +341,25 @@ class WorkspaceSettingsSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- Compliance Export Schemas ---
+
+class ExportItemPayload(BaseModel):
+    question_index: int = 0
+    section: Optional[str] = "General"
+    question_text: str
+    answer_text: str = ""
+    review_status: str = "Draft"
+    assigned_role: Optional[str] = "Security Director"
+    confidence_score: Optional[float] = 0.0
+    sources: Optional[List[Any]] = None
+    comments: Optional[str] = None
+
+
+class ExportRequestPayload(BaseModel):
+    workspace_id: Optional[str] = None
+    tenant_id: str = "acme-corp"
+    title: str = "RFP Compliance Response Matrix"
+    format: str = Field(default="xlsx", pattern="^(xlsx|docx|pdf|csv)$")
+    items: List[ExportItemPayload] = []
+
+

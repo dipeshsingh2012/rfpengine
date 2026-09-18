@@ -7,6 +7,7 @@ interface CelebrationBannerProps {
   isCsv: boolean;
   exportAnswers: () => void;
   openOriginalForm: () => void;
+  onOpenExportModal?: () => void;
 }
 
 export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
@@ -15,6 +16,7 @@ export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
   isCsv,
   exportAnswers,
   openOriginalForm,
+  onOpenExportModal,
 }) => {
   if (!isAllApproved) return null;
 
@@ -25,29 +27,29 @@ export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
           <CheckCircle size={18} /> Governance Complete: All {allQuestionsCount} Responses Approved!
         </strong>
         <p>
-          {isCsv
-            ? "All answers have passed approval. Ready to export completed questionnaire as CSV."
-            : "All answers have passed SME & Legal reviews. Ready for 1-click buyer form injection."}
+          All answers have passed SME & Legal reviews. Ready to export an audit-ready compliance package or inject into external buyer forms.
         </p>
       </div>
-      {isCsv ? (
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <button
           className="primary-button"
-          onClick={exportAnswers}
-          style={{ padding: "8px 16px" }}
+          onClick={onOpenExportModal || exportAnswers}
+          style={{ padding: "8px 18px", fontWeight: 600 }}
         >
-          <Download size={14} /> 📥 Export CSV with Generated Answers
+          <Download size={15} /> 📥 Export Audit Package (.xlsx, .docx, .pdf)
         </button>
-      ) : (
-        <button
-          className="primary-button"
-          onClick={openOriginalForm}
-          style={{ padding: "8px 16px" }}
-        >
-          <Sparkles size={14} /> ⚡ Inject Answers into Buyer Form
-        </button>
-      )}
+        {!isCsv && (
+          <button
+            className="outline-button"
+            onClick={openOriginalForm}
+            style={{ padding: "8px 14px", background: "white" }}
+          >
+            <Sparkles size={14} /> ⚡ Inject into Buyer Form
+          </button>
+        )}
+      </div>
     </div>
   );
 };
+
 

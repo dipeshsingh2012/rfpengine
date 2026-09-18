@@ -157,7 +157,7 @@ DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
     {
         "id": "compliance-matrix-exporter",
         "title": "Automated Compliance Matrix & Audit Package Exporter",
-        "stage": "development",
+        "stage": "shipped",
         "theme": "Enterprise Governance",
         "priority": "P1 - High",
         "target_persona": "Security Director",
