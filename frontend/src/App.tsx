@@ -80,10 +80,7 @@ export function App() {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(DEFAULT_ACTIVITY_LOGS);
 
-  // Environment & Health State
-  const [backendEnv, setBackendEnv] = useState<string>(
-    () => import.meta.env.VITE_APP_ENV || "local",
-  );
+  // Health State
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
 
   // Responses Dashboard State (PostgreSQL backed, no localStorage)
@@ -166,6 +163,22 @@ export function App() {
     }
   }
 
+
+  useEffect(() => {
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${apiBaseUrl.replace(/\/api$/, "")}/health`);
+        if (res.ok) {
+          setBackendHealth("ok");
+        } else {
+          setBackendHealth("degraded");
+        }
+      } catch {
+        setBackendHealth("degraded");
+      }
+    }
+    checkHealth();
+  }, []);
 
   useEffect(() => {
     async function fetchAuditLogs() {
