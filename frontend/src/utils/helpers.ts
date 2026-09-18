@@ -42,21 +42,6 @@ export function parseCsvLine(line: string): string[] {
 }
 
 export function extractFormQuestions(text: string, fileName: string): string[] {
-  if (fileName.endsWith(".json")) {
-    try {
-      const parsed = JSON.parse(text);
-      const records = Array.isArray(parsed) ? parsed : parsed.questions || parsed.records || parsed.items || [];
-      return records
-        .map(
-          (record: { question?: string; text?: string; title?: string; prompt?: string }) =>
-            record.question || record.title || record.text || record.prompt || "",
-        )
-        .map((q: any) => String(q).trim())
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
   if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
     const isTsv = fileName.endsWith(".tsv");
     const rawLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -92,22 +77,7 @@ export function extractFormQuestions(text: string, fileName: string): string[] {
       })
       .filter(Boolean);
   }
-  const document = new DOMParser().parseFromString(text, "text/html");
-  return [
-    ...document.querySelectorAll(
-      'textarea, input:not([type="hidden"]), [contenteditable="true"]',
-    ),
-  ]
-    .map(
-      (field) =>
-        document
-          .querySelector(`label[for="${CSS.escape(field.id)}"]`)
-          ?.textContent?.trim() ||
-        field.getAttribute("aria-label") ||
-        field.getAttribute("placeholder") ||
-        "",
-    )
-    .filter((q) => q.length > 5);
+  return [];
 }
 
 export function formatScore(score: number): string {

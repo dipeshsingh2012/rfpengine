@@ -119,7 +119,7 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
                     Upload Knowledge Base Files
                   </strong>
                   <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "11px" }}>
-                    Drag & drop or select files. Supported: <code>.csv</code>, <code>.json</code>, <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code>
+                    Drag & drop or select files. Supported: <code>.xlsx</code>, <code>.xls</code>, <code>.docx</code>, <code>.pdf</code>, <code>.csv</code>, <code>.txt</code>, <code>.md</code>
                   </p>
                 </div>
 
@@ -136,7 +136,7 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
                     )}
                     <input
                       type="file"
-                      accept=".csv,.tsv,.json,.jsonl,.pdf,.docx,.txt,.md"
+                      accept=".xlsx,.xls,.docx,.pdf,.csv,.tsv,.txt,.md"
                       disabled={isUploadingKB}
                       onChange={(e) => {
                         const file = e.target.files?.[0];

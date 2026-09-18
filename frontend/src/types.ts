@@ -176,7 +176,7 @@ export const DEFAULT_ACTIVITY_LOGS: ActivityLogItem[] = [
 export const sampleDemoFiles = [
   { name: "Security Whitepaper", file: "01_Security_and_Compliance_Whitepaper.md", format: "MD" },
   { name: "SLA & Operations", file: "02_SLA_Disaster_Recovery_and_Operations.pdf", format: "PDF" },
-  { name: "Privacy & Subprocessors", file: "03_Data_Privacy_GDPR_and_Subprocessors.json", format: "JSON" },
+  { name: "Privacy & Subprocessors", file: "03_Data_Privacy_GDPR_and_Subprocessors.xlsx", format: "XLSX" },
   { name: "Vendor Security Q&A", file: "04_Standard_Vendor_Security_Questionnaire.csv", format: "CSV" },
   { name: "API & Integrations", file: "05_Product_Features_and_API_Integrations.docx", format: "DOCX" },
   { name: "Code of Conduct / HR", file: "06_Employee_Code_of_Conduct_and_HR_Policies.txt", format: "TXT" },

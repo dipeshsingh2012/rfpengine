@@ -54,22 +54,22 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
           <div className="home-feature-icon upload-icon">
             <Upload size={22} />
           </div>
-          <h2>Upload form data</h2>
+          <h2>Upload questionnaire</h2>
           <p>
-            Import an HTML, JSON, or CSV questionnaire from your computer.
+            Import an Excel (.xlsx, .xls), Word (.docx), PDF, or CSV questionnaire from your computer.
           </p>
           <label className="home-upload-button">
-            <Upload size={16} /> Choose a form file
+            <Upload size={16} /> Choose questionnaire file
             <input
               type="file"
-              accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
+              accept=".xlsx,.xls,.docx,.pdf,.csv,.tsv"
               onChange={async (event) => {
                 const id = await loadFormFile(event);
                 if (id) openImport(id);
               }}
             />
           </label>
-          <small>Questions are extracted locally in your browser.</small>
+          <small>Questions and sections are extracted using enterprise multi-format AI parser.</small>
         </div>
       </div>
     </section>

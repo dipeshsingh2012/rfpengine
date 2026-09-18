@@ -3,10 +3,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
+from app.services.questionnaire_parser_service import (
+    QuestionnaireParserService,
+    QuestionnaireParseResult,
+)
 from app.models.schemas import (
     AuditLogCreate,
     AuditLogItem,
@@ -389,6 +393,42 @@ async def update_workspace_settings(
         db, tenant_id=resolved_tenant, update_data=payload
     )
     return WorkspaceSettingsSchema.model_validate(updated)
+
+
+@router.post("/parse-file", response_model=QuestionnaireParseResult)
+async def parse_questionnaire_file(
+    file: UploadFile = File(...),
+    x_tenant_id: Optional[str] = Header(default="acme-corp", alias="X-Tenant-ID"),
+) -> QuestionnaireParseResult:
+    """
+    Parses an enterprise questionnaire file (Excel .xlsx/.xls/.csv, Word .docx, or PDF .pdf)
+    and extracts structured questions, sections, and answer expectations.
+    """
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    filename = file.filename
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        result = QuestionnaireParserService.parse_questionnaire(content, filename)
+        logger.info(
+            "Parsed %d questions from %s (format: %s) for tenant %s",
+            result.total_questions,
+            filename,
+            result.format,
+            x_tenant_id,
+        )
+        return result
+    except ValueError as val_err:
+        logger.warning("Validation error parsing questionnaire file %s: %s", filename, val_err)
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.error("Error parsing questionnaire file %s: %s", filename, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(exc)}")
+
 
 
 

@@ -644,16 +644,101 @@ export function App() {
   async function loadFormFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    try {
-      const fileText = await file.text();
-      setUploadedFileContent(fileText);
-      return loadQuestions(
-        extractFormQuestions(fileText, file.name.toLowerCase()),
-        file.name,
-        "upload",
+
+    const lowerName = file.name.toLowerCase();
+    const isBinary =
+      lowerName.endsWith(".xlsx") ||
+      lowerName.endsWith(".xls") ||
+      lowerName.endsWith(".docx") ||
+      lowerName.endsWith(".pdf");
+    const isCsv = lowerName.endsWith(".csv") || lowerName.endsWith(".tsv");
+
+    if (!isBinary && !isCsv) {
+      setSourceStatus(
+        "Unsupported file format. Please upload Excel (.xlsx, .xls), Word (.docx), PDF (.pdf), or CSV.",
       );
+      setNotice("Unsupported format (JSON/HTML removed)");
+      return undefined;
+    }
+
+    try {
+      setSourceStatus(`Extracting questions from ${file.name} with AI parser...`);
+      setNotice("Parsing document...");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/parse-file`, {
+        method: "POST",
+        headers: {
+          "X-Tenant-ID": tenantId,
+        },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const parseResult: {
+          format: string;
+          filename: string;
+          sections: string[];
+          total_questions: number;
+          questions: Array<{
+            id: string;
+            question_text: string;
+            section?: string;
+            answer_type?: string;
+          }>;
+        } = await res.json();
+
+        const extractedQuestions = (parseResult.questions || []).map(
+          (q) => q.question_text,
+        );
+
+        if (isCsv) {
+          try {
+            const fileText = await file.text();
+            setUploadedFileContent(fileText);
+          } catch (_) {}
+        }
+
+        const workspaceId = await loadQuestions(
+          extractedQuestions,
+          file.name,
+          "upload",
+        );
+
+        setSourceStatus(
+          `${file.name} (${parseResult.format.toUpperCase()}) · ${extractedQuestions.length} question${extractedQuestions.length === 1 ? "" : "s"} detected${
+            parseResult.sections?.length
+              ? ` across ${parseResult.sections.length} section${parseResult.sections.length === 1 ? "" : "s"}`
+              : ""
+          }`,
+        );
+        setNotice(
+          extractedQuestions.length
+            ? `${parseResult.format.toUpperCase()} questions parsed`
+            : "No questions detected in file",
+        );
+        return workspaceId;
+      } else {
+        let errDetail = `Server returned ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson.detail) errDetail = errJson.detail;
+        } catch (_) {}
+
+        if (isCsv) {
+          const fileText = await file.text();
+          setUploadedFileContent(fileText);
+          const localQuestions = extractFormQuestions(fileText, file.name.toLowerCase());
+          return loadQuestions(localQuestions, file.name, "upload");
+        }
+
+        throw new Error(errDetail);
+      }
     } catch (error) {
-      setSourceStatus(`Could not read form: ${(error as Error).message}`);
+      setSourceStatus(`Could not read questionnaire: ${(error as Error).message}`);
+      setNotice("Questionnaire parsing failed");
       return undefined;
     }
   }

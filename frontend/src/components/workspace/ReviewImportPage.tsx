@@ -61,10 +61,10 @@ export const ReviewImportPage: React.FC<ReviewImportPageProps> = ({
               </button>
             </div>
             <label className="upload-form-button">
-              <Upload size={15} /> Upload HTML, JSON, or CSV
+              <Upload size={15} /> Upload Excel, Word, PDF, or CSV
               <input
                 type="file"
-                accept=".html,.htm,.json,.csv,text/html,application/json,text/csv"
+                accept=".xlsx,.xls,.docx,.pdf,.csv,.tsv"
                 onChange={loadFormFile}
               />
             </label>

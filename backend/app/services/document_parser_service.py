@@ -22,7 +22,7 @@ class DocumentParserService:
     CHUNK_OVERLAP_CHARS = 200  # ~50 tokens
 
     ALLOWED_EXTENSIONS = {
-        ".csv", ".tsv", ".json", ".jsonl", ".pdf", ".docx", ".txt", ".md", ".markdown"
+        ".csv", ".tsv", ".xlsx", ".xls", ".pdf", ".docx", ".txt", ".md", ".markdown"
     }
 
     @classmethod
@@ -86,8 +86,8 @@ class DocumentParserService:
 
         if lower_name.endswith(".csv") or lower_name.endswith(".tsv"):
             return cls._parse_tabular(content, filename, tenant_id, default_category)
-        elif lower_name.endswith(".json") or lower_name.endswith(".jsonl"):
-            return cls._parse_json(content, filename, tenant_id, default_category)
+        elif lower_name.endswith(".xlsx") or lower_name.endswith(".xls"):
+            return cls._parse_excel(content, filename, tenant_id, default_category)
         elif lower_name.endswith(".pdf"):
             return cls._parse_pdf(content, filename, tenant_id, default_category)
         elif lower_name.endswith(".docx"):
@@ -169,71 +169,73 @@ class DocumentParserService:
         logger.info("Parsed %d entries from CSV/TSV file '%s'", len(entries), filename)
         return entries
 
-    # --- 2. JSON / JSONL Parser ---
+    # --- 2. Excel Parser (.xlsx / .xls) ---
     @classmethod
-    def _parse_json(
+    def _parse_excel(
         cls,
         content: bytes,
         filename: str,
         tenant_id: str,
         default_category: Optional[str],
     ) -> List[KBEntryCreate]:
-        text_content = content.decode("utf-8-sig", errors="replace")
+        import openpyxl
+
+        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
         entries: List[KBEntryCreate] = []
 
-        try:
-            data = json.loads(text_content)
-            items = data if isinstance(data, list) else data.get("items", data.get("records", [data]))
-        except json.JSONDecodeError:
-            items = []
-            for line in text_content.splitlines():
-                line = line.strip()
-                if line:
-                    try:
-                        items.append(json.loads(line))
-                    except Exception:
-                        continue
-
-        for idx, item in enumerate(items, start=1):
-            if not isinstance(item, dict):
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            rows = list(sheet.iter_rows(values_only=True))
+            if not rows or len(rows) < 2:
                 continue
-            title = (
-                item.get("title")
-                or item.get("topic")
-                or item.get("question")
-                or item.get("prompt")
-                or item.get("name")
-                or f"{filename} - Item {idx}"
-            )
-            body_content = (
-                item.get("content")
-                or item.get("text")
-                or item.get("answer")
-                or item.get("response")
-                or item.get("details")
-                or item.get("description")
-            )
-            category = (
-                item.get("category")
-                or item.get("section")
-                or cls.infer_category(filename, str(body_content or ""), default_category)
-            )
 
-            if body_content:
-                meta = item.get("metadata", {})
-                meta["source_file"] = filename
-                meta["item_index"] = idx
+            headers = [str(c).strip().lower() if c is not None else "" for c in rows[0]]
+            q_col = -1
+            a_col = -1
+            sec_col = -1
+
+            for idx, h in enumerate(headers):
+                if any(k in h for k in ["question", "prompt", "requirement", "topic", "q", "title"]) and q_col == -1:
+                    q_col = idx
+                if any(k in h for k in ["answer", "response", "content", "details", "solution", "description"]) and a_col == -1:
+                    a_col = idx
+                if any(k in h for k in ["category", "section", "domain"]) and sec_col == -1:
+                    sec_col = idx
+
+            if q_col == -1:
+                q_col = 0
+            if a_col == -1 and len(headers) > 1:
+                a_col = 1
+
+            for r_idx, row in enumerate(rows[1:], start=2):
+                if not row:
+                    continue
+                q_val = str(row[q_col]).strip() if q_col < len(row) and row[q_col] is not None else ""
+                a_val = str(row[a_col]).strip() if a_col != -1 and a_col < len(row) and row[a_col] is not None else ""
+                sec_val = str(row[sec_col]).strip() if sec_col != -1 and sec_col < len(row) and row[sec_col] is not None else sheet_name
+
+                body = a_val if a_val else q_val
+                if not body or len(body) < 5 or body.lower() == "none":
+                    continue
+
+                cat = sec_val or cls.infer_category(filename, body, default_category)
+                title = q_val if q_val and a_val else f"{filename} - {sheet_name} R{r_idx}"
+
                 entries.append(
                     KBEntryCreate(
                         tenant_id=tenant_id,
-                        title=str(title).strip(),
-                        content=str(body_content).strip(),
-                        category=str(category).strip(),
-                        metadata=meta,
+                        title=title[:250],
+                        content=body,
+                        category=cat,
+                        metadata={
+                            "source_file": filename,
+                            "sheet": sheet_name,
+                            "row": r_idx,
+                        },
                     )
                 )
 
-        logger.info("Parsed %d entries from JSON file '%s'", len(entries), filename)
+        logger.info("Parsed %d entries from Excel file '%s'", len(entries), filename)
         return entries
 
     # --- 3. Markdown Parser (Heading-Aware) ---
