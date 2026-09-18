@@ -327,7 +327,7 @@ DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
     {
         "id": "feat-feedback-l3",
         "title": "Dynamic Few-Shot In-Context Learning from Exemplars (Level 3 Feedback Loop)",
-        "stage": "discovery",
+        "stage": "shipped",
         "theme": "Core AI & Retrieval",
         "priority": "P1 - High",
         "target_persona": "Proposal Drafter",
@@ -1016,6 +1016,52 @@ class PostgresService:
         await session.refresh(kb_entry)
         await session.refresh(review)
         return kb_entry, review
+
+    @staticmethod
+    async def get_golden_qa_exemplars(
+        session: AsyncSession,
+        tenant_id: str = "acme-corp",
+        limit: int = 3,
+    ) -> List[KBEntry]:
+        """
+        Retrieves top SME-approved Golden Q&A entries for a tenant to be used as dynamic few-shot exemplars.
+        """
+        stmt = (
+            select(KBEntry)
+            .where(
+                KBEntry.tenant_id == tenant_id,
+                KBEntry.category == "Golden Q&A",
+            )
+            .order_by(KBEntry.updated_at.desc())
+            .limit(limit)
+        )
+        res = await session.execute(stmt)
+        entries = list(res.scalars().all())
+        if not entries:
+            q_stmt = (
+                select(QuestionReview)
+                .join(ResponseWorkspace, ResponseWorkspace.id == QuestionReview.workspace_id)
+                .where(
+                    ResponseWorkspace.tenant_id == tenant_id,
+                    QuestionReview.is_promoted_to_kb == True,
+                )
+                .order_by(QuestionReview.updated_at.desc())
+                .limit(limit)
+            )
+            q_res = await session.execute(q_stmt)
+            promoted_reviews = list(q_res.scalars().all())
+            entries = [
+                KBEntry(
+                    id=r.promoted_kb_id or f"kb-gold-{r.id}",
+                    tenant_id=tenant_id,
+                    question=r.question_text,
+                    answer=r.final_answer or r.suggested_answer or "",
+                    category="Golden Q&A",
+                    metadata_json={"is_golden_qa": True, "approved_by_role": r.assigned_role},
+                )
+                for r in promoted_reviews
+            ]
+        return entries
 
     # --- Audit Logging (PostgreSQL) ---
 

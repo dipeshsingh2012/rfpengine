@@ -45,10 +45,21 @@ class Source(BaseModel):
         return data
 
 
+class ExemplarItem(BaseModel):
+    id: str
+    question: str
+    approved_answer: str
+    category: Optional[str] = "Golden Q&A"
+    relevance_score: Optional[float] = None
+    source_file: Optional[str] = None
+
+
 class SearchResponse(BaseModel):
     suggested_answer: str
     confidence_score: float = Field(ge=0, le=1)
     sources: List[Source]
+    exemplars_used: List[ExemplarItem] = Field(default_factory=list, description="Top Golden Q&A exemplars used for dynamic few-shot tone adaptation")
+    tone_applied: Optional[str] = Field(default="Authoritative & Direct", description="Enterprise brand voice profile applied to synthesis")
 
 
 # --- Knowledge Base Passage Schemas ---

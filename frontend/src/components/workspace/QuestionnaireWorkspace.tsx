@@ -317,6 +317,8 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
             promotedQuestions={promotedQuestions}
             handlePromoteToKnowledgeBase={handlePromoteToKnowledgeBase}
             sourcesCount={response.sources.length}
+            exemplarsUsed={response.exemplars_used}
+            toneApplied={response.tone_applied}
           />
         </section>
 

@@ -9,7 +9,7 @@ from google import genai
 from google.oauth2 import service_account
 
 from app.core.config import Settings
-from app.models.schemas import SearchRequest, SearchResponse, Source
+from app.models.schemas import ExemplarItem, SearchRequest, SearchResponse, Source
 from app.services.algolia_service import AlgoliaService
 from app.services.pinecone_service import PineconeService
 
@@ -208,17 +208,79 @@ class HybridSearchService:
                 )
             )
 
-        # Synthesize grounded answer with Gemini 2.5 Flash
-        suggested_answer = await self._generate_answer(request.question, sources)
+        # Extract Golden Q&A exemplars from the fused results
+        exemplars: List[ExemplarItem] = []
+        for hit in fused_hits:
+            is_golden = bool(
+                hit.get("is_golden_qa")
+                or hit.get("category") == "Golden Q&A"
+                or (hit.get("metadata") and hit["metadata"].get("is_golden_qa") is True)
+                or str(hit.get("id", "")).startswith("kb-gold-")
+            )
+            if is_golden:
+                q_text = hit.get("title") or hit.get("question") or ""
+                a_text = hit.get("content") or hit.get("answer") or ""
+                if q_text and a_text:
+                    exemplars.append(
+                        ExemplarItem(
+                            id=hit["id"],
+                            question=q_text,
+                            approved_answer=a_text,
+                            category=hit.get("category") or "Golden Q&A",
+                            relevance_score=round(hit.get("score", 0.0), 4),
+                            source_file=hit.get("source_file"),
+                        )
+                    )
+
+        # Synthesize grounded answer with Gemini 2.5 Flash and Dynamic Few-Shot Demonstrations
+        tone = "Authoritative, Direct, and Concise"
+        suggested_answer = await self._generate_answer(
+            request.question,
+            sources,
+            exemplars=exemplars[:2],
+            tone=tone,
+        )
         confidence = min(1.0, max((s.score for s in sources), default=0.0) * 60)
 
         return SearchResponse(
             suggested_answer=suggested_answer,
             confidence_score=round(confidence, 4),
             sources=sources,
+            exemplars_used=exemplars[:2],
+            tone_applied=tone,
         )
 
-    async def _generate_answer(self, question: str, sources: List[Source]) -> str:
+    @classmethod
+    def build_few_shot_prompt(
+        cls,
+        question: str,
+        sources: List[Source],
+        exemplars: Optional[List[ExemplarItem]] = None,
+        tone: str = "Authoritative, Direct, and Concise",
+        company_name: str = "Acme Corp",
+    ) -> str:
+        exemplars = exemplars or []
+
+        # 1. Dynamic Few-Shot Demonstrations (Brand Voice & Formatting)
+        demonstration_blocks = []
+        for idx, ex in enumerate(exemplars[:2], start=1):
+            category_tag = f" [{ex.category}]" if ex.category else ""
+            demonstration_blocks.append(
+                f"[Approved Reference Exemplar #{idx}{category_tag}]\n"
+                f"Question / Requirement: {ex.question}\n"
+                f"Approved Executive Response: {ex.approved_answer}"
+            )
+
+        exemplar_section = ""
+        if demonstration_blocks:
+            exemplar_section = (
+                "=== APPROVED FEW-SHOT WINNING DEMONSTRATIONS (EXECUTIVE BRAND VOICE) ===\n"
+                "The following reference pairs have been formally vetted and approved by company SMEs.\n"
+                "Carefully study and mirror their direct tone, sentence cadence, assertive phrasing, and standard-citation style:\n\n"
+                + "\n\n".join(demonstration_blocks)
+            )
+
+        # 2. Grounded Evidence Passages (Factual source material)
         context_blocks = []
         for s in sources:
             source_info = s.source_file or (s.metadata.get("source_file") if s.metadata else "Knowledge Base")
@@ -228,29 +290,55 @@ class HybridSearchService:
                 s.is_golden_qa
                 or s.category == "Golden Q&A"
                 or (s.metadata and s.metadata.get("is_golden_qa") is True)
-                or s.id.startswith("kb-gold-")
+                or str(s.id).startswith("kb-gold-")
             )
             authority_badge = " [⭐ SME-APPROVED GOLDEN Q&A - HIGHEST CANONICAL AUTHORITY]" if is_golden else ""
-            header = f"--- Source Document Passage [{s.id}]{authority_badge} ({source_info}{page_info} | {topic_info}) ---"
+            header = f"--- Evidence Passage [{s.id}]{authority_badge} ({source_info}{page_info} | {topic_info}) ---"
             context_blocks.append(f"{header}\n{s.content}")
 
         context = "\n\n".join(context_blocks) if context_blocks else "No relevant documentation passages found in the knowledge base."
 
-        prompt = (
-            "You are an enterprise AI Proposal Drafter specializing in technical, security, and compliance RFP questionnaires.\n\n"
-            "Your task is to synthesize a direct, authoritative, and audit-ready answer to the buyer's questionnaire requirement "
-            "based SOLELY on the approved documentation passages provided below.\n\n"
-            "Precedence & Grounding Hierarchy (ADR 0019 Closed-Loop AI Feedback):\n"
-            "1. Golden Q&A Precedence: If any provided passage is tagged '[⭐ SME-APPROVED GOLDEN Q&A - HIGHEST CANONICAL AUTHORITY]', "
-            "it represents a recent verified human sign-off by a Security SME or Legal Counsel. "
-            "STRICTLY prioritize the Golden Q&A as the latest authoritative ground truth, using its exact terms to override any contradictory statements in older raw PDF/policy documents.\n"
-            "2. Direct & Professional Tone: Address the requirement directly and clearly (e.g. state 'Yes' or confirm capabilities when supported by documentation).\n"
-            "3. Exact Specifics: Extract and incorporate specific standards, protocols, SLAs, ciphers, and technical metrics mentioned in the passages.\n"
-            "4. Anti-Hallucination: If the documentation passages do not provide sufficient information to answer the question, state clearly that the information is not specified in current approved documentation.\n"
-            "5. Strict Boundary: Do NOT extrapolate, assume unmentioned features, or invent capabilities beyond the provided text passages.\n\n"
-            f"Questionnaire Requirement / Buyer Question:\n{question}\n\n"
-            f"Approved Documentation Passages (Ordered by Relevance & SME Authority):\n{context}\n\n"
-            "Synthesized RFP Answer:"
+        # 3. Assemble Prompt
+        prompt_parts = [
+            f"You are the enterprise AI Proposal Drafter for {company_name}, specializing in technical, security, and compliance RFP questionnaires.\n",
+            f"=== TARGET BRAND VOICE & EXECUTIVE PERSONA ===\n- Tone: {tone}\n- Style Directive: Emulate the exact phrasing structure, concise executive confidence, and compliance citation format demonstrated in the approved winning exemplars below.",
+        ]
+
+        if exemplar_section:
+            prompt_parts.extend(["", exemplar_section])
+
+        prompt_parts.extend([
+            "",
+            "=== APPROVED FACTUAL EVIDENCE (SOURCE PASSAGES) ===",
+            "Extract facts, protocols, ciphers, SLAs, and technical parameters SOLELY from these approved passages:",
+            context,
+            "",
+            "=== PRECEDENCE & GOVERNANCE RULES ===",
+            "1. Golden Q&A Precedence: If any passage is tagged '[⭐ SME-APPROVED GOLDEN Q&A - HIGHEST CANONICAL AUTHORITY]', it represents a recent verified human sign-off. STRICTLY prioritize it as the latest ground truth.",
+            "2. Direct & Conclusive: Open directly with compliance confirmation (e.g. 'Yes', 'Compliant', or explicit statement of capability) when supported by evidence.",
+            "3. Specific Technical Ciphers: Cite exact standards (AES-256, TLS 1.3, SOC 2 Type II, ISO 27001) and metrics (RPO/RTO) found in the text.",
+            "4. Anti-Hallucination: If the documentation does not provide sufficient detail, state clearly that the information is not specified in current approved documentation. Do not invent commitments.",
+            "",
+            f"Questionnaire Requirement / Buyer Question:\n{question}\n",
+            "Synthesized Executive RFP Response:",
+        ])
+
+        return "\n".join(prompt_parts)
+
+    async def _generate_answer(
+        self,
+        question: str,
+        sources: List[Source],
+        exemplars: Optional[List[ExemplarItem]] = None,
+        tone: str = "Authoritative, Direct, and Concise",
+        company_name: str = "Acme Corp",
+    ) -> str:
+        prompt = self.build_few_shot_prompt(
+            question=question,
+            sources=sources,
+            exemplars=exemplars,
+            tone=tone,
+            company_name=company_name,
         )
 
         if self.genai_client:
@@ -265,6 +353,12 @@ class HybridSearchService:
             except Exception as exc:
                 logger.error("Vertex AI Gemini answer generation failed: %s", exc)
 
+        if exemplars:
+            for ex in exemplars:
+                if ex.question.lower() in question.lower() or question.lower() in ex.question.lower():
+                    return ex.approved_answer
+
         if sources:
             return sources[0].content or sources[0].answer
         return "Information regarding this questionnaire requirement is not available in approved documentation."
+

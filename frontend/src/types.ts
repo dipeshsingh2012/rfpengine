@@ -5,10 +5,21 @@ export type Source = {
   score: number;
 };
 
+export interface ExemplarItem {
+  id: string;
+  question: string;
+  approved_answer: string;
+  category?: string;
+  relevance_score?: number;
+  source_file?: string;
+}
+
 export type SearchResponse = {
   suggested_answer: string;
   confidence_score: number;
   sources: Source[];
+  exemplars_used?: ExemplarItem[];
+  tone_applied?: string;
 };
 
 export type KBItem = {
@@ -219,6 +230,27 @@ export const demoResponse: SearchResponse = {
       score: 0.0308,
     },
   ],
+  exemplars_used: [
+    {
+      id: "kb-gold-101",
+      question: "What is your automated backup retention schedule?",
+      approved_answer:
+        "Customer database backups are encrypted with AES-256 and rotated on a strict 35-day automated lifecycle schedule, ensuring zero orphaned records post-expiration.",
+      category: "Golden Q&A",
+      relevance_score: 0.96,
+      source_file: "02_SLA_Disaster_Recovery_and_Operations.pdf",
+    },
+    {
+      id: "kb-gold-102",
+      question: "Are GDPR Right to Erasure requests honored within statutory timelines?",
+      approved_answer:
+        "Yes. Deletion requests are cryptographically purged across all active production clusters within 24 hours, followed by standard 35-day immutable backup rotation.",
+      category: "Golden Q&A",
+      relevance_score: 0.93,
+      source_file: "03_Data_Privacy_GDPR_and_Subprocessors.xlsx",
+    },
+  ],
+  tone_applied: "Authoritative & Direct",
 };
 
 export const starterQuestions = [
