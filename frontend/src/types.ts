@@ -48,6 +48,49 @@ export type KBItem = {
   updated_at?: string;
 };
 
+export interface KBSourceItem {
+  id: string;
+  tenant_id: string;
+  name: string;
+  source_type: "web_crawler" | "github_docs" | "cloud_storage" | "rfp_harvest" | string;
+  config: Record<string, any>;
+  schedule_frequency: "manual" | "hourly" | "daily" | "weekly" | string;
+  status: "idle" | "syncing" | "success" | "error" | string;
+  last_synced_at?: string | null;
+  last_error?: string | null;
+  metrics?: {
+    documents_count?: number;
+    chunks_count?: number;
+    last_duration_sec?: number;
+  };
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface KBSyncLogItem {
+  id: string;
+  source_id: string;
+  tenant_id: string;
+  status: "running" | "completed" | "failed" | string;
+  started_at: string;
+  completed_at?: string | null;
+  duration_seconds: number;
+  documents_scanned: number;
+  chunks_created: number;
+  chunks_updated: number;
+  chunks_pruned: number;
+  error_details?: string | null;
+}
+
+export interface KBSourceCreatePayload {
+  name: string;
+  source_type: string;
+  config: Record<string, any>;
+  schedule_frequency: string;
+  tenant_id?: string;
+}
+
+
 export type WorkspaceSettings = {
   tenant_id: string;
   company_name: string;

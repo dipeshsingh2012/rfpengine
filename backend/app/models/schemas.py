@@ -136,7 +136,66 @@ class KBUploadResponse(BaseModel):
     preview: List[KBEntryResponse]
 
 
+# --- Automated Knowledge Base Sync & Ingestion Schemas ---
+
+class KBSourceCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=256)
+    source_type: str = Field(..., description="web_crawler | github_docs | cloud_storage | rfp_harvest")
+    config: Dict[str, Any] = Field(default_factory=dict, description="Source-specific parameters (url, repo, folder, category)")
+    schedule_frequency: str = Field(default="daily", description="manual | hourly | daily | weekly")
+    tenant_id: str = Field(default="acme-corp")
+
+
+class KBSourceUpdate(BaseModel):
+    name: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    schedule_frequency: Optional[str] = None
+    status: Optional[str] = None
+
+
+class KBSourceResponse(BaseModel):
+    id: str
+    tenant_id: str
+    name: str
+    source_type: str
+    config: Dict[str, Any] = Field(default_factory=dict)
+    schedule_frequency: str
+    status: str
+    last_synced_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class KBSyncLogResponse(BaseModel):
+    id: str
+    source_id: str
+    tenant_id: str
+    status: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: float = 0.0
+    documents_scanned: int = 0
+    chunks_created: int = 0
+    chunks_updated: int = 0
+    chunks_pruned: int = 0
+    error_details: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class KBSyncTriggerResponse(BaseModel):
+    status: str
+    source_id: str
+    message: str
+    log_id: Optional[str] = None
+
+
 # --- Workspace & Review Schemas ---
+
 
 class QuestionReviewItem(BaseModel):
     id: Optional[str] = None

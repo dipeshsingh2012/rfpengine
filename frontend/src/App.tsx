@@ -107,7 +107,7 @@ export function App() {
 
   // Knowledge Base State
   const [showKBModal, setShowKBModal] = useState(false);
-  const [kbModalTab, setKbModalTab] = useState<"upload" | "playground">("upload");
+  const [kbModalTab, setKbModalTab] = useState<"upload" | "connectors" | "playground">("upload");
   const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
   const [kbStats, setKbStats] = useState<{
     totalRecords: number;
@@ -1474,8 +1474,9 @@ export function App() {
           setShowActivityModal(false);
           setKbModalTab(tab);
           setShowKBModal(true);
-          navigate(tab === "upload" ? "/knowledge-base" : "/playground");
+          navigate(tab === "playground" ? "/playground" : "/knowledge-base");
         }}
+
         onOpenActivity={() => {
           setShowKBModal(false);
           setShowActivityModal(true);
@@ -1614,7 +1615,7 @@ export function App() {
         tab={kbModalTab}
         setTab={(tab) => {
           setKbModalTab(tab);
-          navigate(tab === "upload" ? "/knowledge-base" : "/playground");
+          navigate(tab === "playground" ? "/playground" : "/knowledge-base");
         }}
         isDragOver={isDragOver}
         setIsDragOver={setIsDragOver}
@@ -1633,7 +1634,10 @@ export function App() {
         handlePlaygroundSearch={handlePlaygroundSearch}
         playgroundError={playgroundError}
         playgroundResult={playgroundResult}
+        apiBaseUrl={apiBaseUrl}
+        tenantId={tenantId}
       />
+
 
       <ActivityLogModal
         isOpen={showActivityModal}

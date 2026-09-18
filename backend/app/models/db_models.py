@@ -175,4 +175,51 @@ class WorkspaceSettingsModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class KBSource(Base):
+    __tablename__ = "kb_sources"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: f"src-{uuid.uuid4().hex[:10]}")
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False, default="acme-corp")
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False)  # "web_crawler", "github_docs", "cloud_storage", "rfp_harvest"
+    config_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    schedule_frequency: Mapped[str] = mapped_column(String(32), default="daily")  # "manual", "hourly", "daily", "weekly"
+    status: Mapped[str] = mapped_column(String(32), default="idle")  # "idle", "syncing", "success", "error"
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metrics_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=lambda: {
+        "documents_count": 0,
+        "chunks_count": 0,
+        "last_duration_sec": 0.0,
+    })
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        Index("ix_kbsource_tenant_type", "tenant_id", "source_type"),
+    )
+
+
+class KBSyncLog(Base):
+    __tablename__ = "kb_sync_logs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: f"synclog-{uuid.uuid4().hex[:10]}")
+    source_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False, default="acme-corp")
+    status: Mapped[str] = mapped_column(String(32), default="completed")  # "running", "completed", "failed"
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    documents_scanned: Mapped[int] = mapped_column(Integer, default=0)
+    chunks_created: Mapped[int] = mapped_column(Integer, default=0)
+    chunks_updated: Mapped[int] = mapped_column(Integer, default=0)
+    chunks_pruned: Mapped[int] = mapped_column(Integer, default=0)
+    error_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("ix_kbsynclog_source_time", "source_id", "started_at"),
+    )
+
+
+
 

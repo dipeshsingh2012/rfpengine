@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -25,9 +26,16 @@ from app.models.schemas import (
     KBEntryResponse,
     KBBatchImportRequest,
     KBUploadResponse,
+    KBSourceCreate,
+    KBSourceResponse,
+    KBSourceUpdate,
+    KBSyncLogResponse,
+    KBSyncTriggerResponse,
 )
 from app.services.document_parser_service import DocumentParserService
 from app.services.postgres_service import PostgresService
+from app.services.kb_sync_service import kb_sync_service
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
@@ -118,7 +126,201 @@ async def get_knowledge_base_stats(
     return await PostgresService.get_kb_stats(db, tenant_id=tenant_id)
 
 
+# ==============================================================================
+# Automated Knowledge Base Synchronization & Connectors Endpoints
+# ==============================================================================
+
+@router.get("/sources", response_model=List[KBSourceResponse])
+async def list_knowledge_base_sources(
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> List[KBSourceResponse]:
+    """
+    Lists all configured automated ingestion sources for the tenant.
+    """
+    return await kb_sync_service.list_sources(tenant_id=tenant_id, db=db)
+
+
+@router.post("/sources", response_model=KBSourceResponse, status_code=status.HTTP_201_CREATED)
+async def create_knowledge_base_source(
+    payload: KBSourceCreate,
+    db: AsyncSession = Depends(get_db_session),
+) -> KBSourceResponse:
+    """
+    Registers a new automated ingestion source (Web Crawler, GitHub Docs, Cloud Storage, or RFP Harvest).
+    """
+    return await kb_sync_service.create_source(tenant_id=payload.tenant_id, payload=payload, db=db)
+
+
+@router.get("/sources/{source_id}", response_model=KBSourceResponse)
+async def get_knowledge_base_source(
+    source_id: str,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> KBSourceResponse:
+    """
+    Retrieves configuration and sync status for a specific source.
+    """
+    source = await kb_sync_service.get_source(tenant_id=tenant_id, source_id=source_id, db=db)
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Source '{source_id}' not found.")
+    return source
+
+
+@router.put("/sources/{source_id}", response_model=KBSourceResponse)
+async def update_knowledge_base_source(
+    source_id: str,
+    payload: KBSourceUpdate,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> KBSourceResponse:
+    """
+    Updates configuration, scheduling frequency, or active status of a source.
+    """
+    updated = await kb_sync_service.update_source(
+        tenant_id=tenant_id, source_id=source_id, payload=payload, db=db
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Source '{source_id}' not found.")
+    return updated
+
+
+@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_knowledge_base_source(
+    request: Request,
+    source_id: str,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    prune_chunks: bool = Query(default=True, description="Whether to prune all chunks indexed by this source"),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """
+    Deletes an automated ingestion source and optionally prunes all indexed chunks across PostgreSQL, Algolia, and Pinecone.
+    """
+    algolia_service = getattr(request.app.state, "algolia", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    deleted = await kb_sync_service.delete_source(
+        tenant_id=tenant_id,
+        source_id=source_id,
+        prune_chunks=prune_chunks,
+        db=db,
+        algolia_service=algolia_service,
+        pinecone_service=pinecone_service,
+    )
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Source '{source_id}' not found.")
+
+
+@router.post("/sources/{source_id}/sync", response_model=KBSyncLogResponse)
+async def trigger_source_sync(
+    request: Request,
+    source_id: str,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> KBSyncLogResponse:
+    """
+    Triggers an immediate on-demand synchronization run for a specific source.
+    """
+    algolia_service = getattr(request.app.state, "algolia", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    hybrid_search_service = getattr(request.app.state, "hybrid_search", None)
+
+    try:
+        return await kb_sync_service.execute_sync(
+            tenant_id=tenant_id,
+            source_id=source_id,
+            db=db,
+            algolia_service=algolia_service,
+            pinecone_service=pinecone_service,
+            hybrid_search_service=hybrid_search_service,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Sync execution failed: {exc}")
+
+
+@router.post("/sync-all", response_model=List[KBSyncLogResponse])
+async def trigger_sync_all_sources(
+    request: Request,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> List[KBSyncLogResponse]:
+    """
+    Triggers synchronization across all configured sources for the tenant.
+    """
+    sources = await kb_sync_service.list_sources(tenant_id=tenant_id, db=db)
+    algolia_service = getattr(request.app.state, "algolia", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    hybrid_search_service = getattr(request.app.state, "hybrid_search", None)
+
+    results: List[KBSyncLogResponse] = []
+    for s in sources:
+        try:
+            log_res = await kb_sync_service.execute_sync(
+                tenant_id=tenant_id,
+                source_id=s.id,
+                db=db,
+                algolia_service=algolia_service,
+                pinecone_service=pinecone_service,
+                hybrid_search_service=hybrid_search_service,
+            )
+            results.append(log_res)
+        except Exception as exc:
+            logger.error("Sync error for source %s during sync-all: %s", s.id, exc)
+
+    return results
+
+
+@router.post("/sources/{source_id}/webhook", response_model=KBSyncTriggerResponse)
+async def handle_source_webhook(
+    request: Request,
+    source_id: str,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    db: AsyncSession = Depends(get_db_session),
+) -> KBSyncTriggerResponse:
+    """
+    Inbound webhook endpoint to trigger source sync from CI/CD, GitHub Actions, or cloud storage events.
+    """
+    algolia_service = getattr(request.app.state, "algolia", None)
+    pinecone_service = getattr(request.app.state, "pinecone", None)
+    hybrid_search_service = getattr(request.app.state, "hybrid_search", None)
+
+    # Trigger background task without blocking webhook caller
+    asyncio.create_task(
+        kb_sync_service.execute_sync(
+            tenant_id=tenant_id,
+            source_id=source_id,
+            db=db,
+            algolia_service=algolia_service,
+            pinecone_service=pinecone_service,
+            hybrid_search_service=hybrid_search_service,
+        )
+    )
+
+    return KBSyncTriggerResponse(
+        status="triggered",
+        source_id=source_id,
+        message=f"Sync triggered successfully via webhook for source '{source_id}'.",
+    )
+
+
+@router.get("/sources/{source_id}/logs", response_model=List[KBSyncLogResponse])
+async def get_source_sync_logs(
+    source_id: str,
+    tenant_id: str = Query(default="acme-corp", description="Tenant ID"),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db_session),
+) -> List[KBSyncLogResponse]:
+    """
+    Retrieves execution history and audit logs for a source.
+    """
+    return await kb_sync_service.get_source_logs(
+        tenant_id=tenant_id, source_id=source_id, limit=limit, db=db
+    )
+
+
 @router.get("/{entry_id}", response_model=KBEntryResponse)
+
 async def get_knowledge_base_entry(
     request: Request,
     entry_id: str,

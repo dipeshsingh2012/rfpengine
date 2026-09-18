@@ -24,7 +24,7 @@ interface SidebarProps {
   onNavigateHome: () => void;
   onNavigateResponses: () => void;
   onSelectRFP: (id: string) => void;
-  onOpenKB: (tab: "upload" | "playground") => void;
+  onOpenKB: (tab: "upload" | "connectors" | "playground") => void;
   onOpenActivity: () => void;
   onOpenSettings: () => void;
   showSettingsModal: boolean;
