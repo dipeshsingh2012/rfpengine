@@ -153,7 +153,12 @@ class HybridSearchService:
 
         return [None for _ in texts]
 
-    async def search(self, request: SearchRequest) -> SearchResponse:
+    async def search(
+        self,
+        request: SearchRequest,
+        model_override: Optional[str] = None,
+        company_name: str = "Acme Corp",
+    ) -> SearchResponse:
         sparse_task = (
             self.algolia_service.search_sparse(
                 tenant_id=request.tenant_id,
@@ -232,13 +237,15 @@ class HybridSearchService:
                         )
                     )
 
-        # Synthesize grounded answer with Gemini 2.5 Flash and Dynamic Few-Shot Demonstrations
+        # Synthesize grounded answer with Gemini or Tuned Model Endpoint
         tone = "Authoritative, Direct, and Concise"
         suggested_answer = await self._generate_answer(
             request.question,
             sources,
             exemplars=exemplars[:2],
             tone=tone,
+            company_name=company_name,
+            model_override=model_override,
         )
         confidence = min(1.0, max((s.score for s in sources), default=0.0) * 60)
 
@@ -332,6 +339,7 @@ class HybridSearchService:
         exemplars: Optional[List[ExemplarItem]] = None,
         tone: str = "Authoritative, Direct, and Concise",
         company_name: str = "Acme Corp",
+        model_override: Optional[str] = None,
     ) -> str:
         prompt = self.build_few_shot_prompt(
             question=question,
@@ -341,17 +349,19 @@ class HybridSearchService:
             company_name=company_name,
         )
 
+        model_to_use = model_override or self.settings.gemini_model
+
         if self.genai_client:
             try:
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
-                    model=self.settings.gemini_model,
+                    model=model_to_use,
                     contents=prompt,
                 )
                 if response.text:
                     return response.text.strip()
             except Exception as exc:
-                logger.error("Vertex AI Gemini answer generation failed: %s", exc)
+                logger.error("Vertex AI answer generation failed for model %s: %s", model_to_use, exc)
 
         if exemplars:
             for ex in exemplars:

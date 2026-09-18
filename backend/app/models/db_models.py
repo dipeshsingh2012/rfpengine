@@ -105,6 +105,11 @@ class QuestionReview(Base):
     )
 
 
+# Backward-compatible model aliases
+KBEntryModel = KBEntry
+QuestionReviewModel = QuestionReview
+
+
 class RoadmapInitiativeModel(Base):
     __tablename__ = "roadmap_initiatives"
 
@@ -171,8 +176,32 @@ class WorkspaceSettingsModel(Base):
         "legal_reviewer_email": "legal-review@acme.corp",
         "final_approver_email": "vp-compliance@acme.corp",
     })
+    active_tuned_model_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class TuningJobModel(Base):
+    __tablename__ = "tuning_jobs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: f"tune-{uuid.uuid4().hex[:10]}")
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False, default="acme-corp")
+    job_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    base_model: Mapped[str] = mapped_column(String(64), default="gemini-1.5-flash-002")
+    tuned_model_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
+    training_dataset_uri: Mapped[str] = mapped_column(String(512), default="")
+    dataset_examples_count: Mapped[int] = mapped_column(Integer, default=0)
+    epochs: Mapped[int] = mapped_column(Integer, default=4)
+    learning_rate_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
+    metrics: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        Index("ix_tuning_tenant_status", "tenant_id", "status"),
+    )
 
 
 class KBSource(Base):

@@ -2,6 +2,7 @@ import React from "react";
 import { Cpu } from "lucide-react";
 import { WorkspaceSettings } from "../../../types";
 import { AiDisclaimerCard } from "./AiDisclaimerCard";
+import { CustomTuningCard } from "./CustomTuningCard";
 
 interface SettingsAiTabProps {
   settings: WorkspaceSettings;
@@ -79,6 +80,7 @@ export const SettingsAiTab: React.FC<SettingsAiTabProps> = ({ settings, setSetti
         </div>
       </div>
 
+      <CustomTuningCard settings={settings} setSettings={setSettings} />
       <AiDisclaimerCard settings={settings} setSettings={setSettings} />
     </>
   );

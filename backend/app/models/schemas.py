@@ -391,6 +391,7 @@ class WorkspaceSettingsUpdate(BaseModel):
     disclaimer: Optional[str] = None
     auto_promote_golden_qa: Optional[bool] = None
     sme_roles_config: Optional[Dict[str, Any]] = None
+    active_tuned_model_id: Optional[str] = None
 
 
 class WorkspaceSettingsSchema(BaseModel):
@@ -405,10 +406,48 @@ class WorkspaceSettingsSchema(BaseModel):
     disclaimer: str
     auto_promote_golden_qa: bool
     sme_roles_config: Dict[str, Any]
+    active_tuned_model_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Supervised Tuning Schemas ---
+
+class TuningJobCreate(BaseModel):
+    base_model: str = Field(default="gemini-1.5-flash-002", description="Base Gemini model to fine-tune")
+    epochs: int = Field(default=4, ge=1, le=20, description="Training epochs")
+    learning_rate_multiplier: float = Field(default=1.0, ge=0.01, le=10.0, description="Learning rate multiplier")
+    include_golden_qa: bool = Field(default=True, description="Include Golden Q&A canonical pairs")
+    include_approved_reviews: bool = Field(default=True, description="Include SME approved review pairs")
+    custom_dataset_uri: Optional[str] = Field(default=None, description="Optional pre-staged GCS JSONL URI")
+
+
+class TuningJobResponse(BaseModel):
+    id: str
+    tenant_id: str
+    job_name: str
+    base_model: str
+    tuned_model_name: Optional[str] = None
+    status: str
+    training_dataset_uri: str
+    dataset_examples_count: int
+    epochs: int
+    learning_rate_multiplier: float
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TuningDatasetPreviewResponse(BaseModel):
+    total_pairs: int
+    golden_qa_count: int
+    approved_reviews_count: int
+    sample_pairs: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 # --- Compliance Export Schemas ---

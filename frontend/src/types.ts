@@ -108,6 +108,7 @@ export type WorkspaceSettings = {
     final_approver_email: string;
     [key: string]: any;
   };
+  active_tuned_model_id?: string | null;
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -128,6 +129,42 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
     legal_reviewer_email: "legal-review@acme.corp",
     final_approver_email: "vp-compliance@acme.corp",
   },
+  active_tuned_model_id: null,
+};
+
+export type TuningJobItem = {
+  id: string;
+  tenant_id: string;
+  job_name: string;
+  base_model: string;
+  tuned_model_name: string | null;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | string;
+  training_dataset_uri: string;
+  dataset_examples_count: number;
+  epochs: number;
+  learning_rate_multiplier: number;
+  metrics: {
+    train_loss?: number;
+    eval_loss?: number;
+    step?: number;
+    total_examples?: number;
+    [key: string]: any;
+  };
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TuningDatasetPreview = {
+  total_pairs: number;
+  golden_qa_count: number;
+  approved_reviews_count: number;
+  sample_pairs: Array<{
+    messages: Array<{
+      role: "system" | "user" | "model";
+      content: string;
+    }>;
+  }>;
 };
 
 export type SourceMode = "url" | "upload" | "extension";
