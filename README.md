@@ -557,7 +557,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 - **`PATCH /api/v1/workspaces/{id}/questions/{question_index}`**: Update review status, assigned role, or edited answer for a specific question.
 
 ### 4. Health & Diagnostics
-- **`GET /health`** / **`GET /api/health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Algolia Cloud, Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
+- **`GET /health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Algolia Cloud, Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
 
 ---
 
