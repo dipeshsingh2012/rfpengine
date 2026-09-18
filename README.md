@@ -3,112 +3,49 @@
 [![Autonomous SDLC: Agentic Fleet](https://img.shields.io/badge/Autonomous%20SDLC-Agentic%20Fleet%20v1-blueviolet?logo=github)](https://github.com/marketplace/actions/agentic-fleet-autonomous-5-agent-sdlc)
 [![CI Test Suite](https://github.com/dipeshsingh2012/rfpengine/actions/workflows/ci.yml/badge.svg)](https://github.com/dipeshsingh2012/rfpengine/actions)
 
-**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire response assistant. It retrieves verified answers from a tenant knowledge base using **hybrid search** (**Algolia** for sparse keyword matching and **Pinecone Serverless** for dense vector similarity), manages knowledge documents with **300–500 token chunking**, persists canonical review lifecycles in **PostgreSQL** (Neon), manages cloud secrets via **GCP Secret Manager**, drafts grounded responses with **Google Cloud Vertex AI** (`gemini-2.5-flash` & `text-embedding-004`), and empowers sellers to review, approve, and insert answers directly into buyer questionnaires via a **Manifest V3 browser extension**.
+**RFPEngine** is an AI-assisted seller-side RFP (Request for Proposal) and vendor security questionnaire platform. It combines hybrid vector-sparse search, continuous knowledge ingestion, multi-stakeholder governance, and direct-in-browser auto-fill to help enterprise revenue and compliance teams complete questionnaires in minutes instead of weeks.
 
 ---
 
-## Architecture Overview
+## 🎯 The Problem
 
-```mermaid
-flowchart TD
-    subgraph Clients ["Clients"]
-        FE[React Seller Workspace\n& Knowledge Base Manager]
-        EXT[Manifest V3 Browser Extension]
-    end
+B2B sales cycles and enterprise vendor security assessments are bottlenecked by high-friction questionnaire workflows:
 
-    subgraph ContinuousSync ["Continuous Knowledge Ingestion & Sync"]
-        WEB["🌐 Web Trust Crawler"]
-        GIT["🐙 GitHub Docs Repo"]
-        CLD["☁️ Cloud Storage (S3/GCS)"]
-        RFP["🏆 Approved RFP Harvester"]
-        SYNC["KBSyncService\n(SHA-256 Delta Hashing & Pruning)"]
-        WEB & GIT & CLD & RFP --> SYNC
-    end
-
-    subgraph IngestionPipeline ["Manual Upload & Parser"]
-        UPLOAD["POST /api/v1/knowledge-base/upload\n(.csv, .xlsx, .pdf, .docx, .txt, .md)"]
-        PARSER["DocumentParserService\n(300–500 Token Chunking)"]
-        UPLOAD --> PARSER
-    end
-
-    subgraph GCPCloudRun ["Google Cloud Run (FastAPI Backend)"]
-        API[API Endpoints: /search, /knowledge-base, /responses, /health]
-        HS[HybridSearchService]
-        RRF[Reciprocal Rank Fusion (RRF)]
-        PG_SVC[PostgresService]
-        ALG_SVC[AlgoliaService]
-        PC_SVC[PineconeService]
-    end
-
-    subgraph Security ["Secrets Management"]
-        GSM[GCP Secret Manager\n(Database URL, Algolia & Pinecone Keys)]
-    end
-
-    subgraph SearchIndexes ["Search & Chunk Storage (Dual Index)"]
-        ALG[(Algolia Cloud Search Index\nSparse Keyword Match\n+ Full Chunk Text Store)]
-        PC[(Pinecone Serverless\n768-dim Dense Vector k-NN\nCosine Metric + Metadata)]
-        VAI[Google Cloud Vertex AI\ntext-embedding-004 & gemini-2.5-flash]
-    end
-
-    subgraph RelationalStore ["Relational Persistence (PostgreSQL)"]
-        PG[(Neon PostgreSQL 17\nWorkspaces, Reviews & KB Sources)]
-    end
-
-    FE -->|HTTP / JSON / Upload| API
-    EXT -->|HTTP / JSON| API
-    GSM -->|Native Injection at Boot| GCPCloudRun
-
-    PARSER -->|1. Store Full Text & BM25| ALG_SVC
-    PARSER -->|2. Generate 768-dim Embeddings| VAI
-    VAI -->|3. Bulk Upsert Vectors + Meta| PC_SVC
-    SYNC -->|Delta Sync & Atomic Pruning| ALG_SVC & PC_SVC & PG_SVC
-    ALG_SVC --> ALG
-    PC_SVC --> PC
-
-    API --> HS
-    API --> PG_SVC
-    
-    HS -->|Generate Query Vector| VAI
-    HS -->|Sparse Keyword Match| ALG_SVC
-    HS -->|Dense Vector k-NN| PC_SVC
-    
-    ALG_SVC & PC_SVC --> RRF
-    RRF -->|Grounded Sources + 1.75x Golden Q&A Boost| VAI
-    VAI -->|Drafted Response| HS
-    
-    PG_SVC --> PG
-```
-
+* **Siloed & Rapidly Stale Documentation**: Compliance certifications (SOC 2, ISO 27001, HIPAA), security whitepapers, and SLA policies live scattered across Notion, GitHub repositories, Google Drive, and cloud object stores.
+* **Repetitive SME Overhead**: Solutions engineers, InfoSec leads, and product managers waste dozens of hours re-answering near-identical questions across different buyer formats.
+* **Costly Hallucination Risks**: Naive generative AI solutions draft plausible-sounding answers that introduce legal, technical, or SLA liabilities if unverified.
+* **Context Switching & Manual Data Entry**: Teams spend hours copy-pasting answers back and forth between internal wikis, spreadsheets, and cumbersome web-based buyer security portals (e.g., OneTrust, Whistic, Loopio).
 
 ---
 
-## Architecture Decision Records (ADRs)
+## 🚀 Key Product Features
 
-Key architectural decisions are documented in the [`docs/adr/`](docs/adr/README.md) directory:
+### 🔍 Grounded Hybrid Search & Automated Drafting
+* **Dual Sparse & Dense Retrieval**: Merges keyword-exact matching with deep semantic vector search to surface the exact clauses, sections, and compliance certifications needed.
+* **Grounded Answer Generation**: Uses enterprise LLM reasoning strictly anchored to retrieved citations, outputting a visual confidence score (0–100%) alongside verified source references.
+* **1.75x Golden Q&A Promotion**: Elevates verified, human-approved answers to canonical reference status, boosting their retrieval rank across future RFP iterations.
 
-- [ADR 0001: Hybrid Search with Algolia and Pinecone via Reciprocal Rank Fusion](docs/adr/0001-hybrid-retrieval-with-algolia-and-pinecone.md)
-- [ADR 0022: Swap Elasticsearch with Algolia for Sparse Retrieval](docs/adr/0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md)
-- [ADR 0002: Relational Persistence with PostgreSQL for Canonical Records and Review Tracking](docs/adr/0002-relational-persistence-with-postgresql.md)
-- [ADR 0003: Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety](docs/adr/0003-human-in-the-loop-governance-and-extension-safety.md)
-- [ADR 0004: Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture](docs/adr/0004-decoupled-seller-workspace-and-browser-extension.md)
-- [ADR 0005: Database Migrations with Alembic](docs/adr/0005-database-migrations-with-alembic.md)
-- [ADR 0006: Centralized Secrets Management with GCP Secret Manager and Terraform](docs/adr/0006-centralized-secrets-management-with-gcp-secret-manager.md)
-- [ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy](docs/adr/0007-knowledge-base-chunking-and-search-index-ingestion.md)
-- [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
-- [ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning](docs/adr/0009-passage-based-document-ingestion-and-llm-reasoning.md)
-- [ADR 0010: Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation](docs/adr/0010-multi-environment-isolation-and-production-secret-propagation.md)
-- [ADR 0011: Continuous Deployment to Google Cloud Run via GitHub Actions](docs/adr/0011-continuous-deployment-to-cloud-run-via-github-actions.md)
-- [ADR 0012: In-App Product Discovery and RICE Prioritization Roadmap Hub](docs/adr/0012-product-discovery-and-prioritization-roadmap-hub.md)
-- [ADR 0013: Manifest V3 Background Service Worker IPC and Sandboxed Storage Sync](docs/adr/0013-manifest-v3-background-service-worker-ipc-and-sandboxed-storage-sync.md)
-- [ADR 0014: Four-Role Enterprise Governance and SME Review Queue](docs/adr/0014-four-role-enterprise-governance-and-sme-review-queue.md)
-- [ADR 0015: Continuous Discovery and Opportunity-First Product Framing](docs/adr/0015-continuous-discovery-and-opportunity-solution-framing.md)
-- [ADR 0016: Relational Persistence for Product Roadmap and Discovery Backlog](docs/adr/0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md)
-- [ADR 0017: Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution](docs/adr/0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md)
-- [ADR 0018: Enterprise Testing Strategy and Automated Verification Matrix](docs/adr/0018-enterprise-testing-strategy-and-automated-verification-matrix.md)
-- [ADR 0019: Closed-Loop AI Feedback Architecture: Golden Q&A Promotion and Exemplar Learning](docs/adr/0019-closed-loop-ai-feedback-architecture.md)
-- [ADR 0020: Autonomous 5-Agent SDLC Governance & Branching Architecture](docs/adr/0020-autonomous-5-agent-sdlc-governance.md)
-- [ADR 0021: Multi-Tenant B2B Authentication via Google Cloud Identity Platform](docs/adr/0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md)
-- [ADR 0022: Model Context Protocol (MCP) Integration for IDEs and Chat Assistants](docs/adr/0022-model-context-protocol-mcp-integration-for-ide-and-chat.md)
+### 📝 Questionnaire Curation & Verification Studio (`/review/:id`)
+* **Split-View Document Comparison**: Embedded native PDF reference viewer (`<iframe>` blob) side-by-side with parsed questions for immediate verification.
+* **✨ AI Question Rephrasing**: Standardizes OCR scans, compound requirements, or clumsy buyer phrasing into clear compliance prompts with before/after diff modals.
+* **Autonomous Feedback Telemetry**: Learns from human corrections, deletions (false-positive noise filters), and explicit rating signals (`👍 / 👎`) to tune subsequent document parsing runs.
+
+### 🔄 Continuous Knowledge Synchronization & Connectors
+* **Zero-Manual-Upload Connectors**: Syncs enterprise documentation directly from live web trust centers, GitHub repositories, and cloud object stores.
+* **SHA-256 Delta Hashing**: Avoids redundant LLM embedding costs by hashing content chunks and skipping untouched passages.
+* **Atomic Triple-Store Pruning**: Automatically purges stale or modified chunks across relational, sparse, and vector stores to eliminate obsolete answers.
+
+### 🛡️ Human-in-the-Loop Governance & Multi-Role Reviews
+* **Review Lifecycle Management**: Tracks proposal progress through distinct KanBan stages (Drafting, SME Review, Approved, Exported).
+* **Role-Based Sign-Offs**: Enforces clear stakeholder accountability between Proposal Managers, Security Officers, and Solutions Engineers before deliverables leave the building.
+
+### 🧩 Manifest V3 In-Browser Form Filler
+* **Direct Portal Integration**: An enterprise Chrome extension that reads buyer questionnaire fields on third-party web portals and injects approved answers directly into web forms.
+
+### 🗺️ Live Discovery & Strategy Roadmap (`https://rfpengine.aroadmap.dev`)
+* **Interactive Kanban Lifecycle**: Real-time visibility into feature stages from Discovery through Production Deployment.
+* **RICE Prioritization Matrix**: Data-driven backlog ranking based on `(Reach × Impact × Confidence) ÷ Effort`.
+* **Living PRD Drawer**: Product specifications featuring Problem Statements, User Stories, and Gherkin Acceptance Criteria.
 
 ---
 
@@ -138,7 +75,6 @@ RFPEngine implements a production **Model Context Protocol (MCP)** server confor
 
 Add the RFPEngine MCP server to your IDE configuration (`~/.gemini/antigravity/mcp_config.json` or `.vscode/mcp.json`):
 
-```json
 {
   "mcpServers": {
     "rfpengine": {
@@ -152,11 +88,9 @@ Add the RFPEngine MCP server to your IDE configuration (`~/.gemini/antigravity/m
     }
   }
 }
-```
 
 ### Quick CLI Testing
 
-```bash
 cd backend
 .venv/bin/python -c "
 import asyncio
@@ -164,43 +98,27 @@ from app.mcp.server import MCPServer
 
 async def test():
     server = MCPServer()
-    # Query live roadmap
     res = await server.handle_request({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': 'manage_roadmap', 'arguments': {'action': 'list'}}})
     print(f'Total Roadmap Items: {res[\"result\"][\"total\"]}')
 
 asyncio.run(test())
 "
-```
-
-## Product Strategy & Discovery Roadmap (`https://rfpengine.aroadmap.dev`)
-
-RFPEngine includes an interactive **Product Strategy & Discovery Hub** live on its dedicated subdomain at [**https://rfpengine.aroadmap.dev/**](https://rfpengine.aroadmap.dev/):
-
-* **Multi-Stage Kanban Lifecycle**:
-  * 🔍 **In Discovery**: Problem validation, user research & persona pain points.
-  * 📐 **In Spec & Design**: PRD specifications, UX wireframing & technical architecture.
-  * ✅ **Approved & Ready**: Signed off by Lead, queued for autonomous agent dispatch.
-  * 🏗️ **In Development**: Active engineering sprint execution.
-  * 🚀 **Shipped & Live**: Production features active in Google Cloud Run and Chrome Web Store.
-* **RICE Prioritization Matrix**: Data-driven ranking calculated via `(Reach × Impact × Confidence) ÷ Effort = RICE Score`.
-* **Interactive Living PRD Drawer**: Slide-over product specifications featuring Customer Problem Statements, User Stories, Gherkin Acceptance Criteria, and Target KPIs.
-* **Community Upvoting & Discovery Submissions**: Stakeholders can upvote features and submit new opportunities directly into the backlog.
 
 ---
 
-## Product & Engineering Backlog
+## 🏛️ System Architecture
 
-Future roadmap items and upcoming architecture enhancements are tracked in [`docs/BACKLOG.md`](docs/BACKLOG.md) and on the live [`/roadmap`](/roadmap) board:
-- **LLM-Powered Background Taxonomy Classification**: Asynchronously tag document categories and regulatory frameworks (`SOC 2`, `ISO 27001`, `GDPR`, `HIPAA`) using fast LLMs (`gemini-2.5-flash-lite`).
-- **Neural Cross-Encoder Reranking**: Cohere Rerank v3 integration on top of RRF.
-- **Direct Spreadsheet & PDF Questionnaire Parser**: Ingestion of multi-tab Excel (`.xlsx`) buyer questionnaires.
-- **Grounded Hallucination Guardrails**: Automated claim verification against retrieved source citations.
+[Architecture Flowchart]
+Clients (React Workspace, Manifest V3 Extension) -> Cloud Run FastAPI Backend
+Ingestion Pipeline (Uploads, DocumentParserService 300-500 Token Chunking) -> Search Indexes
+Continuous Sync (Web Trust Crawler, GitHub Docs, S3/GCS, RFP Harvester) -> KBSyncService -> Tri-Store
+Backend Services (HybridSearchService, RRF, Postgres, Algolia, Pinecone) -> Storage Layer
+Search & Vectors (Algolia Sparse/BM25 + Pinecone 768-dim Dense k-NN + Vertex AI text-embedding-004 / Gemini 2.5 Flash)
+Relational Persistence (Neon PostgreSQL 17 for Workspaces, Reviews, Canonical Records)
 
----
+### Ingestion & Passage Chunking Strategy
 
-## Knowledge Base Ingestion & Passage Chunking
-
-RFPEngine ingests arbitrary enterprise documentation (whitepapers, contracts, SLAs, technical manuals, employee handbooks) and chunks them into semantic **narrative passages**, leaving question-to-passage reasoning to **Gemini 2.5 Flash**:
+Documents are parsed into semantically coherent narrative passages rather than arbitrary character splits, leaving question-to-passage contextual reasoning to **Gemini 2.5 Flash**:
 
 | File Type | Parsing & Chunking Strategy | Target Chunk Size | Section Title / Header Mapping |
 | :--- | :--- | :--- | :--- |
@@ -219,52 +137,19 @@ RFPEngine ingests arbitrary enterprise documentation (whitepapers, contracts, SL
 
 ---
 
-## 🔄 Automated Knowledge Base Syncing & Multi-Source Connectors
+## 🔄 Automated Knowledge Base Syncing & Connectors
 
-RFPEngine features an **Autonomous Continuous Ingestion & Synchronization Engine** ([`kb_sync_service.py`](backend/app/services/kb_sync_service.py)) that eliminates manual document re-uploads by connecting directly to live enterprise documentation sources:
+RFPEngine features an **Autonomous Continuous Ingestion & Synchronization Engine** (`kb_sync_service.py`) that connects directly to live enterprise documentation sources:
 
-```mermaid
-flowchart LR
-    subgraph Sources ["Connected Sources"]
-        W[🌐 Web Trust Portal]
-        G[🐙 GitHub Docs Repo]
-        C[☁️ S3 / Cloud Bucket]
-        R[🏆 RFP SME Answers]
-    end
-
-    subgraph SyncEngine ["KBSyncService Engine"]
-        Delta[SHA-256 Delta Hashing]
-        Chunk[300-500 Token Chunking]
-        Prune[Atomic Stale Pruning]
-    end
-
-    subgraph TriStore ["Triple Index Sync"]
-        PG[(PostgreSQL)]
-        ALG[(Algolia Cloud)]
-        PC[(Pinecone)]
-    end
-
-    Sources --> Delta --> Chunk --> TriStore
-    Delta -->|Obsolete Entries| Prune --> TriStore
-```
-
-### Supported Connectors
-
-| Connector | Source Type | Extraction Engine | Key Capabilities |
-| :--- | :--- | :--- | :--- |
-| **🌐 Web Trust Portal** | `web_crawler` | `CleanHTMLToMarkdownParser` | • Zero-dependency HTML parser stripping scripts, styles, navs, and footers<br>• Recursively traverses trust centers, Notion pages, and compliance portals<br>• Automatically infers enterprise taxonomy categories |
-| **🐙 GitHub Documentation** | `github_docs` | GitHub Raw / API Fetcher | • Pulls markdown specifications, architecture RFCs, and policies (`/docs`, `SECURITY.md`)<br>• Preserves file paths and directory hierarchy as passage metadata |
-| **☁️ Cloud Storage** | `cloud_storage` | Directory & S3 Watcher | • Continuously scans S3/GCS buckets or local folders for updated whitepapers (`.pdf`, `.docx`, `.md`, `.xlsx`)<br>• Ingests delta modifications without re-indexing unchanged documents |
-| **🏆 RFP SME Harvester** | `rfp_harvest` | Canonical Workspace Extractor | • Automatically extracts verified, human-approved answers from completed RFP workspaces<br>• Tags entries as **Golden Q&A**, applying a **1.75x Authority Multiplier** in RRF hybrid retrieval |
+* **🌐 Web Trust Portal** (`web_crawler`): Zero-dependency HTML parser stripping scripts, styles, navs, and footers. Traverses trust centers, Notion pages, and compliance portals.
+* **🐙 GitHub Documentation** (`github_docs`): Pulls markdown specifications, architecture RFCs, and policies (`/docs`, `SECURITY.md`). Preserves file paths and directory hierarchy.
+* **☁️ Cloud Storage** (`cloud_storage`): Continuously scans S3/GCS buckets or local folders for updated whitepapers (`.pdf`, `.docx`, `.md`, `.xlsx`). Ingests delta modifications without re-indexing unchanged documents.
+* **🏆 RFP SME Harvester** (`rfp_harvest`): Automatically extracts verified, human-approved answers from completed workspaces. Applies a **1.75x Authority Multiplier** in RRF hybrid retrieval.
 
 ### Smart Delta Hashing & Atomic Store Pruning
-* **Content Hashing**: Computes deterministic `SHA-256` content and passage hashes (`sha256(source_url + chunk_content)`). Unchanged passages are skipped, incurring zero AI embedding cost.
-* **Atomic 3-Way Store Pruning**: When a source document is revised or deleted, outdated passages are synchronously purged across **PostgreSQL** (`kb_entries`), **Algolia Cloud**, and **Pinecone Serverless**, guaranteeing zero duplicate or stale answers.
-* **Execution Modes**:
-  * **⚡ On-Demand 1-Click Sync**: Sync individual sources or `Sync All Sources` via UI or API (`POST /api/v1/knowledge-base/sources/{id}/sync`).
-  * **⏱️ Scheduled Background Sync**: Automated intervals (`hourly`, `daily`, `weekly`).
-  * **🪝 Inbound Webhook Triggers**: `POST /api/v1/knowledge-base/sources/{id}/webhook` for CI/CD actions and cloud storage event triggers.
-  * **📜 Full Audit History**: Inspect execution duration, documents scanned, passages created, and obsolete passages pruned.
+* **Content Hashing**: Deterministic `SHA-256` hashes (`sha256(source_url + chunk_content)`). Unchanged passages are skipped, incurring zero AI embedding cost.
+* **Atomic 3-Way Store Pruning**: Outdated passages are synchronously purged across PostgreSQL (`kb_entries`), Algolia Cloud, and Pinecone Serverless.
+* **Execution Modes**: On-Demand 1-Click Sync, Scheduled Intervals (`hourly`, `daily`, `weekly`), and Inbound Webhooks (`POST /api/v1/knowledge-base/sources/{id}/webhook`).
 
 ---
 
@@ -272,457 +157,198 @@ flowchart LR
 
 When uploading complex multi-format vendor questionnaires, RFPEngine presents an interactive **Curation & Verification Studio** before importing into active drafting workspaces:
 
-* **📄 Original Document Reference Viewer**:
-  * Embedded native PDF renderer (`<iframe>` blob) with zoom, search, and page navigation side-by-side with parsed questions.
-  * Toggleable **Side-by-Side Split View** or **Slide-Over Drawer** modes, with `↗ Open in New Tab` and `⬇ Download` for multi-monitor workflows.
-* **✨ Question-Wise AI Rephrasing**:
-  * Powered by **Google Cloud Vertex AI (`gemini-2.5-flash`)** via `POST /api/v1/responses/rephrase-question`.
-  * Standardizes fragmented OCR scans, compound requirements, or clumsy phrasing into crisp compliance requirement syntax.
-  * Interactive before/after diff preview modal with 1-click **Accept** or **Revert**.
-* **🔄 Guided Complete Document Re-Parsing**:
-  * Re-runs extraction with custom natural language guidance (e.g. *"Focus strictly on Section 4 technical cybersecurity controls"*).
-* **🧠 Autonomous AI Feedback Loop**:
-  * Tracks user deletions as **false-positive signals** (e.g. table headers, disclaimers).
-  * Tracks user edits as **prompt syntax improvements**.
-  * Explicit `👍 Accurate` / `👎 Needs Tuning` quality ratings persisted via `POST /api/v1/responses/parser-feedback` to continuously tune extraction prompts.
-
+* **📄 Original Document Reference Viewer**: Embedded native PDF renderer (`<iframe>` blob) with zoom, search, and page navigation side-by-side with parsed questions. Supports Side-by-Side Split View or Slide-Over Drawer modes.
+* **✨ Question-Wise AI Rephrasing**: Powered by **Google Cloud Vertex AI (`gemini-2.5-flash`)** via `POST /api/v1/responses/rephrase-question`. Standardizes OCR scans and compound requirements into crisp compliance syntax.
+* **🔄 Guided Complete Document Re-Parsing**: Re-runs extraction with custom natural language guidance.
+* **🧠 Autonomous AI Feedback Loop**: Tracks deletions as false-positive signals, edits as prompt syntax improvements, and records quality ratings (`👍 / 👎`).
 
 ---
 
-## Prerequisites
+## 🛠️ Architecture Decision Records (ADRs)
+
+Key architectural decisions are documented in the `docs/adr/` directory:
+
+- [ADR 0001: Hybrid Search with Algolia and Pinecone via Reciprocal Rank Fusion](docs/adr/0001-hybrid-retrieval-with-algolia-and-pinecone.md)
+- [ADR 0022: Swap Elasticsearch with Algolia for Sparse Retrieval](docs/adr/0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md)
+- [ADR 0002: Relational Persistence with PostgreSQL for Canonical Records and Review Tracking](docs/adr/0002-relational-persistence-with-postgresql.md)
+- [ADR 0003: Human-in-the-Loop Governance, Multi-Role Approval, and Form Insertion Safety](docs/adr/0003-human-in-the-loop-governance-and-extension-safety.md)
+- [ADR 0004: Decoupled Seller Workspace and Manifest V3 Browser Extension Architecture](docs/adr/0004-decoupled-seller-workspace-and-browser-extension.md)
+- [ADR 0005: Database Migrations with Alembic](docs/adr/0005-database-migrations-with-alembic.md)
+- [ADR 0006: Centralized Secrets Management with GCP Secret Manager and Terraform](docs/adr/0006-centralized-secrets-management-with-gcp-secret-manager.md)
+- [ADR 0007: Multi-Format Knowledge Base Ingestion and Search-Index-Only Chunking Strategy](docs/adr/0007-knowledge-base-chunking-and-search-index-ingestion.md)
+- [ADR 0008: Native Google Cloud Vertex AI (Gemini 2.5 Flash and text-embedding-004) for Enterprise Inference](docs/adr/0008-native-gcp-vertex-ai-gemini-and-embeddings.md)
+- [ADR 0009: Passage-Based Document Ingestion and LLM Question-Answering Reasoning](docs/adr/0009-passage-based-document-ingestion-and-llm-reasoning.md)
+- [ADR 0010: Multi-Environment Isolation, Vector Namespacing, and Production Secret Propagation](docs/adr/0010-multi-environment-isolation-and-production-secret-propagation.md)
+- [ADR 0011: Continuous Deployment to Google Cloud Run via GitHub Actions](docs/adr/0011-continuous-deployment-to-cloud-run-via-github-actions.md)
+- [ADR 0012: In-App Product Discovery and RICE Prioritization Roadmap Hub](docs/adr/0012-product-discovery-and-prioritization-roadmap-hub.md)
+- [ADR 0013: Manifest V3 Background Service Worker IPC and Sandboxed Storage Sync](docs/adr/0013-manifest-v3-background-service-worker-ipc-and-sandboxed-storage-sync.md)
+- [ADR 0014: Four-Role Enterprise Governance and SME Review Queue](docs/adr/0014-four-role-enterprise-governance-and-sme-review-queue.md)
+- [ADR 0015: Continuous Discovery and Opportunity-First Product Framing](docs/adr/0015-continuous-discovery-and-opportunity-solution-framing.md)
+- [ADR 0016: Relational Persistence for Product Roadmap and Discovery Backlog](docs/adr/0016-relational-persistence-for-product-roadmap-and-discovery-backlog.md)
+- [ADR 0017: Specialized AI Proposal Drafter and Multi-Agent Swarm Evolution](docs/adr/0017-specialized-ai-proposal-drafter-and-multi-agent-swarm-evolution.md)
+- [ADR 0018: Enterprise Testing Strategy and Automated Verification Matrix](docs/adr/0018-enterprise-testing-strategy-and-automated-verification-matrix.md)
+- [ADR 0019: Closed-Loop AI Feedback Architecture: Golden Q&A Promotion and Exemplar Learning](docs/adr/0019-closed-loop-ai-feedback-architecture.md)
+- [ADR 0020: Autonomous 5-Agent SDLC Governance & Branching Architecture](docs/adr/0020-autonomous-5-agent-sdlc-governance.md)
+- [ADR 0021: Multi-Tenant B2B Authentication via Google Cloud Identity Platform](docs/adr/0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md)
+- [ADR 0022: Model Context Protocol (MCP) Integration for IDEs and Chat Assistants](docs/adr/0022-model-context-protocol-mcp-integration-for-ide-and-chat.md)
+
+---
+
+## ⚡ API Reference
+
+### 1. Hybrid Search & Answer Generation
+- **`POST /api/v1/search`**: Concurrently queries Algolia (sparse) and Pinecone (dense vector k-NN), merges via RRF, applies the 1.75x Golden Q&A boost, and drafts an answer using Gemini 2.5 Flash.
+  Payload: `{"tenant_id": "acme-corp", "question": "Describe your data retention policy.", "top_k": 5}`
+
+### 2. Knowledge Base Ingestion & Continuous Sync
+- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.xlsx`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes across PostgreSQL, Algolia, and Pinecone.
+- **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records with pagination.
+- **`GET /api/v1/knowledge-base/{id}`**: Get a specific knowledge record.
+- **`POST /api/v1/knowledge-base`**: Create a single record across all three data stores.
+- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records across all three stores.
+- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record synchronously across all stores.
+- **`GET /api/v1/knowledge-base/sources`**: List all configured automated ingestion sources.
+- **`POST /api/v1/knowledge-base/sources`**: Register a new source (`web_crawler`, `github_docs`, `cloud_storage`, `rfp_harvest`).
+- **`GET /api/v1/knowledge-base/sources/{id}`**: Retrieve configuration and sync status.
+- **`PUT /api/v1/knowledge-base/sources/{id}`**: Update source parameters, category, or schedule.
+- **`DELETE /api/v1/knowledge-base/sources/{id}`**: Delete source and optionally prune indexed passages.
+- **`POST /api/v1/knowledge-base/sources/{id}/sync`**: Trigger on-demand sync run.
+- **`POST /api/v1/knowledge-base/sync-all`**: Trigger sync across all active sources.
+- **`POST /api/v1/knowledge-base/sources/{id}/webhook`**: Inbound webhook for event-driven triggers.
+- **`GET /api/v1/knowledge-base/sources/{id}/logs`**: Retrieve historical execution logs and passage metrics.
+
+### 3. Questionnaire Curation & Feedback Loop
+- **`POST /api/v1/responses/parse-file`**: Parse uploaded questionnaires (`.pdf`, `.docx`, `.xlsx`, `.csv`) using Gemini 2.5 Flash and heuristics.
+- **`POST /api/v1/responses/rephrase-question`**: Standardize question text into clean enterprise compliance syntax.
+- **`POST /api/v1/responses/parser-feedback`**: Record review-time user corrections, deletions, and quality ratings (`👍 / 👎`).
+- **`POST /api/v1/responses/export`**: Export proposal deliverable as `.docx`, `.xlsx`, `.csv`, `.pdf`, or JSON.
+
+### 4. Workspaces & Review Persistence (PostgreSQL)
+- **`POST /api/v1/responses/workspaces`**: Save an imported questionnaire workspace and questions.
+- **`GET /api/v1/responses/workspaces/{id}`**: Retrieve workspace session and review stages.
+- **`PUT /api/v1/responses/workspaces/{id}`**: Update answers and review statuses.
+- **`POST /api/v1/responses/workspaces/{id}/questions/{index}/promote`**: 1-click promote an approved answer to canonical **Golden Q&A**.
+
+### 5. Health & Diagnostics
+- **`GET /health`**: Returns real-time connection status and latency metrics for PostgreSQL, Algolia Cloud, Pinecone Serverless, GCP Secret Manager, and Vertex AI.
+
+---
+
+## 💻 Frontend Routes & Pages
+
+| Route Path | Page / View Name | Primary Features & User Workflows |
+| :--- | :--- | :--- |
+| **`GET /`** | **Overview & Importer** | • Import questionnaires via URL or file upload (`.csv`, `.json`, `.xlsx`, `.pdf`, `.docx`)<br>• Quick-start starter questions and project summaries |
+| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time Gemini 2.5 Flash answers<br>• Confidence scoring ring (0–100%) and cited hybrid sources<br>• In-line answer editor and reviewer role assignment |
+| **`GET /review/:id`** | **Curation & Verification Studio** | • Embedded native PDF viewer (Split-view and slide-over drawer)<br>• Curation controls: editing, deletion of false positives<br>• Rephrase with AI and natural-language re-parsing guidance |
+| **`GET /knowledge-base`** | **Knowledge Base Hub** | • Drag-and-drop multi-format uploader with 300–500 token chunking<br>• Automated continuous sync connectors and passage pruning |
+| **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Algolia and Pinecone<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection |
+
+---
+
+## 🔒 Multi-Environment Isolation & Secret Propagation
+
+* **Vector Namespacing**: Pinecone Serverless is partitioned into namespaces (`namespace: "local"` vs `namespace: "prod"`). Local tests write only to `local`.
+* **Zero-Secret Docker Images**: `.env` and `.env.local` are excluded from builds via `.dockerignore`.
+* **GCP Secret Manager**: Single source of truth for production secrets (`DATABASE_URL`, `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `PINECONE_API_KEY`).
+* **Cloud Run Boot Injection**: Secrets are mounted directly into container memory via Terraform `secret_key_ref`.
+* **Endpoints**: Production API runs at `https://rfpengine-api-714049712844.us-central1.run.app`.
+
+---
+
+## 📋 Prerequisites
 
 - **Python**: 3.11 or newer
 - **Node.js**: 20 or newer and `npm`
-- **Terraform**: 1.5 or newer (for GCP infrastructure provisioning)
-- **Google Cloud SDK (`gcloud`)**: For managing Vertex AI and Cloud Run
-- **GCP Service Account Key (`gcp-key.json`)**: For local ADC authentication with Vertex AI and Secret Manager
-- **Neon PostgreSQL Connection String**: Cloud database URL
-- **Pinecone API Key**: For managed dense vector search (`aws / us-east-1`)
-- **Browser**: Google Chrome or Microsoft Edge (for loading the extension POC)
+- **Terraform**: 1.5 or newer
+- **Google Cloud SDK (`gcloud`)**: For Vertex AI and Cloud Run
+- **GCP Service Account Key (`gcp-key.json`)**: Local ADC credentials
+- **Neon PostgreSQL Connection String**
+- **Pinecone API Key** & **Algolia Cloud Credentials**
+- **Browser**: Google Chrome or Microsoft Edge
 
 ---
 
-## Quickstart (Local Development)
+## 🚀 Quickstart (Local Development)
 
 ### 1. Environment Configuration
-
-From the repository root:
-
-```bash
-cp .env.example .env
-```
-
-Configure your `.env` file:
-
-```ini
-# Environment ("dev", "staging", "prod")
-ENV=dev
-
-# Google Cloud Project & IAM
-GCP_PROJECT_ID=rfpengine
-GCP_SECRET_MANAGER_ENABLED=true
-GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
-
-# LLM & Embedding Configuration (Vertex AI Native)
-LLM_PROVIDER=vertexai
-GEMINI_MODEL=gemini-2.5-flash
-VERTEX_EMBEDDING_MODEL=text-embedding-004
-EMBEDDING_DIMENSION=768
-
-# Optional OpenAI Fallback
-# OPENAI_API_KEY=sk-proj-...
-
-# Neon PostgreSQL Database
-DATABASE_URL=postgresql://neondb_owner:your_password@ep-rapid-truth-aqw82ysi-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require
-
-# Algolia Cloud Configuration
-ALGOLIA_APP_ID=your_algolia_app_id
-ALGOLIA_API_KEY=your_algolia_api_key
-ALGOLIA_INDEX_NAME=rfp_knowledge_base
-
-# Pinecone Serverless Configuration
-PINECONE_API_KEY=pcsk_...
-PINECONE_INDEX=rfp-knowledge-base
-PINECONE_CLOUD=aws
-PINECONE_REGION=us-east-1
-PINECONE_DIMENSION=768
-
-# CORS & Server
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-PORT=8000
-```
+Copy `.env.example` to `.env` and populate:
+- `GCP_PROJECT_ID=rfpengine`
+- `GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json`
+- `LLM_PROVIDER=vertexai`, `GEMINI_MODEL=gemini-2.5-flash`, `VERTEX_EMBEDDING_MODEL=text-embedding-004`
+- `DATABASE_URL=postgresql://neondb_owner:password@ep-...neon.tech/neondb?sslmode=require`
+- `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `ALGOLIA_INDEX_NAME=rfp_knowledge_base`
+- `PINECONE_API_KEY`, `PINECONE_INDEX=rfp-knowledge-base`, `PINECONE_CLOUD=aws`, `PINECONE_REGION=us-east-1`
 
 ### 2. Start Local PostgreSQL Database
+Run `docker-compose up -d`
 
-```bash
-docker-compose up -d
-```
-
-### 3. Initialize Database Migrations & Virtual Environment
-
-```bash
+### 3. Initialize Virtual Environment & Migrations
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-
-# Run Alembic database migrations against Neon PostgreSQL
 python3 -m alembic upgrade head
 cd ..
-```
 
 ### 4. Database, Seeding, Cloud Diagnostics & Secrets Tooling
+- `npm run seed`: Seed sample documents across PostgreSQL, Algolia, and Pinecone
+- `npm run test:cloud`: Verify live cloud connections
+- `npm run secrets:audit`: Audit GCP Secret Manager against project secrets
+- `npm run secrets:sync`: Sync local `.env` to GCP Secret Manager
+- `npm test`: Run all backend tests
 
-```bash
-# Idempotently seed knowledge base sample docs across PostgreSQL, Elastic Cloud, and Pinecone
-npm run seed
+### 5. Start Backend
+cd backend && uvicorn app.main:app --reload --port 8000
 
-# Run live Cloud Diagnostics across PostgreSQL, Elastic Cloud, Pinecone, and Vertex AI
-npm run test:cloud
-
-# Audit GCP Secret Manager against canonical project secrets
-npm run secrets:audit
-
-# Sync local .env secrets to GCP Secret Manager
-npm run secrets:sync
-
-# Run all backend tests (Document Parser, PostgreSQL, Uploads)
-npm test
-
-# Run PostgreSQL connection and CRUD test suite specifically
-npm run test:db
-
-# Apply pending Alembic migrations
-npm run db:migrate
-
-# Generate a new migration revision after modifying models in backend/app/models/db_models.py
-npm run db:revision -- -m "add_new_feature_table"
-```
-
-### 5. Start the FastAPI Backend
-
-From `backend/`:
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-Verify health status:
-
-```bash
-curl http://localhost:8000/health
-```
-
-### 6. Start the React Frontend Workspace
-
-In a new terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open [http://localhost:5173/](http://localhost:5173/). Click **Knowledge base** in the sidebar to open the file drag-and-drop uploader.
+### 6. Start Frontend
+cd frontend && npm install && npm run dev
+Open http://localhost:5173/
 
 ---
 
-## GCP Deployment & Secrets Management with Terraform
+## ☁️ GCP Deployment & Secrets Management with Terraform
 
-All cloud infrastructure — including **Google Cloud Secret Manager secrets**, **Cloud Run v2**, **IAM Service Accounts**, and **Artifact Registry** — is managed declaratively via **Terraform** in the [`terraform/`](terraform/) directory.
+### Managing Secrets
 
----
+1. Update `terraform/terraform.tfvars`:
+   database_url = "postgresql://neondb_owner:NEW_PW@ep-...neon.tech/neondb?sslmode=require"
+   algolia_app_id = "YOUR_APP_ID"
+   algolia_api_key = "NEW_KEY"
+   pinecone_api_key = "NEW_KEY"
 
-### Managing Secrets with Terraform & GCP Secret Manager
-
-All sensitive credentials (`DATABASE_URL`, `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `PINECONE_API_KEY`) are declared as sensitive variables in Terraform, securely provisioned in **Google Cloud Secret Manager**, and automatically injected into Cloud Run at container boot via `version = "latest"`. Google Cloud Vertex AI (Gemini 2.5 Flash and `text-embedding-004`) authenticates natively using the Cloud Run Service Account (`roles/aiplatform.user`).
-
-#### 1. How to Update or Rotate an Existing Secret
-
-When you update credentials (e.g. rotating a Neon database password, Algolia API Key, or Pinecone API key):
-
-1. Open your local `terraform/terraform.tfvars` file (which is gitignored):
-   ```hcl
-   # terraform/terraform.tfvars
-   database_url     = "postgresql://neondb_owner:NEW_PASSWORD@ep-rapid-truth-...neon.tech/neondb?sslmode=require"
-   algolia_app_id   = "YOUR_ALGOLIA_APP_ID"
-   algolia_api_key  = "NEW_ALGOLIA_API_KEY"
-   pinecone_api_key = "NEW_PINECONE_KEY..."
-   ```
-
-2. **Preview the Changes**:
-   ```bash
+2. Preview & Apply:
    npm run tf:plan
-   ```
-   Terraform will show: `+ resource "google_secret_manager_secret_version" ... will be created`.
-
-3. **Apply the Update**:
-   ```bash
    npm run tf:apply
-   ```
-
-4. **Zero-Downtime Secret Propagation**:
-   - Terraform automatically creates a **new immutable secret version** in GCP Secret Manager (e.g. Version 2).
-   - Because Cloud Run is configured with `version = "latest"`, it automatically re-deploys a new revision using the latest secret value without any downtime.
-
-> [!TIP]
-> **Single Secret Update via CLI**: You can also update a single secret without modifying `terraform.tfvars` by passing the `-var` flag:
-> ```bash
-> npm run tf:apply -- -var="pinecone_api_key=pcsk_NEW_KEY_HERE"
-> ```
-
-👉 **View Active Secrets & Versions**: [Google Cloud Secret Manager Console](https://console.cloud.google.com/security/secret-manager?project=rfpengine)
-
----
-
-#### 2. How to Add a Brand New Secret (Step-by-Step)
-
-If you introduce a new third-party service (e.g. `COHERE_API_KEY` or `SLACK_WEBHOOK_URL`):
-
-1. **Declare the Variable** in [`terraform/variables.tf`](terraform/variables.tf):
-   ```hcl
-   variable "cohere_api_key" {
-     type        = string
-     description = "Cohere API key for reranking"
-     sensitive   = true
-     default     = ""
-   }
-   ```
-
-2. **Define the Secret Manager Resource** in [`terraform/secrets.tf`](terraform/secrets.tf):
-   ```hcl
-   resource "google_secret_manager_secret" "cohere_api_key" {
-     secret_id = "${var.app_name}-cohere-api-key"
-     replication {
-       auto {}
-     }
-     depends_on = [google_project_service.enabled_apis]
-   }
-
-   resource "google_secret_manager_secret_version" "cohere_api_key_val" {
-     count       = var.cohere_api_key != "" ? 1 : 0
-     secret      = google_secret_manager_secret.cohere_api_key.id
-     secret_data = var.cohere_api_key
-   }
-   ```
-
-3. **Grant IAM Access to Cloud Run** in [`terraform/iam.tf`](terraform/iam.tf):
-   ```hcl
-   resource "google_secret_manager_secret_iam_member" "cohere_key_access" {
-     secret_id = google_secret_manager_secret.cohere_api_key.id
-     role      = "roles/secretmanager.secretAccessor"
-     member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
-   }
-   ```
-
-4. **Mount Secret as Environment Variable** in [`terraform/cloud_run.tf`](terraform/cloud_run.tf):
-   ```hcl
-   dynamic "env" {
-     for_each = var.cohere_api_key != "" ? [1] : []
-     content {
-       name = "COHERE_API_KEY"
-       value_source {
-         secret_key_ref {
-           secret  = google_secret_manager_secret.cohere_api_key.secret_id
-           version = "latest"
-         }
-       }
-     }
-   }
-   ```
-
-5. **Set the Value & Apply**:
-   Add `cohere_api_key = "..."` in `terraform/terraform.tfvars` and run `npm run tf:apply`.
-
----
 
 ### Complete GCP Deployment Workflow
+1. Provision Infrastructure:
+   cd terraform
+   cp terraform.tfvars.example terraform.tfvars
+   npm run tf:init && npm run tf:apply
 
-#### 1. Initial Infrastructure Provisioning
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Fill in project_id, database_url (Neon), credentials_file ("../gcp-key.json")
-
-# Initialize and preview
-npm run tf:init
-npm run tf:plan
-
-# Provision GCP Secret Manager, Cloud Run, Artifact Registry, and IAM
-npm run tf:apply
-```
-
-#### 2. Build & Push Backend Container to Artifact Registry
-
-```bash
-# Retrieve variables from Terraform outputs
-PROJECT_ID="rfpengine"
-REGION="us-central1"
-REPO_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/rfpengine-repo"
-
-# Build and Push Container Image to Google Artifact Registry
-cd ../backend
-gcloud builds submit --tag "${REPO_URL}/backend:latest" .
-
-# Update Cloud Run to deploy the pushed image
-gcloud run deploy rfpengine-api \
-  --image "${REPO_URL}/backend:latest" \
-  --region "${REGION}"
-```
+2. Build & Deploy Backend:
+   cd ../backend
+   gcloud builds submit --tag "us-central1-docker.pkg.dev/rfpengine/rfpengine-repo/backend:latest" .
+   gcloud run deploy rfpengine-api --image "us-central1-docker.pkg.dev/rfpengine/rfpengine-repo/backend:latest" --region "us-central1"
 
 ---
 
-## Frontend Routes & Pages
+## 📂 Project Structure
 
-The React single-page application (`frontend/`) provides dedicated routes for questionnaire ingestion, AI-assisted drafting, multi-stakeholder governance, and knowledge base file uploads:
-
-| Route Path | Page / View Name | Primary Features & User Workflows |
-| :--- | :--- | :--- |
-| **`GET /`** | **Overview & Importer** | • Import buyer questionnaires via URL or file upload (`.csv`, `.json`, `.xlsx`, `.pdf`, `.docx`)<br>• Quick-start with pre-configured starter questions<br>• Summary dashboard of recent RFP projects |
-| **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gemini-2.5-flash`) stream<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Algolia (Sparse) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
-| **`GET /review/:id`** | **Curation & Verification Studio** | • **Embedded Document Viewer**: Split-view and slide-over drawer native PDF viewer with zoom, page navigation, and download<br>• **Curation Controls**: Checkbox selection, inline editing, addition of missed items, and deletion of false positives<br>• **✨ Rephrase with AI**: Per-question Gemini 2.5 Flash phrasing cleanup with before/after diff preview<br>• **🔄 Re-Parse Document**: Re-run extraction with custom natural language guidance<br>• **AI Feedback Loop**: Captures deletions, edits, and ratings (`👍 / 👎`) |
-| **`GET /knowledge-base`** | **Knowledge Base Hub** | • **Documents & Ingestion**: Drag-and-drop multi-format file uploader (`.csv`, `.tsv`, `.xlsx`, `.pdf`, `.docx`, `.txt`, `.md`) with 300–500 token chunking<br>• **Automated Sync & Connectors**: Continuous sync from Web trust portals, GitHub repos, Cloud buckets, and completed RFPs<br>• Table of indexed knowledge chunks with single-click deletion |
-| **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Algolia (Sparse) and Pinecone (Dense Vectors)<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection and hit breakdown<br>• Live AI answer generation (`gemini-2.5-flash`) with radial confidence scoring<br>• Quick-click sample test questions for live demonstrations |
-
----
-
-## Multi-Environment Isolation & Secret Propagation
-
-RFPEngine enforces strict isolation between **Local Development** and **Cloud Production**:
-
-### 1. Vector Database Namespacing
-- **Pinecone Serverless**: Partitioned into environment namespaces (`namespace: "local"` vs `namespace: "prod"`).
-- Automated tests and local developer uploads write to the `local` namespace, ensuring production vectors remain pristine.
-
-### 2. Secret Propagation Pipeline
-- **Zero-Secret Docker Images**: `.env` and `.env.local` are excluded from Docker builds via `.dockerignore`.
-- **GCP Secret Manager**: Single source of truth for production secrets (`DATABASE_URL`, `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `PINECONE_API_KEY`).
-- **Cloud Run Boot Injection**: Secrets are mounted directly into container memory via Terraform `secret_key_ref` definitions.
-- **CLI Sync Tool**: Run `npm run secrets:sync` to push updated keys from local `.env` to GCP Secret Manager.
-
-### 3. Production Regional Endpoint
-- **Cloud Run API**: `https://rfpengine-api-714049712844.us-central1.run.app`
-- **Swagger Documentation**: `https://rfpengine-api-714049712844.us-central1.run.app/docs`
-- **CORS Allowed Origins**: `http://localhost:5173`, `http://localhost:3000`, `https://www.rfpengine.net`, `https://rfpengine.net`, and Chrome Extensions (`chrome-extension://*`).
-
----
-
-## API Reference
-
-### 1. Hybrid Search & Answer Generation
-- **`POST /api/v1/search`**
-  - Concurrently queries Algolia (sparse) and Pinecone (dense vector k-NN).
-  - Merges hits with Reciprocal Rank Fusion (RRF) and applies the 1.75x Golden Q&A authority multiplier.
-  - Drafts grounded answer with Google Cloud Vertex AI `gemini-2.5-flash`.
-  - **Request Body**:
-    ```json
-    {
-      "tenant_id": "acme-corp",
-      "question": "Describe your data retention policy.",
-      "top_k": 5
-    }
-    ```
-
-### 2. Knowledge Base Ingestion & Continuous Sync
-- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.xlsx`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into PostgreSQL, Algolia, and Pinecone.
-- **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records from PostgreSQL with pagination.
-- **`GET /api/v1/knowledge-base/{id}`**: Get a specific knowledge record.
-- **`POST /api/v1/knowledge-base`**: Create a single record across PostgreSQL, Algolia, and Pinecone.
-- **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records across PostgreSQL, Algolia, and Pinecone.
-- **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record synchronously from PostgreSQL, Algolia, and Pinecone.
-- **`GET /api/v1/knowledge-base/sources`**: List all configured automated ingestion sources for the tenant.
-- **`POST /api/v1/knowledge-base/sources`**: Register a new source (`web_crawler`, `github_docs`, `cloud_storage`, `rfp_harvest`).
-- **`GET /api/v1/knowledge-base/sources/{id}`**: Retrieve configuration and sync status for a specific source.
-- **`PUT /api/v1/knowledge-base/sources/{id}`**: Update source parameters, category, or schedule.
-- **`DELETE /api/v1/knowledge-base/sources/{id}`**: Delete source and optionally prune all its indexed passages.
-- **`POST /api/v1/knowledge-base/sources/{id}/sync`**: Trigger an immediate on-demand synchronization run.
-- **`POST /api/v1/knowledge-base/sync-all`**: Trigger continuous synchronization across all active sources.
-- **`POST /api/v1/knowledge-base/sources/{id}/webhook`**: Inbound webhook for CI/CD and cloud event triggers.
-- **`GET /api/v1/knowledge-base/sources/{id}/logs`**: Retrieve historical execution logs and passage metrics.
-
-### 3. Questionnaire Curation & Feedback Loop
-- **`POST /api/v1/responses/parse-file`**: Parse uploaded questionnaires (`.pdf`, `.docx`, `.xlsx`, `.csv`) using Gemini 2.5 Flash + heuristics. Accepts optional `guidance` form parameter for custom extraction focus.
-- **`POST /api/v1/responses/rephrase-question`**: Standardize and clean question text into clear enterprise compliance syntax with Gemini 2.5 Flash.
-- **`POST /api/v1/responses/parser-feedback`**: Record review-time user corrections, deletions (false positives), and quality ratings (`👍 / 👎`).
-- **`POST /api/v1/responses/export`**: Export proposal deliverable as `.docx`, `.xlsx`, `.csv`, `.pdf`, or JSON.
-
-### 4. Workspaces & Review Persistence (PostgreSQL)
-- **`POST /api/v1/responses/workspaces`**: Save an imported questionnaire workspace and its questions to PostgreSQL.
-- **`GET /api/v1/responses/workspaces/{id}`**: Retrieve a workspace session and its review stages.
-- **`PUT /api/v1/responses/workspaces/{id}`**: Update answers and review statuses across all questions.
-- **`POST /api/v1/responses/workspaces/{id}/questions/{index}/promote`**: 1-click promote an approved answer to canonical **Golden Q&A** in the knowledge base.
-
-### 5. Health & Diagnostics
-- **`GET /health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Algolia Cloud, Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
-
----
-
-## Project Structure
-
-```text
-├── docker-compose.yml              # Local PostgreSQL container
-├── terraform/                      # Infrastructure as Code (GCP & Cloud Run)
-│   ├── main.tf                     # Provider & GCP API enablement
-│   ├── variables.tf                # Parameter declarations
-│   ├── secrets.tf                  # GCP Secret Manager resources
-│   ├── iam.tf                      # Cloud Run Service Account & Secret Accessor IAM
-│   ├── cloud_run.tf                # Cloud Run v2 service & Artifact Registry
-│   ├── outputs.tf                  # Public API URL & repo outputs
-│   └── terraform.tfvars.example    # Sample configuration values
-├── docs/
-│   └── adr/                        # Architecture Decision Records
-│       ├── README.md               # ADR Index
-│       ├── 0001-hybrid-retrieval-with-algolia-and-pinecone.md
-│       ├── 0002-relational-persistence-with-postgresql.md
-│       ├── 0003-human-in-the-loop-governance-and-extension-safety.md
-│       ├── 0007-knowledge-base-chunking-and-search-index-ingestion.md
-│       ├── 0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md
-│       └── 0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md
+├── docker-compose.yml
+├── terraform/                      # IaC for GCP, Secrets, Cloud Run, Artifact Registry
+├── docs/adr/                       # Architecture Decision Records
 ├── backend/
-│   ├── Dockerfile                  # Production container for Cloud Run
-│   ├── alembic/                    # Database migration versions
+│   ├── Dockerfile
+│   ├── alembic/                    # Database migrations
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── health.py           # /health diagnostic endpoint
-│   │   │   ├── knowledge_base.py   # /api/v1/knowledge-base CRUD, /upload, /sources
-│   │   │   ├── responses.py        # /api/v1/responses workspaces, rephrase & feedback
-│   │   │   ├── search.py           # /api/v1/search hybrid RRF retrieval
-│   │   │   └── endpoints/mcp.py    # /api/v1/mcp/sse and /messages routes
-│   │   ├── core/
-│   │   │   ├── config.py           # Settings and env validation
-│   │   │   └── db.py               # Async SQLAlchemy PostgreSQL connection
-│   │   ├── mcp/
-│   │   │   ├── server.py           # JSON-RPC 2.0 MCPServer & stdio listener
-│   │   │   └── tools.py            # Live MCP Tools (KB search, roadmap, diagnostics)
-│   │   ├── models/
-│   │   │   ├── db_models.py        # SQLAlchemy relational models (KBEntry, KBSource, etc.)
-│   │   │   └── schemas.py          # Pydantic request/response schemas
-│   │   ├── services/
-│   │   │   ├── document_parser_service.py # Multi-format parser & 300-500 token chunker
-│   │   │   ├── kb_sync_service.py         # Multi-source connectors, delta hashing & pruning
-│   │   │   ├── parser_feedback_service.py # AI extraction feedback loop & telemetry
-│   │   │   ├── questionnaire_parser_service.py # Dual-layer AI + heuristic questionnaire parser
-│   │   │   ├── algolia_service.py         # Algolia search & text store
-│   │   │   ├── gcp_secret_service.py      # Google Cloud Secret Manager client
-│   │   │   ├── pinecone_service.py        # Pinecone dense vector similarity search
-│   │   │   ├── postgres_service.py        # PostgreSQL database operations
-│   │   │   └── hybrid_search_service.py   # RRF fusion & Gemini 2.5 Flash reasoning
-│   │   └── main.py                 # FastAPI application factory and lifespan
-│   ├── tests/
-│   │   ├── conftest.py             # Pytest async session fixtures
-│   │   ├── test_kb_sync_service.py # Automated sync & connectors test suite
-│   │   ├── test_parser_feedback.py # Questionnaire feedback & rephrasing tests
-│   │   ├── test_questionnaire_parser.py # Questionnaire parser test suite
-│   │   └── test_postgres_connection.py # Production PostgreSQL validation suite
-│   ├── scripts/
-│   │   ├── gcp_secrets_sync.py     # CLI sync to GCP Secret Manager
-│   │   ├── verify_cloud_connections.py # Live Cloud diagnostics CLI
-│   │   ├── init_services.py        # DB schema and index setup script
-│   │   └── seed_data.py            # Sample RFP data seed script
-│   ├── pytest.ini
-│   └── requirements.txt
-├── frontend/                       # React seller workspace & Knowledge Hub modal
-└── extension/                      # Manifest V3 browser extension
-```
-
+│   │   ├── api/                    # Health, knowledge base, responses, search, MCP routes
+│   │   ├── core/                   # DB, settings, config
+│   │   ├── mcp/                    # Model Context Protocol server & tools
+│   │   ├── models/                 # SQLAlchemy & Pydantic models
+│   │   └── services/               # Parsers, connectors, hybrid search, LLM reasoning
+│   ├── tests/                      # Automated test suite
+│   └── scripts/                    # Seeding, cloud connection, secret sync scripts
+├── frontend/                       # React 18 / Tailwind Workspace
+└── extension/                      # Manifest V3 Browser Extension

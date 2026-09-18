@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger(__name__)
 
 from app.models.db_models import AuditLogModel, KBEntry, QuestionReview, ResponseWorkspace, RoadmapInitiativeModel, WorkspaceSettingsModel
 from app.models.schemas import (
@@ -348,6 +351,114 @@ DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
     }
 ]
 
+DEFAULT_KB_SEEDS = [
+    {
+        "question": "What cloud infrastructure and hosting providers are utilized?",
+        "answer": "All production infrastructure is hosted exclusively within Amazon Web Services (AWS) in us-east-1 (N. Virginia) and us-west-2 (Oregon) regions. We utilize AWS VPCs with private subnets, strict security group rules, and zero direct public access to internal database or application nodes. Our infrastructure complies with SOC 2 Type II, ISO/IEC 27001:2022, and HIPAA Security Rule specifications.",
+        "category": "Cloud & Infrastructure",
+        "source_file": "01_Security_and_Compliance_Whitepaper.md",
+        "format": "MD",
+    },
+    {
+        "question": "What encryption standards are enforced for data in transit and at rest?",
+        "answer": "All external and internal network communications are encrypted in transit using TLS 1.3 (with fallback to TLS 1.2 minimum). HSTS is enforced with max-age of 31536000 seconds. All customer data at rest is encrypted using AES-256 via AWS KMS Customer Managed Keys (CMKs) across all databases, search indices, S3 buckets, and EBS volumes, rotated automatically every 365 days.",
+        "category": "Security & Cryptography",
+        "source_file": "01_Security_and_Compliance_Whitepaper.md",
+        "format": "MD",
+    },
+    {
+        "question": "What Single Sign-On (SSO) and Multi-Factor Authentication (MFA) capabilities exist?",
+        "answer": "Enterprise customers can enforce SAML 2.0 and OpenID Connect (OIDC) Single Sign-On across identity providers including Okta, Microsoft Entra ID (Azure AD), Google Workspace, and PingFederate. All internal employee access requires hardware-backed multi-factor authentication (FIDO2 / WebAuthn security keys).",
+        "category": "Identity & Access Control",
+        "source_file": "01_Security_and_Compliance_Whitepaper.md",
+        "format": "MD",
+    },
+    {
+        "question": "How often are third-party penetration tests and vulnerability scans conducted?",
+        "answer": "Independent third-party penetration tests are conducted annually by CREST-accredited security firms. We also operate a private bug bounty program on HackerOne. Container base images and application dependencies are scanned continuously in CI/CD using Trivy, Snyk, and GitHub Dependabot.",
+        "category": "Security & Vulnerability",
+        "source_file": "01_Security_and_Compliance_Whitepaper.md",
+        "format": "MD",
+    },
+    {
+        "question": "What are your Recovery Point Objective (RPO) and Recovery Time Objective (RTO)?",
+        "answer": "Our infrastructure guarantees a Recovery Point Objective (RPO) of < 1 hour and a Recovery Time Objective (RTO) of < 4 hours. Automated point-in-time database snapshots are taken every 15 minutes and replicated across AWS us-east-1 and us-west-2.",
+        "category": "Disaster Recovery & SLA",
+        "source_file": "02_SLA_Disaster_Recovery_and_Operations.pdf",
+        "format": "PDF",
+    },
+    {
+        "question": "What is your uptime service level agreement (SLA) commitment?",
+        "answer": "We offer a guaranteed 99.9% monthly uptime service level agreement for all Enterprise tier customers, backed by financial service credits if availability drops below target thresholds.",
+        "category": "Disaster Recovery & SLA",
+        "source_file": "02_SLA_Disaster_Recovery_and_Operations.pdf",
+        "format": "PDF",
+    },
+    {
+        "question": "How is customer personal data handled under GDPR and international privacy regulations?",
+        "answer": "We fully comply with GDPR, CCPA, and global privacy frameworks. A comprehensive Data Processing Addendum (DPA) incorporating European Commission Standard Contractual Clauses (SCCs) is available for all enterprise accounts. We support data subject access requests (DSAR) including complete data export and cryptographically verified deletion within 30 days.",
+        "category": "Privacy & GDPR",
+        "source_file": "03_Data_Privacy_GDPR_and_Subprocessors.json",
+        "format": "JSON",
+    },
+    {
+        "question": "Who are your authorized subprocessors and where are they located?",
+        "answer": "Our authorized sub-processors include Amazon Web Services (AWS - Hosting & DB, US/EU), Datadog (Monitoring, US), Twilio SendGrid (Transactional Email, US), and Stripe (Billing, US). All subprocessors undergo rigorous annual security and compliance evaluations.",
+        "category": "Privacy & GDPR",
+        "source_file": "03_Data_Privacy_GDPR_and_Subprocessors.json",
+        "format": "JSON",
+    },
+    {
+        "question": "What is your data retention schedule after account termination?",
+        "answer": "Customer data is retained for the duration of an active contract and for up to 30 days following termination to support orderly transition. All backups are purged on a 35-day rotation schedule, after which customer data is permanently destroyed in accordance with DoD 5220.22-M guidelines.",
+        "category": "Privacy & GDPR",
+        "source_file": "03_Data_Privacy_GDPR_and_Subprocessors.json",
+        "format": "JSON",
+    },
+    {
+        "question": "Do you undergo annual independent SOC 2 audits?",
+        "answer": "Yes. An independent AICPA-accredited accounting firm performs annual SOC 2 Type II examinations covering Security, Availability, and Confidentiality trust service criteria. Formal audit reports are provided to customers under mutual non-disclosure agreement.",
+        "category": "Compliance & Audit",
+        "source_file": "04_Standard_Vendor_Security_Questionnaire.csv",
+        "format": "CSV",
+    },
+    {
+        "question": "What APIs and programmatic integration protocols are supported?",
+        "answer": "We provide a complete RESTful API with JSON payloads, OpenAPI 3.1 specifications, and granular OAuth2 scoped access tokens. Webhooks are supported with HMAC-SHA256 signature verification for automated downstream workflow integration.",
+        "category": "Product & Integrations",
+        "source_file": "05_Product_Features_and_API_Integrations.docx",
+        "format": "DOCX",
+    },
+    {
+        "question": "What are the rate limits and API SLAs for enterprise customers?",
+        "answer": "Standard Enterprise rate limits allow 10,000 requests per minute with burst capacity up to 15,000 req/min. API uptime SLA is 99.9% with p95 response latencies under 150ms for cached and indexed lookups.",
+        "category": "Product & Integrations",
+        "source_file": "05_Product_Features_and_API_Integrations.docx",
+        "format": "DOCX",
+    },
+    {
+        "question": "What background checks are performed on employees prior to hire?",
+        "answer": "Comprehensive background screenings are conducted on all full-time employees, contractors, and executives prior to start date. Verifications include 7-year criminal history, identity verification, national sex offender registry, and educational/employment verification.",
+        "category": "HR & Governance",
+        "source_file": "06_Employee_Code_of_Conduct_and_HR_Policies.txt",
+        "format": "TXT",
+    },
+    {
+        "question": "What employee security awareness training is mandated?",
+        "answer": "All new hires must complete security and privacy training within their first 7 days. Annual refresher training is mandatory across all employees, supplemented by unannounced monthly phishing simulations.",
+        "category": "HR & Governance",
+        "source_file": "06_Employee_Code_of_Conduct_and_HR_Policies.txt",
+        "format": "TXT",
+    },
+    {
+        "question": "What aviation and safety standards govern autonomous drone fleet logistics?",
+        "answer": "All operations strictly adhere to FAA Part 107 regulations, FAA Remote ID mandates, and ASTM F3411 standards. Drones feature dual-redundant GPS/IMU navigation, encrypted C2 telemetry links, and automated geo-fenced Return-to-Launch (RTL) fail-safes.",
+        "category": "Aviation & Safety",
+        "source_file": "07_Autonomous_Drone_Fleet_Logistics_and_Aviation_Safety.txt",
+        "format": "TXT",
+    },
+]
+
 
 class PostgresService:
     @staticmethod
@@ -553,12 +664,56 @@ class PostgresService:
         return list(result.scalars().all())
 
     @staticmethod
+    async def seed_kb_if_empty(session: AsyncSession, tenant_id: str = "acme-corp") -> int:
+        """
+        Auto-seeds canonical compliance and architecture Q&A pairs for default/demo tenants
+        if no entries exist in PostgreSQL.
+        """
+        if tenant_id not in ("acme-corp", "demo-tenant"):
+            return 0
+        try:
+            count_stmt = select(func.count(KBEntry.id)).where(KBEntry.tenant_id == tenant_id)
+            count_res = await session.execute(count_stmt)
+            count = count_res.scalar() or 0
+            if count > 0:
+                return 0
+
+            synced = 0
+            for item in DEFAULT_KB_SEEDS:
+                entry = KBEntry(
+                    id=f"seed-{tenant_id}-{synced + 1}",
+                    tenant_id=tenant_id,
+                    question=item["question"],
+                    answer=item["answer"],
+                    category=item.get("category", "General"),
+                    metadata_json={
+                        "source_file": item.get("source_file"),
+                        "format": item.get("format", "TXT"),
+                        "category": item.get("category", "General"),
+                        "is_golden_qa": True,
+                    },
+                )
+                session.add(entry)
+                synced += 1
+            await session.commit()
+            logger.info("Auto-seeded %d canonical knowledge base entries for tenant '%s'", synced, tenant_id)
+            return synced
+        except Exception as exc:
+            logger.warning("Auto-seed KB failed for tenant '%s': %s", tenant_id, exc)
+            return 0
+
+    @staticmethod
     async def list_kb_entries(
         session: AsyncSession,
         tenant_id: str,
         limit: int = 100,
         offset: int = 0,
     ) -> List[KBEntry]:
+        try:
+            await PostgresService.seed_kb_if_empty(session, tenant_id)
+        except Exception:
+            pass
+
         stmt = (
             select(KBEntry)
             .where(KBEntry.tenant_id == tenant_id)
@@ -580,30 +735,56 @@ class PostgresService:
         - total_sources: number of unique source files/documents
         - categories_count: count of distinct categories
         """
-        count_stmt = select(func.count(KBEntry.id)).where(KBEntry.tenant_id == tenant_id)
-        count_res = await session.execute(count_stmt)
-        total_records = count_res.scalar() or 0
+        try:
+            await PostgresService.seed_kb_if_empty(session, tenant_id)
+        except Exception as seed_err:
+            logger.warning("Could not auto-seed KB in get_kb_stats: %s", seed_err)
 
-        source_stmt = select(KBEntry.metadata_json).where(KBEntry.tenant_id == tenant_id)
-        source_res = await session.execute(source_stmt)
-        sources = set()
-        for meta in source_res.scalars():
-            if isinstance(meta, dict):
-                src = meta.get("source_file") or meta.get("filename") or meta.get("source")
-                if src:
-                    sources.add(src)
+        try:
+            count_stmt = select(func.count(KBEntry.id)).where(KBEntry.tenant_id == tenant_id)
+            count_res = await session.execute(count_stmt)
+            total_records = count_res.scalar() or 0
 
-        cat_stmt = select(func.count(func.distinct(KBEntry.category))).where(KBEntry.tenant_id == tenant_id)
-        cat_res = await session.execute(cat_stmt)
-        cat_count = cat_res.scalar() or 0
+            source_stmt = select(KBEntry.metadata_json).where(KBEntry.tenant_id == tenant_id)
+            source_res = await session.execute(source_stmt)
+            sources = set()
+            for meta in source_res.scalars():
+                if isinstance(meta, dict):
+                    src = meta.get("source_file") or meta.get("filename") or meta.get("source") or meta.get("source_url")
+                    if src:
+                        sources.add(src)
 
-        return {
-            "tenant_id": tenant_id,
-            "total_records": total_records,
-            "total_sources": len(sources),
-            "categories_count": cat_count,
-            "sync_status": "synced" if total_records > 0 else "ready",
-        }
+            # Also check KBSource table if configured
+            try:
+                from app.models.db_models import KBSource
+                src_tbl_stmt = select(KBSource.name).where(KBSource.tenant_id == tenant_id)
+                src_tbl_res = await session.execute(src_tbl_stmt)
+                for s_name in src_tbl_res.scalars():
+                    if s_name:
+                        sources.add(s_name)
+            except Exception:
+                pass
+
+            cat_stmt = select(func.count(func.distinct(KBEntry.category))).where(KBEntry.tenant_id == tenant_id)
+            cat_res = await session.execute(cat_stmt)
+            cat_count = cat_res.scalar() or 0
+
+            return {
+                "tenant_id": tenant_id,
+                "total_records": total_records,
+                "total_sources": len(sources),
+                "categories_count": cat_count,
+                "sync_status": "synced" if total_records > 0 else "ready",
+            }
+        except Exception as exc:
+            logger.warning("Error fetching KB stats: %s", exc)
+            return {
+                "tenant_id": tenant_id,
+                "total_records": 0,
+                "total_sources": 0,
+                "categories_count": 0,
+                "sync_status": "ready",
+            }
 
     @staticmethod
     async def update_kb_entry(

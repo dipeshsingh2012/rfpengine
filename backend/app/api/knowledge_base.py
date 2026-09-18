@@ -123,7 +123,25 @@ async def get_knowledge_base_stats(
     - categories_count: count of distinct categories
     - sync_status: 'synced' if entries exist, else 'ready'
     """
-    return await PostgresService.get_kb_stats(db, tenant_id=tenant_id)
+    if db is None:
+        return {
+            "tenant_id": tenant_id,
+            "total_records": 0,
+            "total_sources": 0,
+            "categories_count": 0,
+            "sync_status": "ready",
+        }
+    try:
+        return await PostgresService.get_kb_stats(db, tenant_id=tenant_id)
+    except Exception as exc:
+        logger.warning("Error in get_knowledge_base_stats: %s", exc)
+        return {
+            "tenant_id": tenant_id,
+            "total_records": 0,
+            "total_sources": 0,
+            "categories_count": 0,
+            "sync_status": "ready",
+        }
 
 
 # ==============================================================================

@@ -103,6 +103,15 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
 }) => {
   const allCurrentQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
   const isCsv = sourceLabel.toLowerCase().endsWith(".csv");
+  const isUpload = sourceMode === "upload";
+
+  const isQuestionFilled = (q: string) => Boolean(answersByQuestion[q]?.trim());
+  const answeredQuestionsCount =
+    detectedQuestions.length > 0
+      ? detectedQuestions.filter(isQuestionFilled).length
+      : (answer?.trim() ? 1 : 0);
+  const totalQuestionsCount = detectedQuestions.length > 0 ? detectedQuestions.length : 1;
+  const isAllFilled = answeredQuestionsCount === totalQuestionsCount && totalQuestionsCount > 0;
 
   return (
     <>
@@ -139,14 +148,25 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
         <div style={{ display: "flex", gap: "8px" }}>
           {onOpenExportModal && (
             <button
-              className="outline-button"
-              onClick={onOpenExportModal}
-              title="Export compliance matrix to Excel, Word, or PDF"
+              className={`outline-button ${!isAllFilled ? "button-disabled" : ""}`}
+              onClick={isAllFilled ? onOpenExportModal : undefined}
+              disabled={!isAllFilled}
+              title={
+                isAllFilled
+                  ? "Export compliance matrix to Excel, Word, or PDF"
+                  : `Complete all ${totalQuestionsCount} responses to export deliverable (${answeredQuestionsCount}/${totalQuestionsCount} filled)`
+              }
+              style={!isAllFilled ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
             >
               <Download size={15} /> Export Deliverable
+              {!isAllFilled && (
+                <span style={{ fontSize: "11px", marginLeft: "4px", opacity: 0.85 }}>
+                  ({answeredQuestionsCount}/{totalQuestionsCount})
+                </span>
+              )}
             </button>
           )}
-          {!isCsv && (
+          {!isCsv && !isUpload && (
             <button
               className="outline-button"
               onClick={openOriginalForm}
@@ -225,6 +245,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
         exportAnswers={exportAnswers}
         openOriginalForm={openOriginalForm}
         onOpenExportModal={onOpenExportModal}
+        sourceMode={sourceMode}
       />
 
       {detectedQuestions.length > 0 && (
@@ -255,16 +276,6 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
                 <option value="demo-tenant">demo-tenant</option>
               </select>
             </div>
-            {onOpenExportModal && (
-              <button
-                className="outline-button"
-                onClick={onOpenExportModal}
-                title="Export compliance matrix to Excel, Word, or PDF"
-                style={{ padding: "8px 14px" }}
-              >
-                <Download size={15} /> Export Deliverable
-              </button>
-            )}
             <button
               className="primary-button"
               onClick={generateAllAnswers}

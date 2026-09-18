@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, ArrowUpRight, Upload } from "lucide-react";
+import { Link, ArrowUpRight, Upload, RefreshCw, FileText } from "lucide-react";
 
 interface HomeWelcomeViewProps {
   formUrl: string;
@@ -7,6 +7,8 @@ interface HomeWelcomeViewProps {
   loadFormUrl: () => Promise<string | void>;
   loadFormFile: (event: React.ChangeEvent<HTMLInputElement>) => Promise<string | void>;
   openImport: (id: string) => void;
+  isParsingDocument?: boolean;
+  parsingProgress?: string;
 }
 
 export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
@@ -15,6 +17,8 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
   loadFormUrl,
   loadFormFile,
   openImport,
+  isParsingDocument = false,
+  parsingProgress = "",
 }) => {
   return (
     <section className="home-screen">
@@ -24,7 +28,7 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
         Choose how you want to load the buyer form.
       </p>
       <div className="home-feature-grid">
-        <div className="home-feature">
+        <div className="home-feature" style={isParsingDocument ? { opacity: 0.6, pointerEvents: "none" } : undefined}>
           <div className="home-feature-icon">
             <Link size={22} />
           </div>
@@ -37,6 +41,7 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
               value={formUrl}
               onChange={(event) => setFormUrl(event.target.value)}
               placeholder="https://buyer.example/form"
+              disabled={isParsingDocument}
             />
             <button
               className="primary-button"
@@ -44,7 +49,7 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
                 const id = await loadFormUrl();
                 if (id) openImport(id);
               }}
-              disabled={!formUrl.trim()}
+              disabled={!formUrl.trim() || isParsingDocument}
             >
               Load URL <ArrowUpRight size={15} />
             </button>
@@ -52,24 +57,43 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
         </div>
         <div className="home-feature">
           <div className="home-feature-icon upload-icon">
-            <Upload size={22} />
+            {isParsingDocument ? <FileText size={22} className="spin" /> : <Upload size={22} />}
           </div>
           <h2>Upload questionnaire</h2>
           <p>
             Import an Excel (.xlsx, .xls), Word (.docx), PDF, or CSV questionnaire from your computer.
           </p>
-          <label className="home-upload-button">
-            <Upload size={16} /> Choose questionnaire file
-            <input
-              type="file"
-              accept=".xlsx,.xls,.docx,.pdf,.csv,.tsv"
-              onChange={async (event) => {
-                const id = await loadFormFile(event);
-                if (id) openImport(id);
-              }}
-            />
-          </label>
-          <small>Questions and sections are extracted using enterprise multi-format AI parser.</small>
+          {isParsingDocument ? (
+            <div className="home-parsing-loader">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <RefreshCw size={17} className="spin" style={{ color: "var(--blue)", flexShrink: 0 }} />
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--navy)" }}>
+                  {parsingProgress || "Extracting questions with Gemini 2.5 Flash..."}
+                </div>
+              </div>
+              <div className="home-parsing-progress-bar">
+                <div className="home-parsing-progress-inner" />
+              </div>
+              <small style={{ color: "var(--muted)", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                Analyzing document hierarchy, compliance tables, and question types...
+              </small>
+            </div>
+          ) : (
+            <label className="home-upload-button">
+              <Upload size={16} /> Choose questionnaire file
+              <input
+                type="file"
+                accept=".xlsx,.xls,.docx,.pdf,.csv,.tsv"
+                onChange={async (event) => {
+                  const id = await loadFormFile(event);
+                  if (id) openImport(id);
+                }}
+              />
+            </label>
+          )}
+          {!isParsingDocument && (
+            <small>Questions and sections are extracted using enterprise multi-format AI parser.</small>
+          )}
         </div>
       </div>
     </section>

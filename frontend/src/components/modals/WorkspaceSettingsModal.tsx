@@ -26,6 +26,7 @@ interface WorkspaceSettingsModalProps {
   saveNotice: string | null;
   tenantId: string;
   kbRecordsCount: number;
+  kbDocumentsCount?: number;
   recentRfpsCount: number;
   settingsTab: "profile" | "ai" | "governance" | "data";
   setSettingsTab: (tab: "profile" | "ai" | "governance" | "data") => void;
@@ -42,6 +43,7 @@ export const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
   saveNotice,
   tenantId,
   kbRecordsCount,
+  kbDocumentsCount = 0,
   recentRfpsCount,
   settingsTab,
   setSettingsTab,
@@ -430,6 +432,12 @@ export const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                     <span className="eyebrow" style={{ color: "#166534" }}>Indexed KB Records</span>
                     <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>
                       {kbRecordsCount}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, background: "#f5f3ff", padding: "12px 14px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
+                    <span className="eyebrow" style={{ color: "#6d28d9" }}>Indexed Documents</span>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: "#7c3aed" }}>
+                      {kbDocumentsCount}
                     </div>
                   </div>
                   <div style={{ flex: 1, background: "#eff6ff", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bfdbfe" }}>

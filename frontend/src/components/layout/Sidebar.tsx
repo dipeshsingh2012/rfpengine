@@ -30,6 +30,7 @@ interface SidebarProps {
   showSettingsModal: boolean;
   kbTotalRecords: number;
   kbTotalSources: number;
+  tenantId?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -51,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   showSettingsModal,
   kbTotalRecords,
   kbTotalSources,
+  tenantId = "acme-corp",
 }) => {
   return (
     <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
@@ -83,7 +85,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onOpenKB("upload");
             }}
           >
-            <FolderOpen size={17} /> Knowledge base
+            <FolderOpen size={17} /> Knowledge base{" "}
+            {kbTotalSources > 0 && (
+              <span
+                className="nav-count"
+                title={`${kbTotalRecords} indexed records across ${kbTotalSources} documents for ${tenantId}`}
+              >
+                {kbTotalSources} {kbTotalSources === 1 ? "doc" : "docs"}
+              </span>
+            )}
           </button>
           <button
             className={`nav-item ${isPlaygroundActive ? "active" : ""}`}
@@ -187,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="kb-summary-header">
             <span>Knowledge Base</span>
             <span className="kb-summary-status">
-              <span className="status-dot" /> Live
+              <span className="status-dot" /> {tenantId}
             </span>
           </div>
           <div className="kb-summary-body">
@@ -196,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <FolderOpen size={14} style={{ color: "var(--blue)" }} />
             </div>
             <div className="kb-summary-sources">
-              <span>{kbTotalSources} source {kbTotalSources === 1 ? "document" : "documents"}</span>
+              <span>{kbTotalSources} indexed {kbTotalSources === 1 ? "document" : "documents"}</span>
               <span className="kb-manage-link">Manage ↗</span>
             </div>
           </div>

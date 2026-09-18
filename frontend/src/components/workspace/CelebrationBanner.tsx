@@ -1,5 +1,6 @@
 import React from "react";
 import { CheckCircle, Download, Sparkles } from "lucide-react";
+import { SourceMode } from "../../types";
 
 interface CelebrationBannerProps {
   isAllApproved: boolean;
@@ -8,6 +9,7 @@ interface CelebrationBannerProps {
   exportAnswers: () => void;
   openOriginalForm: () => void;
   onOpenExportModal?: () => void;
+  sourceMode?: SourceMode;
 }
 
 export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
@@ -17,8 +19,11 @@ export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
   exportAnswers,
   openOriginalForm,
   onOpenExportModal,
+  sourceMode,
 }) => {
   if (!isAllApproved) return null;
+
+  const isUpload = sourceMode === "upload";
 
   return (
     <div className="celebration-banner">
@@ -27,7 +32,9 @@ export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
           <CheckCircle size={18} /> Governance Complete: All {allQuestionsCount} Responses Approved!
         </strong>
         <p>
-          All answers have passed SME & Legal reviews. Ready to export an audit-ready compliance package or inject into external buyer forms.
+          {isUpload
+            ? "All answers have passed SME & Legal reviews. Ready to export an audit-ready compliance package (.xlsx, .docx, .pdf)."
+            : "All answers have passed SME & Legal reviews. Ready to export an audit-ready compliance package or inject into external buyer forms."}
         </p>
       </div>
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -38,7 +45,7 @@ export const CelebrationBanner: React.FC<CelebrationBannerProps> = ({
         >
           <Download size={15} /> 📥 Export Audit Package (.xlsx, .docx, .pdf)
         </button>
-        {!isCsv && (
+        {!isCsv && !isUpload && (
           <button
             className="outline-button"
             onClick={openOriginalForm}

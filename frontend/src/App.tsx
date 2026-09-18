@@ -105,6 +105,10 @@ export function App() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSaveNotice, setSettingsSaveNotice] = useState<string | null>(null);
 
+  // Document Upload & Parsing State
+  const [isParsingDocument, setIsParsingDocument] = useState(false);
+  const [parsingProgress, setParsingProgress] = useState("");
+
   // Knowledge Base State
   const [showKBModal, setShowKBModal] = useState(false);
   const [kbModalTab, setKbModalTab] = useState<"upload" | "connectors" | "playground">("upload");
@@ -378,6 +382,8 @@ export function App() {
 
   useEffect(() => {
     fetchWorkspaceSettings();
+    fetchKBStats();
+    fetchKBEntries();
   }, [apiBaseUrl, tenantId]);
 
   async function fetchKBStats() {
@@ -666,9 +672,12 @@ export function App() {
       return undefined;
     }
 
+    setIsParsingDocument(true);
+    setParsingProgress(`Reading ${file.name}...`);
     setUploadedFormFile(file);
 
     try {
+      setParsingProgress(`Analyzing ${file.name} with Gemini 2.5 Flash...`);
       setSourceStatus(`Extracting questions from ${file.name} with AI parser...`);
       setNotice("Parsing document...");
 
@@ -684,6 +693,7 @@ export function App() {
       });
 
       if (res.ok) {
+        setParsingProgress("Structuring compliance sections and questions...");
         const parseResult: {
           format: string;
           filename: string;
@@ -760,6 +770,9 @@ export function App() {
       setSourceStatus(`Could not read questionnaire: ${(error as Error).message}`);
       setNotice("Questionnaire parsing failed");
       return undefined;
+    } finally {
+      setIsParsingDocument(false);
+      setParsingProgress("");
     }
   }
 
@@ -1485,6 +1498,7 @@ export function App() {
         showSettingsModal={showSettingsModal}
         kbTotalRecords={kbTotalRecords}
         kbTotalSources={kbTotalSources}
+        tenantId={tenantId}
       />
 
       <main className="main-content">
@@ -1495,6 +1509,8 @@ export function App() {
             loadFormUrl={loadFormUrl}
             loadFormFile={loadFormFile}
             openImport={openImport}
+            isParsingDocument={isParsingDocument}
+            parsingProgress={parsingProgress}
           />
         ) : route === "/responses" ? (
           <ResponsesDashboard
@@ -1636,6 +1652,8 @@ export function App() {
         playgroundResult={playgroundResult}
         apiBaseUrl={apiBaseUrl}
         tenantId={tenantId}
+        kbTotalRecords={kbTotalRecords}
+        kbTotalSources={kbTotalSources}
       />
 
 
@@ -1655,7 +1673,8 @@ export function App() {
         isSaving={isSavingSettings}
         saveNotice={settingsSaveNotice}
         tenantId={tenantId}
-        kbRecordsCount={kbEntries.length || kbStats.totalRecords}
+        kbRecordsCount={kbTotalRecords}
+        kbDocumentsCount={kbTotalSources}
         recentRfpsCount={recentRFPs.length}
         settingsTab={settingsTab}
         setSettingsTab={setSettingsTab}

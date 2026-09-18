@@ -59,6 +59,8 @@ interface KnowledgeBaseModalProps {
   playgroundResult: SearchResponse | null;
   apiBaseUrl?: string;
   tenantId?: string;
+  kbTotalRecords?: number;
+  kbTotalSources?: number;
 }
 
 export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
@@ -85,6 +87,8 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
   playgroundResult,
   apiBaseUrl = "",
   tenantId = "acme-corp",
+  kbTotalRecords,
+  kbTotalSources,
 }) => {
   // Automated Sync & Connectors state
   const [sources, setSources] = useState<KBSourceItem[]>([]);
@@ -455,7 +459,24 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
               >
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <h3 style={{ margin: 0, fontSize: "15px" }}>Indexed Knowledge Records</h3>
+                    {((kbTotalRecords ?? kbEntries.length) > 0 || (kbTotalSources ?? 0) > 0) && (
+                      <span
+                        className="badge"
+                        style={{
+                          background: "#e0e7ff",
+                          color: "var(--blue)",
+                          fontWeight: 700,
+                          fontSize: "11px",
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                        }}
+                      >
+                        {kbTotalRecords ?? kbEntries.length} records · {kbTotalSources ?? 1} {((kbTotalSources ?? 1) === 1 ? "document" : "documents")} ({tenantId})
+                      </span>
+                    )}
+                  </div>
                   <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: "11px" }}>
                     Synchronized across PostgreSQL, Algolia (lexical), and Pinecone (768-dim embeddings).
                   </p>
