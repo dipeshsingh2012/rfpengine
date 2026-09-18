@@ -410,11 +410,6 @@ export function App() {
   }
 
   useEffect(() => {
-    fetchKBEntries();
-    fetchKBStats();
-  }, [tenantId, apiBaseUrl]);
-
-  useEffect(() => {
     if (showKBModal) {
       fetchKBEntries();
       fetchKBStats();
@@ -512,7 +507,6 @@ export function App() {
     if (route === "/knowledge-base") {
       setKbModalTab("upload");
       setShowKBModal(true);
-      fetchKBEntries();
       return;
     }
     if (route === "/playground") {
