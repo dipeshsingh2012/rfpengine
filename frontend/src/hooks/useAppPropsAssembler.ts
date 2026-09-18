@@ -175,6 +175,11 @@ export function assembleAppProps(p: any) {
     totalQuestions: p.workflow.detectedQuestions.length > 0 ? p.workflow.detectedQuestions.length : 1,
     approvedCount: p.workflow.approvedCount,
     handleExportPackage: (f: ExportFormat) => p.handleExportPackage(f),
+    revisionItem: p.revisionItem,
+    setRevisionItem: p.setRevisionItem,
+    onSaveRevisionFeedback: p.onSaveRevisionFeedback,
+    role: p.workflow.role,
+    reviewCommentsByQuestion: p.review.reviewCommentsByQuestion,
   };
 
   return { reviewImportProps, questionnaireProps, shellProps, mainViewProps, modalsProps };

@@ -68,3 +68,4 @@ export const TuningJobRow: React.FC<Props> = ({ job, isActive, onActivate, onCan
     </tr>
   );
 };
+

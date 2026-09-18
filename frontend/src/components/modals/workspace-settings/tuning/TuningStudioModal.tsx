@@ -5,6 +5,7 @@ import { useTuningStudioState } from "./useTuningStudioState";
 import { TuningDatasetStatsCard } from "./TuningDatasetStatsCard";
 import { TuningJobsTable } from "./TuningJobsTable";
 import { NewTuningJobModal } from "./NewTuningJobModal";
+import { ModalPortal } from "../../../common/ModalPortal";
 
 interface Props {
   isOpen: boolean;
@@ -15,40 +16,53 @@ interface Props {
   onShowToast?: (msg: string) => void;
 }
 
-export const TuningStudioModal: React.FC<Props> = ({ isOpen, onClose, tenantId, settings, setSettings, onShowToast }) => {
+export const TuningStudioModal: React.FC<Props> = ({
+  isOpen, onClose, tenantId, settings, setSettings, onShowToast,
+}) => {
   const state = useTuningStudioState(tenantId, settings, setSettings, onShowToast);
-  if (!isOpen) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "var(--bg-card, #fff)", width: "760px", maxHeight: "90vh", borderRadius: "14px", border: "1px solid var(--border-color)", display: "flex", flexDirection: "column", boxShadow: "0 20px 40px rgba(0,0,0,0.25)" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <>
+      <ModalPortal
+        isOpen={isOpen}
+        onClose={onClose}
+        cardClassName="modal-card tuning-studio-modal"
+        ariaLabel="Gemini Supervised Tuning Studio"
+      >
+        <div className="modal-header">
           <div>
-            <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+            <h3 className="modal-title-row">
               <Sparkles size={18} color="var(--blue)" /> Gemini Supervised Tuning Studio
-            </h2>
-            <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--muted)" }}>
+            </h3>
+            <p className="settings-group-subtitle" style={{ marginTop: "3px" }}>
               Train Google Cloud Vertex AI base models on enterprise Q&A pairs to produce custom dedicated endpoints.
             </p>
           </div>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)" }}><X size={20} /></button>
+          <button className="close-btn" onClick={onClose} aria-label="Close dialog">
+            <X size={18} />
+          </button>
         </div>
 
-        <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
+        <div className="modal-body form-grid">
           {state.error && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(239,68,68,0.1)", color: "#ef4444", padding: "10px 14px", borderRadius: "8px", fontSize: "12px", marginBottom: "14px" }}>
+            <div className="alert-banner error" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <AlertCircle size={15} /> {state.error}
             </div>
           )}
 
-          <TuningDatasetStatsCard preview={state.preview} isLoading={state.isLoading} onRefresh={state.refreshPreview} />
+          <TuningDatasetStatsCard
+            preview={state.preview}
+            isLoading={state.isLoading}
+            onRefresh={state.refreshPreview}
+          />
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 10px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "16px 0 8px" }}>
             <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Training Jobs & Endpoints</h4>
             <button
               type="button"
+              className="primary-button"
               onClick={() => state.setIsNewJobModalOpen(true)}
-              style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--blue, #2563eb)", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+              style={{ padding: "6px 12px", fontSize: "12px" }}
             >
               <Plus size={14} /> New Tuning Job
             </button>
@@ -62,14 +76,20 @@ export const TuningStudioModal: React.FC<Props> = ({ isOpen, onClose, tenantId, 
           />
         </div>
 
-        <NewTuningJobModal
-          isOpen={state.isNewJobModalOpen}
-          isStarting={state.isStartingJob}
-          totalPairs={state.preview?.total_pairs || 0}
-          onClose={() => state.setIsNewJobModalOpen(false)}
-          onSubmit={state.startTuningJob}
-        />
-      </div>
-    </div>
+        <div className="modal-footer">
+          <button type="button" className="secondary-button" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </ModalPortal>
+
+      <NewTuningJobModal
+        isOpen={state.isNewJobModalOpen}
+        isStarting={state.isStartingJob}
+        totalPairs={state.preview?.total_pairs || 0}
+        onClose={() => state.setIsNewJobModalOpen(false)}
+        onSubmit={state.startTuningJob}
+      />
+    </>
   );
 };

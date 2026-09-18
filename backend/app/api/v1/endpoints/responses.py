@@ -378,6 +378,7 @@ async def create_audit_log_entry(
         raise HTTPException(status_code=500, detail="Audit log storage failed")
 
 
+@router.get("/settings", response_model=WorkspaceSettingsSchema)
 @router.get("/workspace/settings", response_model=WorkspaceSettingsSchema)
 async def get_workspace_settings(
     tenant_id: Optional[str] = None,
@@ -390,6 +391,7 @@ async def get_workspace_settings(
     return WorkspaceSettingsSchema.model_validate(settings)
 
 
+@router.put("/settings", response_model=WorkspaceSettingsSchema)
 @router.put("/workspace/settings", response_model=WorkspaceSettingsSchema)
 async def update_workspace_settings(
     payload: WorkspaceSettingsUpdate,

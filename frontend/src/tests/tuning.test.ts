@@ -57,3 +57,4 @@ test("TuningJobItem handles job statuses and metric computation", () => {
   assert.equal(job.metrics.eval_loss, 0.31);
   assert.ok(job.tuned_model_name?.includes("tuned-abc123"));
 });
+

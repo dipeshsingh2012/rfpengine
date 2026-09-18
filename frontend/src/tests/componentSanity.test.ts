@@ -1,0 +1,378 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import React from "react";
+import { renderToString } from "react-dom/server";
+
+// Import layout components
+import { AppShell } from "../components/layout/AppShell.js";
+import { Topbar } from "../components/layout/Topbar.js";
+import { Sidebar } from "../components/layout/Sidebar.js";
+
+// Import workspace components
+import { HomeWelcomeView } from "../components/workspace/HomeWelcomeView.js";
+import { HomeUrlFeature } from "../components/workspace/home/HomeUrlFeature.js";
+import { HomeUploadFeature } from "../components/workspace/home/HomeUploadFeature.js";
+import { SingleQuestionInputPanel } from "../components/workspace/questionnaire/SingleQuestionInputPanel.js";
+import { BatchQuestionsHeaderBar } from "../components/workspace/questionnaire/BatchQuestionsHeaderBar.js";
+import { EvidenceSourcesPanel } from "../components/workspace/EvidenceSourcesPanel.js";
+import { GovernanceBar } from "../components/workspace/GovernanceBar.js";
+
+// Import responses dashboard components
+import { ResponsesDashboard } from "../components/responses/ResponsesDashboard.js";
+import { DeleteConfirmModal } from "../components/responses/dashboard/DeleteConfirmModal.js";
+
+// Import modal components
+import { KnowledgeBaseModal } from "../components/modals/KnowledgeBaseModal.js";
+import { WorkspaceSettingsModal } from "../components/modals/WorkspaceSettingsModal.js";
+import { ExportPackageModal } from "../components/modals/ExportPackageModal.js";
+import { ActivityLogModal } from "../components/modals/ActivityLogModal.js";
+import { ReviewGovernanceModal } from "../components/modals/ReviewGovernanceModal.js";
+import { KBUploadTab } from "../components/modals/knowledge-base/KBUploadTab.js";
+import { KBConnectorsTab } from "../components/modals/knowledge-base/KBConnectorsTab.js";
+import { KBPlaygroundTab } from "../components/modals/knowledge-base/KBPlaygroundTab.js";
+import { ModalPortal } from "../components/common/ModalPortal.js";
+import { TuningStudioModal } from "../components/modals/workspace-settings/tuning/TuningStudioModal.js";
+import { NewTuningJobModal } from "../components/modals/workspace-settings/tuning/NewTuningJobModal.js";
+import { RevisionFeedbackModal } from "../components/workspace/questionnaire/RevisionFeedbackModal.js";
+
+import { DEFAULT_WORKSPACE_SETTINGS } from "../types.js";
+
+test("Component Sanity: AppShell, Topbar, and Sidebar render without crashing", () => {
+  const html = renderToString(
+    React.createElement(
+      AppShell,
+      {
+        mobileNavOpen: false,
+        setMobileNavOpen: () => {},
+        companyName: "Acme Corp",
+        onOpenSettings: () => {},
+        backendHealth: "ok",
+        isOverviewActive: true,
+        isResponsesActive: false,
+        isKbActive: false,
+        isPlaygroundActive: false,
+        isActivityActive: false,
+        recentRFPs: [
+          { id: "rfp-1", title: "Security Questionnaire", date: "Today", count: 12, tone: "concise" },
+        ],
+        activeResponseId: "rfp-1",
+        onNavigateHome: () => {},
+        onNavigateResponses: () => {},
+        onSelectRFP: () => {},
+        onOpenKB: () => {},
+        onOpenActivity: () => {},
+        showSettingsModal: false,
+        kbTotalRecords: 150,
+        kbTotalSources: 8,
+        tenantId: "acme-corp",
+        toastNotice: null,
+      },
+      React.createElement("div", { className: "child-test" }, "Test Content")
+    )
+  );
+
+  assert.ok(html.includes("app-shell"));
+  assert.ok(html.includes("topbar"));
+  assert.ok(html.includes("sidebar"));
+  assert.ok(html.includes("Test Content"));
+});
+
+test("Component Sanity: HomeWelcomeView and features render without crashing", () => {
+  const html = renderToString(
+    React.createElement(HomeWelcomeView, {
+      formUrl: "https://example.com/form",
+      setFormUrl: () => {},
+      loadFormUrl: async () => {},
+      loadFormFile: async () => {},
+      openImport: () => {},
+      isParsingDocument: false,
+      parsingProgress: "",
+    })
+  );
+
+  assert.ok(html.includes("home-screen"));
+  assert.ok(html.includes("home-feature-grid"));
+  assert.ok(html.includes("Paste a form URL"));
+  assert.ok(html.includes("Upload questionnaire"));
+});
+
+test("Component Sanity: ResponsesDashboard and DeleteConfirmModal render properly", () => {
+  const html = renderToString(
+    React.createElement(ResponsesDashboard, {
+      workspaces: [
+        {
+          id: "ws-1",
+          title: "SaaS Security Audit",
+          created_at: new Date().toISOString(),
+          total_questions: 10,
+          approved_count: 8,
+          in_review_count: 2,
+          changes_requested_count: 0,
+          source_label: "security_audit.pdf",
+          source_mode: "upload",
+        },
+      ],
+      isLoading: false,
+      onSelectWorkspace: () => {},
+      onDuplicateWorkspace: () => {},
+      onDeleteWorkspace: () => {},
+      onExportWorkspace: () => {},
+      onNewQuestionnaire: () => {},
+      onRefresh: () => {},
+    })
+  );
+
+  assert.ok(html.includes("responses-dashboard"));
+  assert.ok(html.includes("SaaS Security Audit"));
+
+  const modalHtml = renderToString(
+    React.createElement(DeleteConfirmModal, {
+      workspaceId: "ws-1",
+      actionLoadingId: null,
+      onClose: () => {},
+      onDelete: () => {},
+    })
+  );
+  assert.ok(modalHtml.includes("modal-backdrop"));
+  assert.ok(modalHtml.includes("modal-card") || modalHtml.includes("delete-confirm-modal"));
+});
+
+test("Component Sanity: SingleQuestionInputPanel, BatchQuestionsHeaderBar, and EvidenceSourcesPanel render", () => {
+  const inputHtml = renderToString(
+    React.createElement(SingleQuestionInputPanel, {
+      question: "How is data protected?",
+      setQuestion: () => {},
+      tenantId: "acme-corp",
+      setTenantId: () => {},
+      generateAnswer: () => {},
+      isGenerating: false,
+    })
+  );
+  assert.ok(inputHtml.includes("question-panel"));
+
+  const batchHtml = renderToString(
+    React.createElement(BatchQuestionsHeaderBar, {
+      questionsCount: 5,
+      tenantId: "acme-corp",
+      setTenantId: () => {},
+      generateAllAnswers: () => {},
+      isGenerating: false,
+      isBatchApproved: false,
+    })
+  );
+  assert.ok(batchHtml.includes("question-header-bar"));
+
+  const evidenceHtml = renderToString(
+    React.createElement(EvidenceSourcesPanel, {
+      sources: [
+        { id: "src-1", question: "Encryption details", answer: "All data encrypted with AES-256", score: 0.95 },
+      ],
+      activeSource: "src-1",
+      setActiveSource: () => {},
+    })
+  );
+  assert.ok(evidenceHtml.includes("sources-column"));
+  assert.ok(evidenceHtml.includes("source-card"));
+});
+
+test("Component Sanity: KnowledgeBaseModal tabs render with correct design classes", () => {
+  const uploadHtml = renderToString(
+    React.createElement(KBUploadTab, {
+      isDragOver: false,
+      setIsDragOver: () => {},
+      isUploading: false,
+      onUpload: () => {},
+      uploadMsg: null,
+      entries: [
+        { id: "kb-1", title: "SOC2 Compliance", content: "We maintain SOC2 Type II certification", category: "Security" },
+      ],
+      isFetching: false,
+      onRefresh: () => {},
+      onDelete: () => {},
+    })
+  );
+  assert.ok(uploadHtml.includes("kb-upload-tab"));
+  assert.ok(uploadHtml.includes("kb-dropzone"));
+  assert.ok(uploadHtml.includes("kb-entries-section"));
+  assert.ok(uploadHtml.includes("kb-entry-card"));
+
+  const connectorsHtml = renderToString(
+    React.createElement(KBConnectorsTab, {
+      sources: [
+        {
+          id: "conn-1",
+          tenant_id: "acme-corp",
+          name: "Trust Portal",
+          source_type: "web_crawler",
+          target_url: "https://trust.acme.com",
+          schedule_frequency: "daily",
+          status: "active",
+          metrics: { documents_count: 5, chunks_count: 50 },
+        },
+      ],
+      isLoading: false,
+      isSyncingAll: false,
+      syncingSourceIds: new Set(),
+      syncNotice: null,
+      onOpenAddModal: () => {},
+      onSyncAll: () => {},
+      onTriggerSync: () => {},
+      onViewLogs: () => {},
+      onDelete: () => {},
+    })
+  );
+  assert.ok(connectorsHtml.includes("kb-connectors-tab"));
+  assert.ok(connectorsHtml.includes("kb-sources-grid"));
+  assert.ok(connectorsHtml.includes("kb-source-card"));
+
+  const playgroundHtml = renderToString(
+    React.createElement(KBPlaygroundTab, {
+      query: "GDPR compliance",
+      setQuery: () => {},
+      topK: 4,
+      setTopK: () => {},
+      isLoading: false,
+      onSearch: () => {},
+      error: null,
+      result: null,
+    })
+  );
+  assert.ok(playgroundHtml.includes("kb-playground-tab"));
+  assert.ok(playgroundHtml.includes("playground-search-input"));
+});
+
+test("Component Sanity: WorkspaceSettingsModal, ExportPackageModal, and ActivityLogModal render", () => {
+  const settingsHtml = renderToString(
+    React.createElement(WorkspaceSettingsModal, {
+      isOpen: true,
+      onClose: () => {},
+      settings: DEFAULT_WORKSPACE_SETTINGS,
+      setSettings: () => {},
+      onSave: async () => {},
+      onExport: () => {},
+      isSaving: false,
+      saveNotice: null,
+      tenantId: "acme-corp",
+      kbRecordsCount: 42,
+      kbDocumentsCount: 5,
+      recentRfpsCount: 12,
+      settingsTab: "profile",
+      setSettingsTab: () => {},
+    })
+  );
+  assert.ok(settingsHtml.includes("settings-modal-container"));
+  assert.ok(settingsHtml.includes("settings-modal-body"));
+
+  const exportHtml = renderToString(
+    React.createElement(ExportPackageModal, {
+      isOpen: true,
+      onClose: () => {},
+      title: "Quarterly Audit",
+      totalQuestions: 20,
+      approvedCount: 20,
+      onExport: async () => {},
+    })
+  );
+  assert.ok(exportHtml.includes("settings-modal-container"));
+  assert.ok(exportHtml.includes("settings-modal-body"));
+
+  const activityHtml = renderToString(
+    React.createElement(ActivityLogModal, {
+      isOpen: true,
+      onClose: () => {},
+      activityLogs: [
+        {
+          id: "act-1",
+          timestamp: "Just now",
+          action: "Approved Answer",
+          user: "Security Lead",
+          details: "Approved response for data encryption",
+          type: "approval",
+        },
+      ],
+    })
+  );
+  assert.ok(activityHtml.includes("activity-feed-list"));
+  assert.ok(activityHtml.includes("activity-stats-bar"));
+});
+
+test("Component Sanity: ModalPortal renders children and backdrop with proper ARIA attributes", () => {
+  const html = renderToString(
+    React.createElement(
+      ModalPortal,
+      {
+        isOpen: true,
+        onClose: () => {},
+        cardClassName: "modal-card test-modal",
+        ariaLabel: "Sanity Modal",
+      },
+      React.createElement("p", null, "Hello Modal")
+    )
+  );
+  assert.ok(html.includes('role="dialog"'));
+  assert.ok(html.includes('aria-modal="true"'));
+  assert.ok(html.includes("modal-backdrop"));
+  assert.ok(html.includes("Hello Modal"));
+});
+
+test("Component Sanity: ReviewGovernanceModal and RevisionFeedbackModal render cleanly", () => {
+  const govHtml = renderToString(
+    React.createElement(ReviewGovernanceModal, {
+      isOpen: true,
+      onClose: () => {},
+      reviewTargetRole: "Security SME",
+      setReviewTargetRole: () => {},
+      reviewSelectedQuestion: null,
+      reviewModalScope: "all",
+      setReviewModalScope: () => {},
+      reviewInstructions: "Review technical architecture",
+      setReviewInstructions: () => {},
+      onSubmit: () => {},
+      allQuestionsCount: 15,
+      currentQuestionText: "What is your backup policy?",
+    })
+  );
+  assert.ok(govHtml.includes("review-modal"));
+  assert.ok(govHtml.includes("Security SME"));
+
+  const revHtml = renderToString(
+    React.createElement(RevisionFeedbackModal, {
+      isOpen: true,
+      questionText: "What encryption standards are supported?",
+      initialNote: "Please clarify AES-256 vs AES-128",
+      reviewerRole: "Security SME",
+      onSave: () => {},
+      onClose: () => {},
+    })
+  );
+  assert.ok(revHtml.includes("revision-feedback-modal"));
+  assert.ok(revHtml.includes("feedback-textarea"));
+  assert.ok(revHtml.includes("Needs SME Review"));
+});
+
+test("Component Sanity: TuningStudioModal and NewTuningJobModal render cleanly", () => {
+  const studioHtml = renderToString(
+    React.createElement(TuningStudioModal, {
+      isOpen: true,
+      onClose: () => {},
+      tenantId: "acme-corp",
+      settings: DEFAULT_WORKSPACE_SETTINGS,
+      setSettings: () => {},
+    })
+  );
+  assert.ok(studioHtml.includes("tuning-studio-modal"));
+  assert.ok(studioHtml.includes("Gemini Supervised Tuning Studio"));
+
+  const jobHtml = renderToString(
+    React.createElement(NewTuningJobModal, {
+      isOpen: true,
+      isStarting: false,
+      totalPairs: 45,
+      onClose: () => {},
+      onSubmit: async () => true,
+    })
+  );
+  assert.ok(jobHtml.includes("new-tuning-modal"));
+  assert.ok(jobHtml.includes("Launch Gemini Tuning Job"));
+});
+

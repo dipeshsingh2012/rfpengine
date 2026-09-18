@@ -69,4 +69,11 @@ export interface AppModalsProps {
   totalQuestions: number;
   approvedCount: number;
   handleExportPackage: (format: ExportFormat) => Promise<void>;
+
+  revisionItem: string | null;
+  setRevisionItem: (item: string | null) => void;
+  onSaveRevisionFeedback: (note: string) => void;
+  role: string;
+  reviewCommentsByQuestion: Record<string, string>;
 }
+

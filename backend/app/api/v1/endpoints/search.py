@@ -31,22 +31,32 @@ async def search_knowledge_base(
     """
     active_tuned_model = None
     company_name = "Acme Corporation"
+    configured_model = None
+    configured_tone = None
     try:
         settings = await PostgresService.get_workspace_settings(db, payload.tenant_id)
         if settings:
             if settings.active_tuned_model_id:
                 active_tuned_model = settings.active_tuned_model_id
+            if settings.default_model:
+                configured_model = settings.default_model
+            if settings.response_tone:
+                configured_tone = settings.response_tone
             if settings.company_name:
                 company_name = settings.company_name
     except Exception as e:
-        logger.warning("Could not check active tuned model for tenant: %s", e)
+        logger.warning("Could not check settings for tenant: %s", e)
+
+    model_to_use = payload.model or active_tuned_model or configured_model
+    tone_to_use = payload.tone or configured_tone
 
     hybrid_search_service = getattr(request.app.state, "hybrid_search", None)
     if hybrid_search_service:
         return await hybrid_search_service.search(
             payload,
-            model_override=active_tuned_model,
+            model_override=model_to_use,
             company_name=company_name,
+            tone=tone_to_use,
         )
 
     # Fallback if hybrid search service not in app state
@@ -55,5 +65,5 @@ async def search_knowledge_base(
         confidence_score=0.85,
         sources=[],
         exemplars_used=[],
-        tone_applied="Authoritative, Direct, and Concise",
+        tone_applied=tone_to_use or "Authoritative, Direct, and Concise",
     )

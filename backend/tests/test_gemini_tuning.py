@@ -185,3 +185,4 @@ async def test_search_endpoint_with_tuned_model_routing():
             data = res.json()
             assert "suggested_answer" in data
             assert data["confidence_score"] > 0
+

@@ -29,6 +29,8 @@ async def main() -> None:
         engine = get_engine()
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS active_tuned_model_id VARCHAR(256);"))
         logger.info("✓ PostgreSQL tables created successfully.")
     except Exception as exc:
         logger.error("✗ Failed to initialize PostgreSQL tables: %s", exc)

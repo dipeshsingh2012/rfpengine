@@ -55,12 +55,16 @@ async def test_get_workspace_settings():
     )
     with patch.object(PostgresService, "get_workspace_settings", new=AsyncMock(return_value=mock_settings)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            response = await ac.get(
+            response1 = await ac.get(
                 "/api/v1/responses/workspace/settings",
                 headers={"X-Tenant-ID": "test_tenant"}
             )
-        assert response.status_code == 200
-        data = response.json()
+            response2 = await ac.get(
+                "/api/v1/responses/settings?tenant_id=test_tenant",
+            )
+        assert response1.status_code == 200
+        assert response2.status_code == 200
+        data = response2.json()
         assert data["tenant_id"] == "test_tenant"
         assert "company_name" in data
         assert "default_model" in data

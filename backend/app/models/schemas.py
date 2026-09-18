@@ -11,6 +11,8 @@ class SearchRequest(BaseModel):
     tenant_id: str = Field(min_length=1, default="acme-corp", description="Tenant identifier")
     question: str = Field(min_length=1, description="Question or RFP requirement to answer")
     top_k: int = Field(default=5, ge=1, le=50, description="Max number of source passages to retrieve")
+    model: Optional[str] = Field(default=None, description="Optional Gemini model or tuned endpoint override")
+    tone: Optional[str] = Field(default=None, description="Optional response tone override")
 
 
 class Source(BaseModel):

@@ -158,6 +158,7 @@ class HybridSearchService:
         request: SearchRequest,
         model_override: Optional[str] = None,
         company_name: str = "Acme Corp",
+        tone: Optional[str] = None,
     ) -> SearchResponse:
         sparse_task = (
             self.algolia_service.search_sparse(
@@ -238,12 +239,12 @@ class HybridSearchService:
                     )
 
         # Synthesize grounded answer with Gemini or Tuned Model Endpoint
-        tone = "Authoritative, Direct, and Concise"
+        applied_tone = tone or "Authoritative, Direct, and Concise"
         suggested_answer = await self._generate_answer(
             request.question,
             sources,
             exemplars=exemplars[:2],
-            tone=tone,
+            tone=applied_tone,
             company_name=company_name,
             model_override=model_override,
         )
@@ -254,7 +255,7 @@ class HybridSearchService:
             confidence_score=round(confidence, 4),
             sources=sources,
             exemplars_used=exemplars[:2],
-            tone_applied=tone,
+            tone_applied=applied_tone,
         )
 
     @classmethod

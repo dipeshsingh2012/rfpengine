@@ -118,3 +118,4 @@ async def cancel_tuning_job(
             detail=f"Tuning job '{job_id}' not found",
         )
     return TuningJobResponse.model_validate(job)
+

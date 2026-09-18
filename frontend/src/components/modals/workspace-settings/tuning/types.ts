@@ -15,3 +15,4 @@ export interface TuningStudioState {
   cancelTuningJob: (jobId: string) => Promise<boolean>;
   setIsNewJobModalOpen: (open: boolean) => void;
 }
+

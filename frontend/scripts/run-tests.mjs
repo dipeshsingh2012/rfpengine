@@ -18,6 +18,7 @@ await build({
   format: "esm",
   target: "node22",
   sourcemap: "inline",
+  packages: "external",
 });
 
 console.log("Running node:test test suite with coverage...");

@@ -7,17 +7,22 @@ import { KBUploadTab } from "./knowledge-base/KBUploadTab";
 import { KBConnectorsTab } from "./knowledge-base/KBConnectorsTab";
 import { KBPlaygroundTab } from "./knowledge-base/KBPlaygroundTab";
 import { KBConnectedModals } from "./knowledge-base/KBConnectedModals";
+import { ModalPortal } from "../common/ModalPortal";
 
 export { type KnowledgeBaseModalProps } from "./knowledge-base/types";
 
 export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = (props) => {
   const state = useKnowledgeBaseModalState(props);
 
-  if (!props.isOpen) return null;
-
   return (
-    <div className="kb-modal-backdrop" onClick={props.onClose}>
-      <div className="kb-modal-container" onClick={(e) => e.stopPropagation()}>
+    <>
+      <ModalPortal
+        isOpen={props.isOpen}
+        onClose={props.onClose}
+        overlayClassName="kb-modal-backdrop"
+        cardClassName="kb-modal-container"
+        ariaLabel="Knowledge Base & Automated Connectors"
+      >
         <KBModalHeader onClose={props.onClose} tenantId={props.tenantId || "acme-corp"} />
         <KBTabNav tab={props.tab} setTab={props.setTab} sourcesCount={state.sources.length} />
 
@@ -64,9 +69,9 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = (props) => 
             />
           )}
         </div>
+      </ModalPortal>
 
-        <KBConnectedModals s={state} />
-      </div>
-    </div>
+      <KBConnectedModals s={state} />
+    </>
   );
 };

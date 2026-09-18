@@ -73,3 +73,4 @@ export const CustomTuningCard: React.FC<Props> = ({ settings, setSettings }) => 
     </div>
   );
 };
+

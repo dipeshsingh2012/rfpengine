@@ -4,6 +4,7 @@ import { KnowledgeBaseModal } from "./KnowledgeBaseModal";
 import { ActivityLogModal } from "./ActivityLogModal";
 import { WorkspaceSettingsModal } from "./WorkspaceSettingsModal";
 import { ExportPackageModal } from "./ExportPackageModal";
+import { RevisionFeedbackModal } from "../workspace/questionnaire/RevisionFeedbackModal";
 import { AppModalsProps } from "./types";
 
 export const AppModals: React.FC<AppModalsProps> = (p) => {
@@ -79,7 +80,14 @@ export const AppModals: React.FC<AppModalsProps> = (p) => {
         approvedCount={p.approvedCount}
         onExport={p.handleExportPackage}
       />
+      <RevisionFeedbackModal
+        isOpen={Boolean(p.revisionItem)}
+        questionText={p.revisionItem || ""}
+        initialNote={p.revisionItem ? p.reviewCommentsByQuestion[p.revisionItem] || "" : ""}
+        reviewerRole={p.role}
+        onSave={p.onSaveRevisionFeedback}
+        onClose={() => p.setRevisionItem(null)}
+      />
     </>
   );
 };
-

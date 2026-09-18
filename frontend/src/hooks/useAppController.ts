@@ -19,6 +19,7 @@ export function useAppController() {
   const [tenantId, setTenantId] = useState("acme-corp");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [revisionItem, setRevisionItem] = useState<string | null>(null);
   const [notice, setNotice] = useState("Demo data loaded");
 
   const navigation = useNavigationRouter();
@@ -153,13 +154,20 @@ export function useAppController() {
   }
 
   function handleRequestChanges(item: string) {
-    const note = window.prompt(`Enter revision feedback:`, review.reviewCommentsByQuestion[item] || "");
-    if (note === null) return;
-    workflow.saveReviewStatuses({ ...workflow.reviewStatusByQuestion, [item]: "Changes requested" });
+    setRevisionItem(item);
+  }
+
+  function onSaveRevisionFeedback(note: string) {
+    if (!revisionItem) return;
+    workflow.saveReviewStatuses({ ...workflow.reviewStatusByQuestion, [revisionItem]: "Changes requested" });
     if (note.trim()) {
-      review.setReviewCommentsByQuestion((prev) => ({ ...prev, [item]: `[Changes Requested by ${workflow.role}]: ${note.trim()}` }));
+      review.setReviewCommentsByQuestion((prev) => ({
+        ...prev,
+        [revisionItem]: `[Changes Requested by ${workflow.role}]: ${note.trim()}`,
+      }));
     }
     activity.showToast(`Marked "Changes requested"`);
+    setRevisionItem(null);
   }
 
   async function handleExportPackage(format: ExportFormat) {
@@ -213,6 +221,9 @@ export function useAppController() {
     isActivityActive,
     showExportModal,
     setShowExportModal,
+    revisionItem,
+    setRevisionItem,
+    onSaveRevisionFeedback,
     openOriginalForm,
     submitSendForReview,
     handleConfirmImport,
@@ -234,8 +245,22 @@ export function useAppController() {
       activity.showToast("⭐ Promoted answer to canonical Knowledge Base as Golden Q&A!");
     },
     openSendForReviewModal: (scope: any) => review.openSendForReviewModal(scope, workflow.question),
-    generateAnswer: () => ai.generateAnswer(workflow.question, tenantId, workflow.answersByQuestion, workflow.saveAnswers),
-    generateAllAnswers: () => ai.generateAllAnswers(workflow.detectedQuestions, workflow.question, tenantId, workflow.answersByQuestion, workflow.saveAnswers, activity.showToast),
+    generateAnswer: () => {
+      const opts = {
+        model: settings.workspaceSettings.active_tuned_model_id || settings.workspaceSettings.default_model,
+        tone: settings.workspaceSettings.response_tone,
+        topK: settings.workspaceSettings.default_top_k,
+      };
+      return ai.generateAnswer(workflow.question, tenantId, workflow.answersByQuestion, workflow.saveAnswers, opts);
+    },
+    generateAllAnswers: () => {
+      const opts = {
+        model: settings.workspaceSettings.active_tuned_model_id || settings.workspaceSettings.default_model,
+        tone: settings.workspaceSettings.response_tone,
+        topK: settings.workspaceSettings.default_top_k,
+      };
+      return ai.generateAllAnswers(workflow.detectedQuestions, workflow.question, tenantId, workflow.answersByQuestion, workflow.saveAnswers, activity.showToast, opts);
+    },
     handleExportWorkspace: async (ws: any) => {
       activity.showToast(`Exporting ${ws.title} as Excel compliance matrix...`);
       try {
