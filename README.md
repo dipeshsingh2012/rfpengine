@@ -16,14 +16,23 @@ flowchart TD
         EXT[Manifest V3 Browser Extension]
     end
 
-    subgraph IngestionPipeline ["Knowledge Ingestion & Chunking"]
-        UPLOAD["POST /api/v1/knowledge-base/upload\n(.csv, .json, .pdf, .docx, .txt, .md)"]
+    subgraph ContinuousSync ["Continuous Knowledge Ingestion & Sync"]
+        WEB["🌐 Web Trust Crawler"]
+        GIT["🐙 GitHub Docs Repo"]
+        CLD["☁️ Cloud Storage (S3/GCS)"]
+        RFP["🏆 Approved RFP Harvester"]
+        SYNC["KBSyncService\n(SHA-256 Delta Hashing & Pruning)"]
+        WEB & GIT & CLD & RFP --> SYNC
+    end
+
+    subgraph IngestionPipeline ["Manual Upload & Parser"]
+        UPLOAD["POST /api/v1/knowledge-base/upload\n(.csv, .xlsx, .pdf, .docx, .txt, .md)"]
         PARSER["DocumentParserService\n(300–500 Token Chunking)"]
         UPLOAD --> PARSER
     end
 
     subgraph GCPCloudRun ["Google Cloud Run (FastAPI Backend)"]
-        API[API Endpoints: /search, /knowledge-base, /workspaces, /health]
+        API[API Endpoints: /search, /knowledge-base, /responses, /health]
         HS[HybridSearchService]
         RRF[Reciprocal Rank Fusion (RRF)]
         PG_SVC[PostgresService]
@@ -42,32 +51,34 @@ flowchart TD
     end
 
     subgraph RelationalStore ["Relational Persistence (PostgreSQL)"]
-        PG[(Neon PostgreSQL 17\nWorkspaces & Question Reviews)]
+        PG[(Neon PostgreSQL 17\nWorkspaces, Reviews & KB Sources)]
     end
 
     FE -->|HTTP / JSON / Upload| API
     EXT -->|HTTP / JSON| API
     GSM -->|Native Injection at Boot| GCPCloudRun
 
-    PARSER -->|1. Store Full Text & BM25| ES_SVC
+    PARSER -->|1. Store Full Text & BM25| ALG_SVC
     PARSER -->|2. Generate 768-dim Embeddings| VAI
     VAI -->|3. Bulk Upsert Vectors + Meta| PC_SVC
-    ES_SVC --> ES
+    SYNC -->|Delta Sync & Atomic Pruning| ALG_SVC & PC_SVC & PG_SVC
+    ALG_SVC --> ALG
     PC_SVC --> PC
 
     API --> HS
     API --> PG_SVC
     
     HS -->|Generate Query Vector| VAI
-    HS -->|Sparse Keyword Match| ES_SVC
+    HS -->|Sparse Keyword Match| ALG_SVC
     HS -->|Dense Vector k-NN| PC_SVC
     
-    ES_SVC & PC_SVC --> RRF
-    RRF -->|Grounded Sources| VAI
+    ALG_SVC & PC_SVC --> RRF
+    RRF -->|Grounded Sources + 1.75x Golden Q&A Boost| VAI
     VAI -->|Drafted Response| HS
     
     PG_SVC --> PG
 ```
+
 
 ---
 
@@ -204,7 +215,77 @@ RFPEngine ingests arbitrary enterprise documentation (whitepapers, contracts, SL
 * **Primary Model**: Google Cloud Vertex AI `text-embedding-004` (768 dimensions)
 * **Similarity Metric**: Cosine Similarity in Pinecone Serverless
 * **Passage Format**: `Title: {title}\n\nContent: {content}`
-* **Storage Synchronization**: Passage chunks are synchronized idempotently across **PostgreSQL** (`kb_entries`), **Elastic Cloud** (BM25 sparse search), and **Pinecone Serverless** (dense vector k-NN).
+* **Storage Synchronization**: Passage chunks are synchronized idempotently across **PostgreSQL** (`kb_entries`), **Algolia Cloud** (BM25 sparse search), and **Pinecone Serverless** (dense vector k-NN).
+
+---
+
+## 🔄 Automated Knowledge Base Syncing & Multi-Source Connectors
+
+RFPEngine features an **Autonomous Continuous Ingestion & Synchronization Engine** ([`kb_sync_service.py`](backend/app/services/kb_sync_service.py)) that eliminates manual document re-uploads by connecting directly to live enterprise documentation sources:
+
+```mermaid
+flowchart LR
+    subgraph Sources ["Connected Sources"]
+        W[🌐 Web Trust Portal]
+        G[🐙 GitHub Docs Repo]
+        C[☁️ S3 / Cloud Bucket]
+        R[🏆 RFP SME Answers]
+    end
+
+    subgraph SyncEngine ["KBSyncService Engine"]
+        Delta[SHA-256 Delta Hashing]
+        Chunk[300-500 Token Chunking]
+        Prune[Atomic Stale Pruning]
+    end
+
+    subgraph TriStore ["Triple Index Sync"]
+        PG[(PostgreSQL)]
+        ALG[(Algolia Cloud)]
+        PC[(Pinecone)]
+    end
+
+    Sources --> Delta --> Chunk --> TriStore
+    Delta -->|Obsolete Entries| Prune --> TriStore
+```
+
+### Supported Connectors
+
+| Connector | Source Type | Extraction Engine | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| **🌐 Web Trust Portal** | `web_crawler` | `CleanHTMLToMarkdownParser` | • Zero-dependency HTML parser stripping scripts, styles, navs, and footers<br>• Recursively traverses trust centers, Notion pages, and compliance portals<br>• Automatically infers enterprise taxonomy categories |
+| **🐙 GitHub Documentation** | `github_docs` | GitHub Raw / API Fetcher | • Pulls markdown specifications, architecture RFCs, and policies (`/docs`, `SECURITY.md`)<br>• Preserves file paths and directory hierarchy as passage metadata |
+| **☁️ Cloud Storage** | `cloud_storage` | Directory & S3 Watcher | • Continuously scans S3/GCS buckets or local folders for updated whitepapers (`.pdf`, `.docx`, `.md`, `.xlsx`)<br>• Ingests delta modifications without re-indexing unchanged documents |
+| **🏆 RFP SME Harvester** | `rfp_harvest` | Canonical Workspace Extractor | • Automatically extracts verified, human-approved answers from completed RFP workspaces<br>• Tags entries as **Golden Q&A**, applying a **1.75x Authority Multiplier** in RRF hybrid retrieval |
+
+### Smart Delta Hashing & Atomic Store Pruning
+* **Content Hashing**: Computes deterministic `SHA-256` content and passage hashes (`sha256(source_url + chunk_content)`). Unchanged passages are skipped, incurring zero AI embedding cost.
+* **Atomic 3-Way Store Pruning**: When a source document is revised or deleted, outdated passages are synchronously purged across **PostgreSQL** (`kb_entries`), **Algolia Cloud**, and **Pinecone Serverless**, guaranteeing zero duplicate or stale answers.
+* **Execution Modes**:
+  * **⚡ On-Demand 1-Click Sync**: Sync individual sources or `Sync All Sources` via UI or API (`POST /api/v1/knowledge-base/sources/{id}/sync`).
+  * **⏱️ Scheduled Background Sync**: Automated intervals (`hourly`, `daily`, `weekly`).
+  * **🪝 Inbound Webhook Triggers**: `POST /api/v1/knowledge-base/sources/{id}/webhook` for CI/CD actions and cloud storage event triggers.
+  * **📜 Full Audit History**: Inspect execution duration, documents scanned, passages created, and obsolete passages pruned.
+
+---
+
+## 📝 Questionnaire Review & Curation Studio (`/review/:id`)
+
+When uploading complex multi-format vendor questionnaires, RFPEngine presents an interactive **Curation & Verification Studio** before importing into active drafting workspaces:
+
+* **📄 Original Document Reference Viewer**:
+  * Embedded native PDF renderer (`<iframe>` blob) with zoom, search, and page navigation side-by-side with parsed questions.
+  * Toggleable **Side-by-Side Split View** or **Slide-Over Drawer** modes, with `↗ Open in New Tab` and `⬇ Download` for multi-monitor workflows.
+* **✨ Question-Wise AI Rephrasing**:
+  * Powered by **Google Cloud Vertex AI (`gemini-2.5-flash`)** via `POST /api/v1/responses/rephrase-question`.
+  * Standardizes fragmented OCR scans, compound requirements, or clumsy phrasing into crisp compliance requirement syntax.
+  * Interactive before/after diff preview modal with 1-click **Accept** or **Revert**.
+* **🔄 Guided Complete Document Re-Parsing**:
+  * Re-runs extraction with custom natural language guidance (e.g. *"Focus strictly on Section 4 technical cybersecurity controls"*).
+* **🧠 Autonomous AI Feedback Loop**:
+  * Tracks user deletions as **false-positive signals** (e.g. table headers, disclaimers).
+  * Tracks user edits as **prompt syntax improvements**.
+  * Explicit `👍 Accurate` / `👎 Needs Tuning` quality ratings persisted via `POST /api/v1/responses/parser-feedback` to continuously tune extraction prompts.
+
 
 ---
 
@@ -498,10 +579,10 @@ The React single-page application (`frontend/`) provides dedicated routes for qu
 
 | Route Path | Page / View Name | Primary Features & User Workflows |
 | :--- | :--- | :--- |
-| **`GET /`** | **Overview & Importer** | • Import buyer questionnaires via URL or file upload (`.csv`, `.json`, `.pdf`, `.docx`)<br>• Quick-start with pre-configured starter questions<br>• Summary dashboard of recent RFP projects |
+| **`GET /`** | **Overview & Importer** | • Import buyer questionnaires via URL or file upload (`.csv`, `.json`, `.xlsx`, `.pdf`, `.docx`)<br>• Quick-start with pre-configured starter questions<br>• Summary dashboard of recent RFP projects |
 | **`GET /response/workspace/:id`** | **Interactive Drafting Workspace** | • Split-pane drafting view with real-time AI answer generation (`gemini-2.5-flash`) stream<br>• Visual confidence scoring ring (0–100%)<br>• Cited hybrid sources from Algolia (Sparse) and Pinecone (Dense Vectors)<br>• In-line answer editor, review status transitions, and reviewer role assignment |
-| **`GET /review/:id`** | **Question Review & Governance** | • Multi-question review queue with role switcher (`Proposal manager`, `Security SME`, `Legal reviewer`, `Final approver`)<br>• Approval state machine badges (`Draft`, `SME review`, `Approved by SME`, `Legal review`, `Approved by Legal`, `Final approved`, `Rejected`)<br>• Question search and filtering<br>• Export approved answers to CSV or automated handoff to buyer form |
-| **`GET /knowledge-base`** | **Knowledge Base Ingestion** | • Drag-and-drop multi-format file uploader (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`)<br>• 300–500 token chunking with automatic taxonomy categorization<br>• Single-click demo sample downloads (`/sample_docs/`)<br>• Clean table of indexed knowledge chunks with single-click deletion |
+| **`GET /review/:id`** | **Curation & Verification Studio** | • **Embedded Document Viewer**: Split-view and slide-over drawer native PDF viewer with zoom, page navigation, and download<br>• **Curation Controls**: Checkbox selection, inline editing, addition of missed items, and deletion of false positives<br>• **✨ Rephrase with AI**: Per-question Gemini 2.5 Flash phrasing cleanup with before/after diff preview<br>• **🔄 Re-Parse Document**: Re-run extraction with custom natural language guidance<br>• **AI Feedback Loop**: Captures deletions, edits, and ratings (`👍 / 👎`) |
+| **`GET /knowledge-base`** | **Knowledge Base Hub** | • **Documents & Ingestion**: Drag-and-drop multi-format file uploader (`.csv`, `.tsv`, `.xlsx`, `.pdf`, `.docx`, `.txt`, `.md`) with 300–500 token chunking<br>• **Automated Sync & Connectors**: Continuous sync from Web trust portals, GitHub repos, Cloud buckets, and completed RFPs<br>• Table of indexed knowledge chunks with single-click deletion |
 | **`GET /playground`** | **Retrieval & Search Playground** | • Interactive query testing against Algolia (Sparse) and Pinecone (Dense Vectors)<br>• Real-time Reciprocal Rank Fusion (RRF) score inspection and hit breakdown<br>• Live AI answer generation (`gemini-2.5-flash`) with radial confidence scoring<br>• Quick-click sample test questions for live demonstrations |
 
 ---
@@ -532,7 +613,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 ### 1. Hybrid Search & Answer Generation
 - **`POST /api/v1/search`**
   - Concurrently queries Algolia (sparse) and Pinecone (dense vector k-NN).
-  - Merges hits with Reciprocal Rank Fusion (RRF).
+  - Merges hits with Reciprocal Rank Fusion (RRF) and applies the 1.75x Golden Q&A authority multiplier.
   - Drafts grounded answer with Google Cloud Vertex AI `gemini-2.5-flash`.
   - **Request Body**:
     ```json
@@ -543,20 +624,36 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
     }
     ```
 
-### 2. Knowledge Base Management & Ingestion
-- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.json`, `.jsonl`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into PostgreSQL (System of Record), Algolia (sparse + text storage), and Pinecone (dense vectors).
+### 2. Knowledge Base Ingestion & Continuous Sync
+- **`POST /api/v1/knowledge-base/upload`**: Multipart file upload (`.csv`, `.tsv`, `.xlsx`, `.pdf`, `.docx`, `.txt`, `.md`). Applies 300–500 token chunking and indexes into PostgreSQL, Algolia, and Pinecone.
 - **`GET /api/v1/knowledge-base?tenant_id=acme-corp`**: List indexed knowledge records from PostgreSQL with pagination.
 - **`GET /api/v1/knowledge-base/{id}`**: Get a specific knowledge record.
 - **`POST /api/v1/knowledge-base`**: Create a single record across PostgreSQL, Algolia, and Pinecone.
 - **`POST /api/v1/knowledge-base/batch`**: Batch import multiple records across PostgreSQL, Algolia, and Pinecone.
 - **`DELETE /api/v1/knowledge-base/{id}`**: Remove a record synchronously from PostgreSQL, Algolia, and Pinecone.
+- **`GET /api/v1/knowledge-base/sources`**: List all configured automated ingestion sources for the tenant.
+- **`POST /api/v1/knowledge-base/sources`**: Register a new source (`web_crawler`, `github_docs`, `cloud_storage`, `rfp_harvest`).
+- **`GET /api/v1/knowledge-base/sources/{id}`**: Retrieve configuration and sync status for a specific source.
+- **`PUT /api/v1/knowledge-base/sources/{id}`**: Update source parameters, category, or schedule.
+- **`DELETE /api/v1/knowledge-base/sources/{id}`**: Delete source and optionally prune all its indexed passages.
+- **`POST /api/v1/knowledge-base/sources/{id}/sync`**: Trigger an immediate on-demand synchronization run.
+- **`POST /api/v1/knowledge-base/sync-all`**: Trigger continuous synchronization across all active sources.
+- **`POST /api/v1/knowledge-base/sources/{id}/webhook`**: Inbound webhook for CI/CD and cloud event triggers.
+- **`GET /api/v1/knowledge-base/sources/{id}/logs`**: Retrieve historical execution logs and passage metrics.
 
-### 3. Workspaces & Review Persistence (PostgreSQL)
-- **`POST /api/v1/workspaces`**: Save an imported questionnaire workspace and its questions to PostgreSQL.
-- **`GET /api/v1/workspaces/{id}`**: Retrieve a workspace session and its review stages.
-- **`PATCH /api/v1/workspaces/{id}/questions/{question_index}`**: Update review status, assigned role, or edited answer for a specific question.
+### 3. Questionnaire Curation & Feedback Loop
+- **`POST /api/v1/responses/parse-file`**: Parse uploaded questionnaires (`.pdf`, `.docx`, `.xlsx`, `.csv`) using Gemini 2.5 Flash + heuristics. Accepts optional `guidance` form parameter for custom extraction focus.
+- **`POST /api/v1/responses/rephrase-question`**: Standardize and clean question text into clear enterprise compliance syntax with Gemini 2.5 Flash.
+- **`POST /api/v1/responses/parser-feedback`**: Record review-time user corrections, deletions (false positives), and quality ratings (`👍 / 👎`).
+- **`POST /api/v1/responses/export`**: Export proposal deliverable as `.docx`, `.xlsx`, `.csv`, `.pdf`, or JSON.
 
-### 4. Health & Diagnostics
+### 4. Workspaces & Review Persistence (PostgreSQL)
+- **`POST /api/v1/responses/workspaces`**: Save an imported questionnaire workspace and its questions to PostgreSQL.
+- **`GET /api/v1/responses/workspaces/{id}`**: Retrieve a workspace session and its review stages.
+- **`PUT /api/v1/responses/workspaces/{id}`**: Update answers and review statuses across all questions.
+- **`POST /api/v1/responses/workspaces/{id}/questions/{index}/promote`**: 1-click promote an approved answer to canonical **Golden Q&A** in the knowledge base.
+
+### 5. Health & Diagnostics
 - **`GET /health`**: Returns real-time connection status, environment, and latency metrics for PostgreSQL (Neon), Algolia Cloud, Pinecone Serverless, GCP Secret Manager, and Google Cloud Vertex AI.
 
 ---
@@ -579,6 +676,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │       ├── 0001-hybrid-retrieval-with-algolia-and-pinecone.md
 │       ├── 0002-relational-persistence-with-postgresql.md
 │       ├── 0003-human-in-the-loop-governance-and-extension-safety.md
+│       ├── 0007-knowledge-base-chunking-and-search-index-ingestion.md
 │       ├── 0021-multi-tenant-authentication-with-google-cloud-identity-and-sso.md
 │       └── 0022-swap-elasticsearch-with-algolia-for-sparse-retrieval.md
 ├── backend/
@@ -587,8 +685,8 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── health.py           # /health diagnostic endpoint
-│   │   │   ├── knowledge_base.py   # /api/v1/knowledge-base CRUD & /upload
-│   │   │   ├── responses.py        # /api/v1/workspaces persistence
+│   │   │   ├── knowledge_base.py   # /api/v1/knowledge-base CRUD, /upload, /sources
+│   │   │   ├── responses.py        # /api/v1/responses workspaces, rephrase & feedback
 │   │   │   ├── search.py           # /api/v1/search hybrid RRF retrieval
 │   │   │   └── endpoints/mcp.py    # /api/v1/mcp/sse and /messages routes
 │   │   ├── core/
@@ -598,19 +696,24 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │   │   │   ├── server.py           # JSON-RPC 2.0 MCPServer & stdio listener
 │   │   │   └── tools.py            # Live MCP Tools (KB search, roadmap, diagnostics)
 │   │   ├── models/
-│   │   │   ├── db_models.py        # SQLAlchemy relational models
+│   │   │   ├── db_models.py        # SQLAlchemy relational models (KBEntry, KBSource, etc.)
 │   │   │   └── schemas.py          # Pydantic request/response schemas
 │   │   ├── services/
 │   │   │   ├── document_parser_service.py # Multi-format parser & 300-500 token chunker
+│   │   │   ├── kb_sync_service.py         # Multi-source connectors, delta hashing & pruning
+│   │   │   ├── parser_feedback_service.py # AI extraction feedback loop & telemetry
+│   │   │   ├── questionnaire_parser_service.py # Dual-layer AI + heuristic questionnaire parser
 │   │   │   ├── algolia_service.py         # Algolia search & text store
 │   │   │   ├── gcp_secret_service.py      # Google Cloud Secret Manager client
 │   │   │   ├── pinecone_service.py        # Pinecone dense vector similarity search
 │   │   │   ├── postgres_service.py        # PostgreSQL database operations
-│   │   │   └── hybrid_search_service.py   # RRF fusion & OpenAI generation
+│   │   │   └── hybrid_search_service.py   # RRF fusion & Gemini 2.5 Flash reasoning
 │   │   └── main.py                 # FastAPI application factory and lifespan
 │   ├── tests/
 │   │   ├── conftest.py             # Pytest async session fixtures
-│   │   ├── test_document_parser.py # Document parsing & upload tests
+│   │   ├── test_kb_sync_service.py # Automated sync & connectors test suite
+│   │   ├── test_parser_feedback.py # Questionnaire feedback & rephrasing tests
+│   │   ├── test_questionnaire_parser.py # Questionnaire parser test suite
 │   │   └── test_postgres_connection.py # Production PostgreSQL validation suite
 │   ├── scripts/
 │   │   ├── gcp_secrets_sync.py     # CLI sync to GCP Secret Manager
@@ -619,6 +722,7 @@ RFPEngine enforces strict isolation between **Local Development** and **Cloud Pr
 │   │   └── seed_data.py            # Sample RFP data seed script
 │   ├── pytest.ini
 │   └── requirements.txt
-├── frontend/                       # React seller workspace & KB library modal
+├── frontend/                       # React seller workspace & Knowledge Hub modal
 └── extension/                      # Manifest V3 browser extension
 ```
+
