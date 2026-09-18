@@ -13,13 +13,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Canonical API route prefix is /api/v1
+# API routes mounted strictly at /api/v1
 app.include_router(api_router, prefix="/api/v1")
 
-# Also maintain /v1 alias for backward compatibility
-app.include_router(api_router, prefix="/v1")
-
 @app.get("/health")
-@app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
