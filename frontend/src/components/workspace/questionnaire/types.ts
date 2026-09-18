@@ -1,0 +1,50 @@
+import React from "react";
+import { ReviewerRole, SearchResponse, SourceMode } from "../../../types";
+
+export interface QuestionnaireWorkspaceProps {
+  onNavigateHome: () => void;
+  onNavigateResponses?: () => void;
+  onOpenImport: (id: string) => void;
+  responseId: string;
+  sourceMode: SourceMode;
+  sourceLabel: string;
+  openOriginalForm: () => void;
+  detectedQuestions: string[];
+  question: string;
+  setQuestion: (q: string) => void;
+  tenantId: string;
+  setTenantId: (id: string) => void;
+  generateAnswer: () => void;
+  generateAllAnswers: () => void;
+  isGenerating: boolean;
+  role: ReviewerRole;
+  setRole: (r: ReviewerRole) => void;
+  showToast: (msg: string) => void;
+  approvedCount: number;
+  inReviewCount: number;
+  changesRequestedCount: number;
+  isBatchApproved: boolean;
+  handleBatchApproveAll: () => void;
+  handleReviewReset: () => void;
+  isAllApproved: boolean;
+  exportAnswers: () => void;
+  onOpenExportModal?: () => void;
+  reviewStatusByQuestion: Record<string, string>;
+  reviewCommentsByQuestion: Record<string, string>;
+  answersByQuestion: Record<string, string>;
+  setAnswersByQuestion: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  saveAnswers: (answers: Record<string, string>) => void;
+  handleRequestChanges: (question: string) => void;
+  openSendForReviewModal: (scope: "all" | "current", question?: string) => void;
+  handleApproveQuestion: (question: string) => void;
+  handleIndividualReview: (question: string) => void;
+  promotedQuestions: Record<string, boolean>;
+  handlePromoteToKnowledgeBase: (question: string, index: number) => void;
+  notice: string;
+  answer: string;
+  setAnswer: (a: string) => void;
+  response: SearchResponse;
+  activeSource: string;
+  setActiveSource: (id: string) => void;
+}
+

@@ -1,5 +1,6 @@
 import React from "react";
 import { Send, X } from "lucide-react";
+import { ReviewRoleSelector } from "./review-governance/ReviewRoleSelector";
 
 interface ReviewGovernanceModalProps {
   isOpen: boolean;
@@ -19,16 +20,8 @@ interface ReviewGovernanceModalProps {
 export const ReviewGovernanceModal: React.FC<ReviewGovernanceModalProps> = ({
   isOpen,
   onClose,
-  reviewTargetRole,
-  setReviewTargetRole,
-  reviewSelectedQuestion,
-  reviewModalScope,
-  setReviewModalScope,
-  reviewInstructions,
-  setReviewInstructions,
   onSubmit,
-  allQuestionsCount,
-  currentQuestionText,
+  ...roleProps
 }) => {
   if (!isOpen) return null;
 
@@ -54,56 +47,13 @@ export const ReviewGovernanceModal: React.FC<ReviewGovernanceModalProps> = ({
               onSubmit();
             }}
           >
-            <label>
-              Target Reviewer Role:
-              <select
-                value={reviewTargetRole}
-                onChange={(e) => setReviewTargetRole(e.target.value as any)}
-              >
-                <option value="Security SME">🛡️ Security SME (Technical Architecture, Encryption, SLAs)</option>
-                <option value="Legal reviewer">⚖️ Legal Reviewer (Compliance, Terms, GDPR, Liability)</option>
-                <option value="Final approver">👑 Final Executive Approver (Sign-off & Lock)</option>
-              </select>
-            </label>
-
-            <label>
-              Review Scope:
-              <select
-                value={reviewSelectedQuestion ? "current" : reviewModalScope}
-                onChange={(e) => setReviewModalScope(e.target.value as "all" | "current")}
-                disabled={!!reviewSelectedQuestion}
-              >
-                <option value="all">
-                  Entire Questionnaire ({allQuestionsCount} Questions)
-                </option>
-                <option value="current">
-                  {reviewSelectedQuestion
-                    ? `Selected: "${reviewSelectedQuestion.slice(0, 40)}..."`
-                    : `Current: "${currentQuestionText.slice(0, 40)}..."`}
-                </option>
-              </select>
-            </label>
-
-            <label>
-              Review Instructions & Notes (Optional):
-              <textarea
-                placeholder="e.g. Please verify that our 35-day backup rotation window matches our current SOC 2 Type II audit report."
-                value={reviewInstructions}
-                onChange={(e) => setReviewInstructions(e.target.value)}
-                rows={3}
-              />
-            </label>
-
+            <ReviewRoleSelector {...roleProps} />
             <div className="review-modal-actions">
-              <button
-                type="button"
-                className="outline-button"
-                onClick={onClose}
-              >
+              <button type="button" className="outline-button" onClick={onClose}>
                 Cancel
               </button>
               <button type="submit" className="primary-button">
-                <Send size={14} /> Dispatch to {reviewTargetRole}
+                <Send size={14} /> Dispatch to {roleProps.reviewTargetRole}
               </button>
             </div>
           </form>
@@ -112,4 +62,3 @@ export const ReviewGovernanceModal: React.FC<ReviewGovernanceModalProps> = ({
     </div>
   );
 };
-

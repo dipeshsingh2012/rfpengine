@@ -1,20 +1,15 @@
 import { SearchResponse, demoResponse } from "../types";
 
-// Fixed production API backend host (globally resolvable on public internet)
 export const API_BASE = "https://rfpengine-api-fwwnzie4dq-uc.a.run.app";
 
 export function demoAnswerFor(question: string): SearchResponse {
-  const normalized = question.toLowerCase();
-  const answer = normalized.includes("encrypt")
-    ? "Customer data is encrypted in transit using TLS 1.2 or higher and at rest using AES-256. Encryption keys are managed through a restricted key-management service."
-    : normalized.includes("certif") || normalized.includes("compliance")
-      ? "Our security program is aligned with industry best practices, and we maintain current SOC 2 Type II and ISO 27001 certifications. Current reports are available under NDA."
-      : normalized.includes("implement") || normalized.includes("timeline")
-        ? "A standard implementation typically takes 4 to 8 weeks, depending on integrations, data preparation, and stakeholder availability. A dedicated implementation manager coordinates the rollout."
-        : normalized.includes("support")
-          ? "The platform includes email support, a searchable help center, and an assigned customer success contact. Premium plans add priority response times and dedicated support."
-          : demoResponse.suggested_answer;
-  return { ...demoResponse, suggested_answer: answer, confidence_score: 0.84 };
+  const q = question.toLowerCase();
+  let ans = demoResponse.suggested_answer;
+  if (q.includes("encrypt")) ans = "Customer data is encrypted in transit using TLS 1.2+ and at rest using AES-256.";
+  else if (q.includes("certif") || q.includes("compliance")) ans = "We maintain current SOC 2 Type II and ISO 27001 certifications.";
+  else if (q.includes("implement") || q.includes("timeline")) ans = "A standard implementation takes 4 to 8 weeks depending on integrations.";
+  else if (q.includes("support")) ans = "Platform includes email support, searchable help center, and customer success.";
+  return { ...demoResponse, suggested_answer: ans, confidence_score: 0.84 };
 }
 
 export function parseCsvLine(line: string): string[] {
@@ -31,13 +26,13 @@ export function parseCsvLine(line: string): string[] {
         inQuotes = !inQuotes;
       }
     } else if (char === "," && !inQuotes) {
-      fields.push(current.trim().replace(/^"|"$/g, ""));
+      fields.push(current.trim());
       current = "";
     } else {
       current += char;
     }
   }
-  fields.push(current.trim().replace(/^"|"$/g, ""));
+  fields.push(current.trim());
   return fields;
 }
 

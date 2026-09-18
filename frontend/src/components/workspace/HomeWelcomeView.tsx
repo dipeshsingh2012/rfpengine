@@ -1,5 +1,6 @@
 import React from "react";
-import { Link, ArrowUpRight, Upload, RefreshCw, FileText } from "lucide-react";
+import { HomeUrlFeature } from "./home/HomeUrlFeature";
+import { HomeUploadFeature } from "./home/HomeUploadFeature";
 
 interface HomeWelcomeViewProps {
   formUrl: string;
@@ -24,79 +25,22 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
     <section className="home-screen">
       <p className="eyebrow">Start a response</p>
       <h1>Bring in your questionnaire</h1>
-      <p className="home-subtitle">
-        Choose how you want to load the buyer form.
-      </p>
+      <p className="home-subtitle">Choose how you want to load the buyer form.</p>
       <div className="home-feature-grid">
-        <div className="home-feature" style={isParsingDocument ? { opacity: 0.6, pointerEvents: "none" } : undefined}>
-          <div className="home-feature-icon">
-            <Link size={22} />
-          </div>
-          <h2>Paste a form URL</h2>
-          <p>
-            Load a hosted questionnaire and extract its questions for review.
-          </p>
-          <div className="home-url-row">
-            <input
-              value={formUrl}
-              onChange={(event) => setFormUrl(event.target.value)}
-              placeholder="https://buyer.example/form"
-              disabled={isParsingDocument}
-            />
-            <button
-              className="primary-button"
-              onClick={async () => {
-                const id = await loadFormUrl();
-                if (id) openImport(id);
-              }}
-              disabled={!formUrl.trim() || isParsingDocument}
-            >
-              Load URL <ArrowUpRight size={15} />
-            </button>
-          </div>
-        </div>
-        <div className="home-feature">
-          <div className="home-feature-icon upload-icon">
-            {isParsingDocument ? <FileText size={22} className="spin" /> : <Upload size={22} />}
-          </div>
-          <h2>Upload questionnaire</h2>
-          <p>
-            Import an Excel (.xlsx, .xls), Word (.docx), PDF, or CSV questionnaire from your computer.
-          </p>
-          {isParsingDocument ? (
-            <div className="home-parsing-loader">
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <RefreshCw size={17} className="spin" style={{ color: "var(--blue)", flexShrink: 0 }} />
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--navy)" }}>
-                  {parsingProgress || "Extracting questions with Gemini 2.5 Flash..."}
-                </div>
-              </div>
-              <div className="home-parsing-progress-bar">
-                <div className="home-parsing-progress-inner" />
-              </div>
-              <small style={{ color: "var(--muted)", fontSize: "11px", marginTop: "4px", display: "block" }}>
-                Analyzing document hierarchy, compliance tables, and question types...
-              </small>
-            </div>
-          ) : (
-            <label className="home-upload-button">
-              <Upload size={16} /> Choose questionnaire file
-              <input
-                type="file"
-                accept=".xlsx,.xls,.docx,.pdf,.csv,.tsv"
-                onChange={async (event) => {
-                  const id = await loadFormFile(event);
-                  if (id) openImport(id);
-                }}
-              />
-            </label>
-          )}
-          {!isParsingDocument && (
-            <small>Questions and sections are extracted using enterprise multi-format AI parser.</small>
-          )}
-        </div>
+        <HomeUrlFeature
+          formUrl={formUrl}
+          setFormUrl={setFormUrl}
+          loadFormUrl={loadFormUrl}
+          openImport={openImport}
+          isParsingDocument={isParsingDocument}
+        />
+        <HomeUploadFeature
+          loadFormFile={loadFormFile}
+          openImport={openImport}
+          isParsingDocument={isParsingDocument}
+          parsingProgress={parsingProgress}
+        />
       </div>
     </section>
   );
 };
-

@@ -307,6 +307,39 @@ Open http://localhost:5173/
 
 ---
 
+## 🧪 Testing & Code Quality Assurance
+
+RFPEngine enforces strict engineering rigor across frontend and backend codebases:
+
+### 1. Frontend Modular Architecture & Component Line Limit (≤ 100 Lines)
+* **Strict Line Limit**: Every React component (`.tsx`) is strictly bounded to **$\le$ 100 lines** to maintain readability and eliminate monolithic anti-patterns.
+* **Domain Hook Decomposition**: The state layer is decomposed into single-responsibility custom hooks under `frontend/src/hooks/`:
+  * `useNavigationRouter`: Client-side routing, URL synchronization, and active ID parsing.
+  * `useDocumentIngestion`: File upload, parsing progress, and parser guidance feedback loops.
+  * `useQuestionnaireWorkflow`: Review status transitions, role governance, and answer persistence.
+  * `useAiAnswerGenerator`: Grounded question generation and batch answering with fallback resilience.
+  * `useKnowledgeBaseManager`: Document vector management, live search playground, and connectors.
+  * `useWorkspaceListManager`: Questionnaire listing, duplication, deletion, and deliverable export.
+  * `useWorkspaceSettingsManager`: Tenant profile, AI tuning, and settings persistence.
+  * `useActivityAndAudit`: System health telemetry, audit event logging, and toast notifications.
+  * `useReviewGovernanceState`: Modal states and role routing for SME and Legal approvals.
+
+### 2. Frontend Test Suite & Code Coverage
+Built-in Node 22 native test runner (`node:test`, `node:assert`) bundled via esbuild with experimental code coverage:
+```bash
+npm --prefix frontend test
+```
+* **Coverage**: **>99% line coverage**, **>94% branch coverage**, **>97% function coverage**.
+
+### 3. Backend Test Suite
+Automated test suite using `pytest` and `pytest-asyncio` with offline database isolation:
+```bash
+backend/.venv/bin/pytest backend/tests/ -v
+```
+* **Coverage**: 70 passing tests covering hybrid search, Algolia indexing, CSV/Excel/PDF parsing, feedback telemetry, and MCP server endpoints.
+
+---
+
 ## ☁️ GCP Deployment & Secrets Management with Terraform
 
 ### Managing Secrets

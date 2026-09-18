@@ -1,350 +1,88 @@
 import React from "react";
-import { Link, RefreshCw, Sparkles, ArrowUpRight, Download } from "lucide-react";
-import { ReviewerRole, SearchResponse, SourceMode } from "../../types";
 import { GovernanceBar } from "./GovernanceBar";
 import { CelebrationBanner } from "./CelebrationBanner";
-import { QuestionReviewList } from "./QuestionReviewList";
-import { ResponseEditorPanel } from "./ResponseEditorPanel";
-import { EvidenceSourcesPanel } from "./EvidenceSourcesPanel";
 import { WorkspaceBottomStrip } from "./WorkspaceBottomStrip";
+import { WorkspaceBreadcrumbHeader } from "./questionnaire/WorkspaceBreadcrumbHeader";
+import { WorkspaceSourceActionsBar } from "./questionnaire/WorkspaceSourceActionsBar";
+import { SingleQuestionInputPanel } from "./questionnaire/SingleQuestionInputPanel";
+import { BatchQuestionsHeaderBar } from "./questionnaire/BatchQuestionsHeaderBar";
+import { QuestionnaireContentGrid } from "./questionnaire/QuestionnaireContentGrid";
+import { QuestionnaireWorkspaceProps } from "./questionnaire/types";
 
-interface QuestionnaireWorkspaceProps {
-  onNavigateHome: () => void;
-  onNavigateResponses?: () => void;
-  onOpenImport: (id: string) => void;
-  responseId: string;
-  sourceMode: SourceMode;
-  sourceLabel: string;
-  openOriginalForm: () => void;
-  detectedQuestions: string[];
-  question: string;
-  setQuestion: (q: string) => void;
-  tenantId: string;
-  setTenantId: (id: string) => void;
-  generateAnswer: () => void;
-  generateAllAnswers: () => void;
-  isGenerating: boolean;
-  role: ReviewerRole;
-  setRole: (r: ReviewerRole) => void;
-  showToast: (msg: string) => void;
-  approvedCount: number;
-  inReviewCount: number;
-  changesRequestedCount: number;
-  isBatchApproved: boolean;
-  handleBatchApproveAll: () => void;
-  handleReviewReset: () => void;
-  isAllApproved: boolean;
-  exportAnswers: () => void;
-  onOpenExportModal?: () => void;
-  reviewStatusByQuestion: Record<string, string>;
-  reviewCommentsByQuestion: Record<string, string>;
-  answersByQuestion: Record<string, string>;
-  setAnswersByQuestion: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  saveAnswers: (answers: Record<string, string>) => void;
-  handleRequestChanges: (question: string) => void;
-  openSendForReviewModal: (scope: "all" | "current", question?: string) => void;
-  handleApproveQuestion: (question: string) => void;
-  handleIndividualReview: (question: string) => void;
-  promotedQuestions: Record<string, boolean>;
-  handlePromoteToKnowledgeBase: (question: string, index: number) => void;
-  notice: string;
-  answer: string;
-  setAnswer: (a: string) => void;
-  response: SearchResponse;
-  activeSource: string;
-  setActiveSource: (id: string) => void;
-}
+export { type QuestionnaireWorkspaceProps } from "./questionnaire/types";
 
-export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = ({
-  onNavigateHome,
-  onNavigateResponses,
-  onOpenImport,
-  responseId,
-  sourceMode,
-  sourceLabel,
-  openOriginalForm,
-  detectedQuestions,
-  question,
-  setQuestion,
-  tenantId,
-  setTenantId,
-  generateAnswer,
-  generateAllAnswers,
-  isGenerating,
-  role,
-  setRole,
-  showToast,
-  approvedCount,
-  inReviewCount,
-  changesRequestedCount,
-  isBatchApproved,
-  handleBatchApproveAll,
-  handleReviewReset,
-  isAllApproved,
-  exportAnswers,
-  onOpenExportModal,
-  reviewStatusByQuestion,
-  reviewCommentsByQuestion,
-  answersByQuestion,
-  setAnswersByQuestion,
-  saveAnswers,
-  handleRequestChanges,
-  openSendForReviewModal,
-  handleApproveQuestion,
-  handleIndividualReview,
-  promotedQuestions,
-  handlePromoteToKnowledgeBase,
-  notice,
-  answer,
-  setAnswer,
-  response,
-  activeSource,
-  setActiveSource,
-}) => {
-  const allCurrentQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
-  const isCsv = sourceLabel.toLowerCase().endsWith(".csv");
-  const isUpload = sourceMode === "upload";
-
-  const isQuestionFilled = (q: string) => Boolean(answersByQuestion[q]?.trim());
-  const answeredQuestionsCount =
-    detectedQuestions.length > 0
-      ? detectedQuestions.filter(isQuestionFilled).length
-      : (answer?.trim() ? 1 : 0);
-  const totalQuestionsCount = detectedQuestions.length > 0 ? detectedQuestions.length : 1;
-  const isAllFilled = answeredQuestionsCount === totalQuestionsCount && totalQuestionsCount > 0;
+export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = (props) => {
+  const allCurrentQuestions = props.detectedQuestions.length > 0 ? props.detectedQuestions : [props.question];
+  const isQuestionFilled = (q: string) => Boolean(props.answersByQuestion[q]?.trim());
+  const answeredCount = props.detectedQuestions.length > 0
+    ? props.detectedQuestions.filter(isQuestionFilled).length
+    : (props.answer?.trim() ? 1 : 0);
+  const totalCount = props.detectedQuestions.length > 0 ? props.detectedQuestions.length : 1;
+  const isAllFilled = answeredCount === totalCount && totalCount > 0;
 
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <p className="breadcrumb">
-            <span style={{ cursor: "pointer" }} onClick={onNavigateResponses || onNavigateHome}>
-              Responses
-            </span>{" "}
-            <span>/</span>{" "}
-            <span
-              style={{ cursor: "pointer" }}
-              onClick={() => onOpenImport(responseId || "demo")}
-            >
-              Review questionnaire
-            </span>
-          </p>
-          <h1>Response workspace</h1>
-          <p className="subtitle">
-            Draft accurate answers from your approved knowledge base.
-          </p>
-        </div>
-      </div>
-
-      <div className="source-actions">
-        <span className="source-badge">
-          {sourceMode === "url"
-            ? "Hosted form"
-            : sourceMode === "upload"
-              ? "Uploaded form"
-              : "Live page"}{" "}
-          · {sourceLabel}
-        </span>
-        <div style={{ display: "flex", gap: "8px" }}>
-          {onOpenExportModal && (
-            <button
-              className={`outline-button ${!isAllFilled ? "button-disabled" : ""}`}
-              onClick={isAllFilled ? onOpenExportModal : undefined}
-              disabled={!isAllFilled}
-              title={
-                isAllFilled
-                  ? "Export compliance matrix to Excel, Word, or PDF"
-                  : `Complete all ${totalQuestionsCount} responses to export deliverable (${answeredQuestionsCount}/${totalQuestionsCount} filled)`
-              }
-              style={!isAllFilled ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-            >
-              <Download size={15} /> Export Deliverable
-              {!isAllFilled && (
-                <span style={{ fontSize: "11px", marginLeft: "4px", opacity: 0.85 }}>
-                  ({answeredQuestionsCount}/{totalQuestionsCount})
-                </span>
-              )}
-            </button>
-          )}
-          {!isCsv && !isUpload && (
-            <button
-              className="outline-button"
-              onClick={openOriginalForm}
-              title="Launch buyer form with pre-approved answers"
-            >
-              <Link size={15} /> Open original form
-            </button>
-          )}
-        </div>
-      </div>
-
-      {detectedQuestions.length === 0 && (
-        <section className="question-panel panel">
-          <div className="panel-label">
-            <span className="step-number">01</span>
-            <div>
-              <p className="eyebrow">Question to answer</p>
-              <span className="label-hint">
-                Ask a question or paste one from your RFP
-              </span>
-            </div>
-          </div>
-          <textarea
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            rows={3}
-          />
-          <div className="question-footer">
-            <div className="question-meta">
-              <span className="status-dot" /> Knowledge base connected{" "}
-              <span className="divider" /> Tenant:{" "}
-              <select
-                value={tenantId}
-                onChange={(event) => setTenantId(event.target.value)}
-              >
-                <option value="acme-corp">acme-corp</option>
-                <option value="demo-tenant">demo-tenant</option>
-              </select>
-            </div>
-            <button
-              className="primary-button"
-              onClick={generateAnswer}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <RefreshCw className="spin" size={16} />
-              ) : (
-                <Sparkles size={16} />
-              )}
-              {isGenerating ? "Drafting..." : "Draft with Proposal Drafter"}{" "}
-              <ArrowUpRight size={15} />
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* Governance & Reviewer Role Bar */}
-      <GovernanceBar
-        role={role}
-        setRole={setRole}
-        showToast={showToast}
-        approvedCount={approvedCount}
-        allQuestionsCount={allCurrentQuestions.length}
-        inReviewCount={inReviewCount}
-        changesRequestedCount={changesRequestedCount}
-        isBatchApproved={isBatchApproved}
-        handleBatchApproveAll={handleBatchApproveAll}
-        handleReviewReset={handleReviewReset}
+      <WorkspaceBreadcrumbHeader
+        onNavigateHome={props.onNavigateHome}
+        onNavigateResponses={props.onNavigateResponses}
+        onOpenImport={props.onOpenImport}
+        responseId={props.responseId}
       />
-
-      {/* All-Approved Governance Celebration Banner */}
-      <CelebrationBanner
-        isAllApproved={isAllApproved}
-        allQuestionsCount={allCurrentQuestions.length}
-        isCsv={isCsv}
-        exportAnswers={exportAnswers}
-        openOriginalForm={openOriginalForm}
-        onOpenExportModal={onOpenExportModal}
-        sourceMode={sourceMode}
+      <WorkspaceSourceActionsBar
+        sourceMode={props.sourceMode}
+        sourceLabel={props.sourceLabel}
+        openOriginalForm={props.openOriginalForm}
+        onOpenExportModal={props.onOpenExportModal}
+        isAllFilled={isAllFilled}
+        answeredQuestionsCount={answeredCount}
+        totalQuestionsCount={totalCount}
       />
-
-      {detectedQuestions.length > 0 && (
-        <div
-          className="question-header-bar panel"
-          style={{
-            padding: "14px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px",
-          }}
-        >
-          <div>
-            <span className="eyebrow">Questionnaire Response Workspace</span>
-            <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--ink)" }}>
-              {detectedQuestions.length} Questions in Questionnaire
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <div className="question-meta">
-              <span className="status-dot" /> Tenant:{" "}
-              <select
-                value={tenantId}
-                onChange={(event) => setTenantId(event.target.value)}
-              >
-                <option value="acme-corp">acme-corp</option>
-                <option value="demo-tenant">demo-tenant</option>
-              </select>
-            </div>
-            <button
-              className="primary-button"
-              onClick={generateAllAnswers}
-              disabled={isGenerating || isBatchApproved}
-            >
-              {isGenerating ? (
-                <RefreshCw className="spin" size={16} />
-              ) : (
-                <Sparkles size={16} />
-              )}
-              {isGenerating ? "Generating All..." : "⚡ Generate All Answers"}{" "}
-              <ArrowUpRight size={15} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="workspace-grid">
-        <section
-          className={`answer-column ${detectedQuestions.length ? "has-question-list" : ""}`}
-        >
-          {detectedQuestions.length > 0 && (
-            <QuestionReviewList
-              detectedQuestions={detectedQuestions}
-              reviewStatusByQuestion={reviewStatusByQuestion}
-              reviewCommentsByQuestion={reviewCommentsByQuestion}
-              answersByQuestion={answersByQuestion}
-              setAnswersByQuestion={setAnswersByQuestion}
-              saveAnswers={saveAnswers}
-              handleRequestChanges={handleRequestChanges}
-              openSendForReviewModal={openSendForReviewModal}
-              handleApproveQuestion={handleApproveQuestion}
-              isBatchApproved={isBatchApproved}
-              role={role}
-              handleIndividualReview={handleIndividualReview}
-              promotedQuestions={promotedQuestions}
-              handlePromoteToKnowledgeBase={handlePromoteToKnowledgeBase}
-            />
-          )}
-
-          <ResponseEditorPanel
-            notice={notice}
-            answer={answer}
-            setAnswer={setAnswer}
-            generateAnswer={generateAnswer}
-            handleRequestChanges={handleRequestChanges}
-            handleApproveQuestion={handleApproveQuestion}
-            question={question}
-            reviewStatusByQuestion={reviewStatusByQuestion}
-            promotedQuestions={promotedQuestions}
-            handlePromoteToKnowledgeBase={handlePromoteToKnowledgeBase}
-            sourcesCount={response.sources.length}
-            exemplarsUsed={response.exemplars_used}
-            toneApplied={response.tone_applied}
-          />
-        </section>
-
-        <EvidenceSourcesPanel
-          sources={response.sources}
-          activeSource={activeSource}
-          setActiveSource={setActiveSource}
+      {props.detectedQuestions.length === 0 && (
+        <SingleQuestionInputPanel
+          question={props.question}
+          setQuestion={props.setQuestion}
+          tenantId={props.tenantId}
+          setTenantId={props.setTenantId}
+          generateAnswer={props.generateAnswer}
+          isGenerating={props.isGenerating}
         />
-      </div>
-
+      )}
+      <GovernanceBar
+        role={props.role}
+        setRole={props.setRole}
+        showToast={props.showToast}
+        approvedCount={props.approvedCount}
+        allQuestionsCount={allCurrentQuestions.length}
+        inReviewCount={props.inReviewCount}
+        changesRequestedCount={props.changesRequestedCount}
+        isBatchApproved={props.isBatchApproved}
+        handleBatchApproveAll={props.handleBatchApproveAll}
+        handleReviewReset={props.handleReviewReset}
+      />
+      <CelebrationBanner
+        isAllApproved={props.isAllApproved}
+        allQuestionsCount={allCurrentQuestions.length}
+        isCsv={props.sourceLabel.toLowerCase().endsWith(".csv")}
+        exportAnswers={props.exportAnswers}
+        openOriginalForm={props.openOriginalForm}
+        onOpenExportModal={props.onOpenExportModal}
+        sourceMode={props.sourceMode}
+      />
+      {props.detectedQuestions.length > 0 && (
+        <BatchQuestionsHeaderBar
+          questionsCount={props.detectedQuestions.length}
+          tenantId={props.tenantId}
+          setTenantId={props.setTenantId}
+          generateAllAnswers={props.generateAllAnswers}
+          isGenerating={props.isGenerating}
+          isBatchApproved={props.isBatchApproved}
+        />
+      )}
+      <QuestionnaireContentGrid {...props} />
       <WorkspaceBottomStrip
-        confidenceScore={response.confidence_score}
-        onSendForReview={() => openSendForReviewModal("all")}
+        confidenceScore={props.response.confidence_score}
+        onSendForReview={() => props.openSendForReviewModal("all")}
       />
     </>
   );
 };
-
