@@ -4,11 +4,17 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
 from app.services.compliance_exporter_service import ComplianceExporterService
+from app.services.parser_feedback_service import (
+    ParserFeedbackPayload,
+    ParserFeedbackRecord,
+    parser_feedback_service,
+)
 from app.services.questionnaire_parser_service import (
     QuestionnaireParserService,
     QuestionnaireParseResult,
@@ -399,14 +405,25 @@ async def update_workspace_settings(
     return WorkspaceSettingsSchema.model_validate(updated)
 
 
+class RephraseQuestionRequest(BaseModel):
+    question_text: str
+    style: str = "clear_compliance"
+
+
+class RephraseQuestionResponse(BaseModel):
+    original_text: str
+    rephrased_text: str
+
+
 @router.post("/parse-file", response_model=QuestionnaireParseResult)
 async def parse_questionnaire_file(
     file: UploadFile = File(...),
+    guidance: Optional[str] = Form(default=None),
     x_tenant_id: Optional[str] = Header(default="acme-corp", alias="X-Tenant-ID"),
 ) -> QuestionnaireParseResult:
     """
     Parses an enterprise questionnaire file (Excel .xlsx/.xls/.csv, Word .docx, or PDF .pdf)
-    and extracts structured questions, sections, and answer expectations.
+    and extracts structured questions, sections, and answer expectations with optional AI guidance.
     """
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
@@ -417,12 +434,15 @@ async def parse_questionnaire_file(
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-        result = await asyncio.to_thread(QuestionnaireParserService.parse_questionnaire, content, filename)
+        result = await asyncio.to_thread(
+            QuestionnaireParserService.parse_questionnaire, content, filename, guidance=guidance
+        )
         logger.info(
-            "Parsed %d questions from %s (format: %s) for tenant %s",
+            "Parsed %d questions from %s (format: %s, guided: %s) for tenant %s",
             result.total_questions,
             filename,
             result.format,
+            bool(guidance),
             x_tenant_id,
         )
         return result
@@ -432,6 +452,39 @@ async def parse_questionnaire_file(
     except Exception as exc:
         logger.error("Error parsing questionnaire file %s: %s", filename, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(exc)}")
+
+
+@router.post("/rephrase-question", response_model=RephraseQuestionResponse)
+async def rephrase_question_endpoint(
+    payload: RephraseQuestionRequest,
+    x_tenant_id: Optional[str] = Header(default="acme-corp", alias="X-Tenant-ID"),
+) -> RephraseQuestionResponse:
+    """
+    Uses Gemini 2.5 Flash to rephrase/clean an extracted question into standardized enterprise compliance syntax.
+    """
+    if not payload.question_text.strip():
+        raise HTTPException(status_code=400, detail="Question text cannot be empty")
+
+    rephrased = await asyncio.to_thread(
+        QuestionnaireParserService.rephrase_question,
+        payload.question_text,
+        payload.style,
+    )
+    return RephraseQuestionResponse(
+        original_text=payload.question_text,
+        rephrased_text=rephrased,
+    )
+
+
+@router.post("/parser-feedback", response_model=ParserFeedbackRecord)
+async def submit_parser_feedback(
+    payload: ParserFeedbackPayload,
+    x_tenant_id: str = Header(default="acme-corp", alias="X-Tenant-ID"),
+) -> ParserFeedbackRecord:
+    """
+    Records review-time user corrections, deletions (false positives), and quality ratings on AI extractions.
+    """
+    return parser_feedback_service.record_feedback(x_tenant_id, payload)
 
 
 @router.post("/export")

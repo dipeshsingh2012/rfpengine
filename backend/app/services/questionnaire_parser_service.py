@@ -93,7 +93,12 @@ class QuestionnaireParserService:
     )
 
     @classmethod
-    def parse_questionnaire(cls, content: bytes, filename: str) -> QuestionnaireParseResult:
+    def parse_questionnaire(
+        cls,
+        content: bytes,
+        filename: str,
+        guidance: Optional[str] = None,
+    ) -> QuestionnaireParseResult:
         lower_name = filename.lower()
 
         if lower_name.endswith((".xlsx", ".xls")):
@@ -103,7 +108,7 @@ class QuestionnaireParserService:
         elif lower_name.endswith(".docx"):
             return cls._parse_docx(content, filename)
         elif lower_name.endswith(".pdf"):
-            return cls._parse_pdf(content, filename)
+            return cls._parse_pdf(content, filename, guidance=guidance)
         else:
             raise ValueError(
                 f"Unsupported questionnaire format for '{filename}'. "
@@ -479,7 +484,12 @@ class QuestionnaireParserService:
             return None
 
     @classmethod
-    def _parse_pdf_with_gemini(cls, raw_text: str, filename: str) -> Optional[QuestionnaireParseResult]:
+    def _parse_pdf_with_gemini(
+        cls,
+        raw_text: str,
+        filename: str,
+        guidance: Optional[str] = None,
+    ) -> Optional[QuestionnaireParseResult]:
         """
         Uses Gemini 2.5 Flash with structured JSON output to extract all questions,
         sections, and answer types with deep semantic understanding.
@@ -492,11 +502,15 @@ class QuestionnaireParserService:
             from google.genai import types
             from app.core.config import settings
 
+            guidance_instruction = ""
+            if guidance and guidance.strip():
+                guidance_instruction = f"\n\nSpecial User Extraction Guidance & Priorities:\n{guidance.strip()}\nEnsure the extraction strictly adheres to this focus.\n"
+
             prompt = (
                 "You are an expert Enterprise RFP & Compliance Questionnaire Parser.\n"
                 "Extract every question, technical requirement, inquiry, specification, and compliance item from the following document text.\n"
                 "Extract both interrogative questions (ending in '?') and imperative requirements (e.g. 'Describe your disaster recovery process', 'Provide proof of SOC 2 certification', 'Vendor must encrypt data at rest', 'Explain your access revocation timeline').\n"
-                "Also identify the section or topic heading each requirement belongs to.\n\n"
+                f"Also identify the section or topic heading each requirement belongs to.{guidance_instruction}\n\n"
                 "Return a valid JSON array of objects with the exact structure:\n"
                 "[\n"
                 "  {\n"
@@ -723,7 +737,12 @@ class QuestionnaireParserService:
         )
 
     @classmethod
-    def _parse_pdf(cls, content: bytes, filename: str) -> QuestionnaireParseResult:
+    def _parse_pdf(
+        cls,
+        content: bytes,
+        filename: str,
+        guidance: Optional[str] = None,
+    ) -> QuestionnaireParseResult:
         from pypdf import PdfReader
 
         reader = PdfReader(io.BytesIO(content))
@@ -731,12 +750,51 @@ class QuestionnaireParserService:
         combined_text = "\n\n".join(page_texts).strip()
 
         # 1. Attempt Gemini 2.5 Flash semantic structured extraction
-        gemini_result = cls._parse_pdf_with_gemini(combined_text, filename)
+        gemini_result = cls._parse_pdf_with_gemini(combined_text, filename, guidance=guidance)
         if gemini_result and gemini_result.total_questions > 0:
             return gemini_result
 
         # 2. Resilient multi-pass heuristic engine fallback
         return cls._parse_pdf_heuristics(page_texts, filename)
+
+    @classmethod
+    def rephrase_question(cls, question_text: str, style: str = "clear_compliance") -> str:
+        """
+        Uses Gemini 2.5 Flash to rephrase/clean a questionnaire requirement prompt.
+        Eliminates OCR artifacts, ambiguous syntax, and fragmented linebreaks.
+        """
+        raw = question_text.strip()
+        if not raw:
+            return ""
+
+        client = cls._get_genai_client()
+        if client:
+            try:
+                from app.core.config import settings
+
+                prompt = (
+                    "You are an expert Enterprise RFP & Compliance proposal editor.\n"
+                    f"Rephrase and clean the following questionnaire prompt into a clear, professional enterprise requirement in a {style} style.\n"
+                    "Fix OCR glitches, broken linebreaks, or fragmented phrasing. Ensure it is crisp, polite, and unambiguous.\n"
+                    "Return ONLY the rephrased question text, with no preamble, quotes, or markdown.\n\n"
+                    f"Original Question:\n{raw}"
+                )
+                response = client.models.generate_content(
+                    model=settings.gemini_model,
+                    contents=prompt,
+                )
+                if response and response.text:
+                    cleaned = response.text.strip().strip('"\'')
+                    if len(cleaned) >= 5:
+                        return cleaned
+            except Exception as exc:
+                logger.warning("Gemini rephrase_question failed (%s); using local cleanup", exc)
+
+        # Fallback local cleanup
+        cleaned = re.sub(r"\s+", " ", raw).strip()
+        if cleaned and not cleaned.endswith((".", "?", "!")):
+            cleaned += "?" if re.search(cls.INTERROGATIVE_STARTERS_RE, cleaned) else "."
+        return cleaned
 
     @classmethod
     def _infer_answer_type(cls, question_text: str) -> tuple[str, List[str]]:

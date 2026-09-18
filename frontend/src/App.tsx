@@ -15,6 +15,7 @@ import {
   DEFAULT_ACTIVITY_LOGS,
   starterQuestions,
   demoResponse,
+  ExtractedQuestionItem,
 } from "./types";
 import {
   getApiBaseUrl,
@@ -57,6 +58,8 @@ export function App() {
   const [formUrl, setFormUrl] = useState("");
   const [sourceStatus, setSourceStatus] = useState("No external form loaded");
   const [detectedQuestions, setDetectedQuestions] = useState<string[]>([]);
+  const [parsedQuestions, setParsedQuestions] = useState<ExtractedQuestionItem[]>([]);
+  const [uploadedFormFile, setUploadedFormFile] = useState<File | null>(null);
   const [sourceMode, setSourceMode] = useState<SourceMode>("upload");
   const [sourceLabel, setSourceLabel] = useState("Demo questionnaire");
   const [route, setRoute] = useState(window.location.pathname || "/");
@@ -663,6 +666,8 @@ export function App() {
       return undefined;
     }
 
+    setUploadedFormFile(file);
+
     try {
       setSourceStatus(`Extracting questions from ${file.name} with AI parser...`);
       setNotice("Parsing document...");
@@ -688,13 +693,26 @@ export function App() {
             id: string;
             question_text: string;
             section?: string;
+            expected_type?: string;
             answer_type?: string;
+            options?: string[];
           }>;
         } = await res.json();
 
-        const extractedQuestions = (parseResult.questions || []).map(
-          (q) => q.question_text,
+        const rawItems: ExtractedQuestionItem[] = (parseResult.questions || []).map(
+          (q, idx) => ({
+            id: q.id || `Q-${idx + 1}`,
+            question_text: q.question_text,
+            original_text: q.question_text,
+            section: q.section || "General",
+            expected_type: q.expected_type || q.answer_type || "narrative",
+            options: q.options || [],
+            selected: true,
+          })
         );
+        setParsedQuestions(rawItems);
+
+        const extractedQuestions = rawItems.map((q) => q.question_text);
 
         if (isCsv) {
           try {
@@ -743,6 +761,129 @@ export function App() {
       setNotice("Questionnaire parsing failed");
       return undefined;
     }
+  }
+
+  async function handleRephraseQuestion(questionText: string): Promise<string> {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/rephrase-question`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify({
+          question_text: questionText,
+          style: "clear_compliance",
+        }),
+      });
+      if (!res.ok) throw new Error("Rephrase failed");
+      const data = await res.json();
+      return data.rephrased_text || questionText;
+    } catch (err) {
+      console.error("Error rephrasing question:", err);
+      return questionText;
+    }
+  }
+
+  async function handleReparseWithGuidance(guidance: string): Promise<void> {
+    if (!uploadedFormFile) return;
+    try {
+      setSourceStatus(`Re-parsing ${uploadedFormFile.name} with Gemini 2.5 Flash guidance...`);
+      const formData = new FormData();
+      formData.append("file", uploadedFormFile);
+      if (guidance && guidance.trim()) {
+        formData.append("guidance", guidance.trim());
+      }
+
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/parse-file`, {
+        method: "POST",
+        headers: {
+          "X-Tenant-ID": tenantId,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Document re-parsing failed");
+      const parseResult = await res.json();
+      const rawItems: ExtractedQuestionItem[] = (parseResult.questions || []).map(
+        (q: any, idx: number) => ({
+          id: q.id || `Q-${idx + 1}`,
+          question_text: q.question_text,
+          original_text: q.question_text,
+          section: q.section || "General",
+          expected_type: q.expected_type || q.answer_type || "narrative",
+          options: q.options || [],
+          selected: true,
+        })
+      );
+
+      setParsedQuestions(rawItems);
+      const extractedTexts = rawItems.map((q) => q.question_text);
+      setDetectedQuestions(extractedTexts);
+      setSourceStatus(
+        `${uploadedFormFile.name} · Re-parsed ${rawItems.length} questions across ${parseResult.sections?.length || 1} sections`
+      );
+    } catch (err) {
+      console.error("Re-parse error:", err);
+      throw err;
+    }
+  }
+
+  async function handleSubmitParserFeedback(payload: any): Promise<void> {
+    try {
+      await fetch(`${apiBaseUrl}/api/v1/responses/parser-feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify({
+          filename: uploadedFormFile?.name || "questionnaire.pdf",
+          format: uploadedFormFile?.name.split(".").pop() || "pdf",
+          ...payload,
+          total_ai_detected: parsedQuestions.length,
+          total_curated: parsedQuestions.filter((q) => q.selected).length,
+        }),
+      });
+    } catch (err) {
+      console.warn("Could not submit parser feedback:", err);
+    }
+  }
+
+  function handleConfirmImport(curatedQuestions: ExtractedQuestionItem[]) {
+    const selectedTexts = curatedQuestions.filter((q) => q.selected).map((q) => q.question_text);
+    if (selectedTexts.length === 0) return;
+
+    setDetectedQuestions(selectedTexts);
+    setQuestion(selectedTexts[0]);
+
+    if (responseId && responseId !== "demo") {
+      try {
+        fetch(`${apiBaseUrl}/api/v1/responses/workspaces`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Tenant-ID": tenantId,
+          },
+          body: JSON.stringify({
+            id: responseId,
+            tenant_id: tenantId,
+            title: sourceLabel || "Uploaded Questionnaire",
+            source_mode: sourceMode,
+            source_url: formUrl,
+            questions: selectedTexts.map((qText, idx) => ({
+              question_index: idx,
+              question_text: qText,
+              review_status: "Draft",
+            })),
+          }),
+        }).then(() => fetchWorkspaceSummaries());
+      } catch (e) {
+        console.warn("Could not update workspace with curated questions:", e);
+      }
+    }
+
+    openWorkspace();
   }
 
   function openImport(id?: string) {
@@ -1245,7 +1386,18 @@ export function App() {
         loadFormFile={loadFormFile}
         sourceStatus={sourceStatus}
         detectedQuestions={detectedQuestions}
+        parsedQuestions={parsedQuestions}
+        uploadedFile={uploadedFormFile}
+        uploadedFileContent={uploadedFileContent}
+        onUpdateQuestions={(qs) => {
+          setParsedQuestions(qs);
+          setDetectedQuestions(qs.filter((q) => q.selected).map((q) => q.question_text));
+        }}
+        onRephraseQuestion={handleRephraseQuestion}
+        onReparseWithGuidance={handleReparseWithGuidance}
+        onSubmitFeedback={handleSubmitParserFeedback}
         openWorkspace={openWorkspace}
+        onConfirmImport={handleConfirmImport}
       />
     );
   }

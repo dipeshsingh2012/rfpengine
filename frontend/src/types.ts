@@ -14,6 +14,19 @@ export interface ExemplarItem {
   source_file?: string;
 }
 
+export interface ExtractedQuestionItem {
+  id: string;
+  question_text: string;
+  original_text?: string;
+  section?: string;
+  expected_type?: "narrative" | "choice" | "numeric" | "boolean" | string;
+  options?: string[];
+  selected?: boolean;
+  is_user_added?: boolean;
+  is_edited?: boolean;
+  is_rephrased?: boolean;
+}
+
 export type SearchResponse = {
   suggested_answer: string;
   confidence_score: number;
