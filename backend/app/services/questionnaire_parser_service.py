@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
+import os
+from pathlib import Path
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,41 @@ class QuestionnaireParserService:
     ID_HEADER_KEYWORDS = [
         "id", "item", "item #", "item no", "item id", "q#", "ref", "reference", "req #", "control id", "#", "no"
     ]
+
+    IMPERATIVE_VERBS_RE = re.compile(
+        r"^(?:please\s+)?(describe|provide|explain|detail|outline|list|confirm|specify|"
+        r"demonstrate|clarify|state|identify|indicate|discuss|summarize|ensure|verify|"
+        r"define|document|note|submit|attach|certify|validate)\b",
+        re.IGNORECASE,
+    )
+
+    OBLIGATION_RE = re.compile(
+        r"\b(vendor|contractor|bidder|supplier|provider|organization|system|platform|solution|application)\s+"
+        r"(?:must|shall|should|will|is required to|needs to|agrees to)\b|"
+        r"\b(?:must|shall|should)\s+(?:be supported|be provided|be implemented|comply|adhere|maintain|enforce)\b",
+        re.IGNORECASE,
+    )
+
+    INTERROGATIVE_STARTERS_RE = re.compile(
+        r"^(how|what|where|when|why|who|which|can|could|do|does|is|are|will|would|have|has|should)\b",
+        re.IGNORECASE,
+    )
+
+    PREFIX_PATTERNS = [
+        re.compile(r"^([A-Z]{2,10}[-_ ]\d+(?:\.\d+)*)[:\.\s\-]+(.*)$", re.IGNORECASE),
+        re.compile(r"^(Q(?:uestion)?\s*#?\d+(?:\.\d+)*)[:\.\s\-]+(.*)$", re.IGNORECASE),
+        re.compile(r"^(Req(?:uirement)?\s*#?\d+(?:\.\d+)*)[:\.\s\-]+(.*)$", re.IGNORECASE),
+        re.compile(r"^(\d+(?:\.\d+)+)[:\.\s\-]+(.*)$"),
+        re.compile(r"^(\d+[\.\)])\s+(.*)$"),
+        re.compile(r"^(\([a-zA-Z0-9]+\)|\[\d+\])\s+(.*)$"),
+    ]
+
+    BULLET_RE = re.compile(r"^[\u2022\u25cf\u25aa\u25ab\x7f\*\-\–\—]\s*|^o\s+")
+
+    PAGE_HEADER_FOOTER_RE = re.compile(
+        r"^(page\s+\d+|table of contents|confidential|copyright|all rights reserved|rfp\s+version)",
+        re.IGNORECASE,
+    )
 
     @classmethod
     def parse_questionnaire(cls, content: bytes, filename: str) -> QuestionnaireParseResult:
@@ -250,6 +288,55 @@ class QuestionnaireParserService:
         )
 
     @classmethod
+    def is_question_or_requirement(cls, text: str) -> Tuple[bool, Optional[str], str]:
+        """
+        Evaluates whether a line or block represents an RFP question or requirement.
+        Detects:
+        - Interrogatives (ending in '?' or starting with question words)
+        - Imperative directives ('Describe...', 'Provide...', 'Explain...', 'Confirm...')
+        - Obligation clauses ('Vendor must...', 'Contractor shall...')
+        - Numbered / prefixed items (SEC-01, 1.1, Q-1)
+        Returns (is_question, detected_id, clean_prompt_text).
+        """
+        raw = text.strip()
+        if len(raw) < 5:
+            return False, None, raw
+
+        # Strip bullet points
+        s = cls.BULLET_RE.sub("", raw).strip()
+
+        # Check for header/footer noise
+        if cls.PAGE_HEADER_FOOTER_RE.search(s):
+            return False, None, s
+
+        # Check for ID prefixes
+        detected_id: Optional[str] = None
+        for pat in cls.PREFIX_PATTERNS:
+            m = pat.match(s)
+            if m:
+                detected_id = m.group(1).strip(".:- ")
+                s = m.group(2).strip()
+                break
+
+        # Check if s is purely a section heading like "Section 1: Data Encryption"
+        if re.search(r"^(?:section|module|category|pillar|part|chapter)\s+[\dA-Z]+[:\.\s\-]+", s, re.IGNORECASE):
+            return False, None, s
+
+        is_match = False
+        if s.endswith("?"):
+            is_match = True
+        elif cls.IMPERATIVE_VERBS_RE.search(s):
+            is_match = True
+        elif cls.OBLIGATION_RE.search(s):
+            is_match = True
+        elif cls.INTERROGATIVE_STARTERS_RE.search(s) and len(s) >= 12:
+            is_match = True
+        elif detected_id and len(s) >= 15:
+            is_match = True
+
+        return is_match, detected_id, s if is_match else raw
+
+    @classmethod
     def _parse_docx(cls, content: bytes, filename: str) -> QuestionnaireParseResult:
         import docx
 
@@ -323,26 +410,16 @@ class QuestionnaireParserService:
                     sections_set.add(current_section)
                     continue
 
-                # Numbered or Question pattern detection
-                # Matches: 1.1, 1.1.1, Q1:, Question 1:, Requirement 1:, or ends with ?
-                is_question = False
-                match_num = re.match(r"^(\d+[\.\d]*|[A-Z]\d+[\.\d]*|Q\d+[:\.]|Req\w*[:\.\s])\s+(.+)$", text, re.IGNORECASE)
-                if match_num:
-                    qid = match_num.group(1).strip(".: ")
-                    q_text = match_num.group(2).strip()
-                    is_question = True
-                elif text.endswith("?") and len(text) > 15:
-                    qid = f"P-{p_idx + 1}"
-                    q_text = text
-                    is_question = True
+                # Numbered, Question, Imperative, or Obligation pattern detection
+                is_question, qid, prompt = cls.is_question_or_requirement(text)
 
-                if is_question and len(q_text) >= 5:
+                if is_question and len(prompt) >= 5:
                     sections_set.add(current_section)
-                    expected_type, options = cls._infer_answer_type(q_text)
+                    expected_type, options = cls._infer_answer_type(prompt)
                     questions.append(
                         ExtractedQuestion(
-                            id=qid,
-                            question_text=q_text,
+                            id=qid or f"P-{p_idx + 1}",
+                            question_text=prompt,
                             section=current_section,
                             row_index=p_idx + 1,
                             expected_type=expected_type,
@@ -359,80 +436,283 @@ class QuestionnaireParserService:
         )
 
     @classmethod
-    def _parse_pdf(cls, content: bytes, filename: str) -> QuestionnaireParseResult:
-        from pypdf import PdfReader
+    def _get_genai_client(cls) -> Optional[Any]:
+        """
+        Initializes Google Cloud Vertex AI / Gemini API client if credentials are configured.
+        """
+        try:
+            from google import genai
+            from google.oauth2 import service_account
+            from app.core.config import settings
 
-        reader = PdfReader(io.BytesIO(content))
-        questions: List[ExtractedQuestion] = []
-        sections_set = set()
-        current_section = "General"
+            if not settings.gcp_project_id or settings.gcp_project_id == "test-project-id":
+                if os.environ.get("GEMINI_API_KEY"):
+                    try:
+                        return genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+                    except Exception:
+                        pass
+                return None
 
-        full_text_blocks: List[str] = []
-        for page in reader.pages:
-            page_text = page.extract_text() or ""
-            # Split into individual lines and paragraphs
-            raw_lines = page_text.splitlines()
-            current_block = ""
-            for line in raw_lines:
-                s_line = line.strip()
-                if not s_line:
-                    if current_block:
-                        full_text_blocks.append(current_block)
-                        current_block = ""
+            creds_path = settings.google_application_credentials
+            credentials = None
+            if creds_path:
+                path_obj = Path(creds_path)
+                if not path_obj.is_absolute():
+                    if not path_obj.exists() and (Path.cwd() / creds_path).exists():
+                        path_obj = Path.cwd() / creds_path
+                    elif not path_obj.exists() and (Path.cwd().parent / creds_path).exists():
+                        path_obj = Path.cwd().parent / creds_path
+                if path_obj.exists():
+                    credentials = service_account.Credentials.from_service_account_file(
+                        str(path_obj.resolve()),
+                        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                    )
+
+            return genai.Client(
+                vertexai=True,
+                project=settings.gcp_project_id,
+                location=settings.GCP_REGION,
+                credentials=credentials,
+            )
+        except Exception as exc:
+            logger.debug("Could not initialize genai client for questionnaire parser: %s", exc)
+            return None
+
+    @classmethod
+    def _parse_pdf_with_gemini(cls, raw_text: str, filename: str) -> Optional[QuestionnaireParseResult]:
+        """
+        Uses Gemini 2.5 Flash with structured JSON output to extract all questions,
+        sections, and answer types with deep semantic understanding.
+        """
+        client = cls._get_genai_client()
+        if not client:
+            return None
+
+        try:
+            from google.genai import types
+            from app.core.config import settings
+
+            prompt = (
+                "You are an expert Enterprise RFP & Compliance Questionnaire Parser.\n"
+                "Extract every question, technical requirement, inquiry, specification, and compliance item from the following document text.\n"
+                "Extract both interrogative questions (ending in '?') and imperative requirements (e.g. 'Describe your disaster recovery process', 'Provide proof of SOC 2 certification', 'Vendor must encrypt data at rest', 'Explain your access revocation timeline').\n"
+                "Also identify the section or topic heading each requirement belongs to.\n\n"
+                "Return a valid JSON array of objects with the exact structure:\n"
+                "[\n"
+                "  {\n"
+                '    "id": "SEC-01",\n'
+                '    "question_text": "Describe your data encryption methods for data at rest and in transit.",\n'
+                '    "section": "Data Protection",\n'
+                '    "expected_type": "narrative",\n'
+                '    "options": []\n'
+                "  }\n"
+                "]\n\n"
+                f"Document Text:\n{raw_text[:35000]}"
+            )
+
+            response = client.models.generate_content(
+                model=settings.gemini_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1,
+                ),
+            )
+
+            if not response or not response.text:
+                return None
+
+            data = json.loads(response.text)
+            if isinstance(data, dict) and "questions" in data:
+                data = data["questions"]
+            if not isinstance(data, list) or len(data) == 0:
+                return None
+
+            questions: List[ExtractedQuestion] = []
+            sections_set = set()
+
+            for idx, item in enumerate(data, start=1):
+                if not isinstance(item, dict):
                     continue
-                # If this line starts a new numbered item (e.g. "1.1", "Q1:"), flush previous block
-                if re.match(r"^(\d+[\.\d]*|[A-Z]\d+[\.\d]*|Q\d+[:\.]|Req\w*[:\.\s])\s+", s_line, re.IGNORECASE):
-                    if current_block:
-                        full_text_blocks.append(current_block)
-                    current_block = s_line
-                else:
-                    if current_block:
-                        current_block += " " + s_line
-                    else:
-                        current_block = s_line
-            if current_block:
-                full_text_blocks.append(current_block)
+                q_text = str(item.get("question_text") or item.get("question") or "").strip()
+                if not q_text or len(q_text) < 4:
+                    continue
+                qid = str(item.get("id") or f"PDF-Q{idx}").strip()
+                sec = str(item.get("section") or "General").strip()
+                exp_type = str(item.get("expected_type") or "narrative").strip().lower()
+                if exp_type not in ("narrative", "choice", "numeric", "boolean"):
+                    exp_type = "narrative"
+                options = [str(o) for o in item.get("options", []) if str(o).strip()]
 
-        for b_idx, block in enumerate(full_text_blocks):
-            # Clean up linebreaks inside block
-            cleaned = re.sub(r"\s+", " ", block).strip()
-            if len(cleaned) < 10:
-                continue
-
-            # Skip common PDF headers/footers
-            if re.search(r"^(page\s+\d+|confidential|all rights reserved|copyright)", cleaned, re.IGNORECASE):
-                continue
-
-            # Heading detection (short, uppercase or title case, no punctuation)
-            if len(cleaned.split()) <= 6 and not cleaned.endswith((".", "?", ":")) and cleaned.istitle():
-                current_section = cleaned
-                sections_set.add(current_section)
-                continue
-
-            is_question = False
-            match_num = re.match(r"^(\d+[\.\d]*|[A-Z]\d+[\.\d]*|Q\d+[:\.]|Req\w*[:\.\s])\s+(.+)$", cleaned, re.IGNORECASE)
-            if match_num:
-                qid = match_num.group(1).strip(".: ")
-                q_text = match_num.group(2).strip()
-                is_question = True
-            elif cleaned.endswith("?") and len(cleaned) > 15:
-                qid = f"PDF-Q{len(questions)+1}"
-                q_text = cleaned
-                is_question = True
-
-            if is_question and len(q_text) >= 5:
-                sections_set.add(current_section)
-                expected_type, options = cls._infer_answer_type(q_text)
+                sections_set.add(sec)
                 questions.append(
                     ExtractedQuestion(
                         id=qid,
                         question_text=q_text,
-                        section=current_section,
-                        row_index=b_idx + 1,
-                        expected_type=expected_type,
+                        section=sec,
+                        row_index=idx,
+                        expected_type=exp_type,
                         options=options,
                     )
                 )
+
+            if len(questions) > 0:
+                logger.info(
+                    "Gemini 2.5 Flash extracted %d questions from PDF %s across %d sections",
+                    len(questions),
+                    filename,
+                    len(sections_set),
+                )
+                return QuestionnaireParseResult(
+                    filename=filename,
+                    format="pdf",
+                    total_questions=len(questions),
+                    sections=sorted(list(sections_set)) if sections_set else ["General"],
+                    questions=questions,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Gemini 2.5 Flash PDF extraction failed (%s); falling back to heuristic engine",
+                exc,
+            )
+            return None
+        return None
+
+    @classmethod
+    def _parse_pdf_heuristics(cls, page_texts: List[str], filename: str) -> QuestionnaireParseResult:
+        """
+        Resilient heuristic parsing engine for PDFs:
+        - Multi-column table layout decomposition
+        - Imperative requirements, obligation statements, and interrogatives
+        - Line-wrap and paragraph continuation stitching
+        """
+        questions: List[ExtractedQuestion] = []
+        sections_set = set()
+        current_section = "General"
+
+        for page_str in page_texts:
+            raw_lines = page_str.splitlines()
+            l_idx = 0
+            while l_idx < len(raw_lines):
+                line = raw_lines[l_idx].strip()
+                l_idx += 1
+                if not line:
+                    continue
+
+                if cls.PAGE_HEADER_FOOTER_RE.search(line):
+                    continue
+
+                # Section Heading Detection (e.g. "Section 1: Data Encryption", "2.0 Access Control")
+                sec_match = re.match(
+                    r"^(?:section|part|category|module|pillar)\s+[\dA-Z]+[:\.\s\-]+(.*)$",
+                    line,
+                    re.IGNORECASE,
+                )
+                if sec_match:
+                    current_section = sec_match.group(1).strip() or line
+                    sections_set.add(current_section)
+                    continue
+
+                if (
+                    len(line.split()) <= 6
+                    and not line.endswith((".", "?", ":", ";"))
+                    and (line.isupper() or line.istitle())
+                    and not any(
+                        line.lower().startswith(v)
+                        for v in [
+                            "describe", "provide", "explain", "detail", "list",
+                            "confirm", "vendor", "do", "does", "what", "how", "is"
+                        ]
+                    )
+                ):
+                    current_section = line
+                    sections_set.add(current_section)
+                    continue
+
+                # Table line detection with column separators (tabs, pipes, 3+ spaces)
+                table_parts = [p.strip() for p in re.split(r"\s{3,}|\t|\|", line) if p.strip()]
+                if len(table_parts) >= 2:
+                    part0_is_id = any(pat.match(table_parts[0]) for pat in cls.PREFIX_PATTERNS) or bool(
+                        re.match(r"^[A-Z0-9\.\-_]{1,10}$", table_parts[0])
+                    )
+                    if part0_is_id and len(table_parts) >= 3:
+                        qid = table_parts[0]
+                        sec = table_parts[1]
+                        prompt = table_parts[2]
+                        matched, _, clean_p = cls.is_question_or_requirement(prompt)
+                        if matched or len(prompt) >= 10:
+                            sections_set.add(sec)
+                            expected_type, options = cls._infer_answer_type(clean_p or prompt)
+                            last_col = table_parts[-1].lower()
+                            if any(w in last_col for w in ["yes", "no", "comply", "compliant", "n/a"]):
+                                expected_type = "choice"
+                                options = ["Compliant", "Partially Compliant", "Non-Compliant", "Not Applicable"]
+                            questions.append(
+                                ExtractedQuestion(
+                                    id=qid,
+                                    question_text=clean_p or prompt,
+                                    section=sec,
+                                    row_index=len(questions) + 1,
+                                    expected_type=expected_type,
+                                    options=options,
+                                )
+                            )
+                            continue
+                    elif part0_is_id and len(table_parts) == 2:
+                        qid = table_parts[0]
+                        prompt = table_parts[1]
+                        matched, _, clean_p = cls.is_question_or_requirement(prompt)
+                        if matched or len(prompt) >= 10:
+                            sections_set.add(current_section)
+                            expected_type, options = cls._infer_answer_type(clean_p or prompt)
+                            questions.append(
+                                ExtractedQuestion(
+                                    id=qid,
+                                    question_text=clean_p or prompt,
+                                    section=current_section,
+                                    row_index=len(questions) + 1,
+                                    expected_type=expected_type,
+                                    options=options,
+                                )
+                            )
+                            continue
+
+                # Standard line question/requirement check
+                matched, qid, prompt = cls.is_question_or_requirement(line)
+                if matched:
+                    comb = prompt
+                    # Stitch wrapped lines continuing this question
+                    while l_idx < len(raw_lines):
+                        nxt = raw_lines[l_idx].strip()
+                        if not nxt:
+                            break
+                        if cls.PAGE_HEADER_FOOTER_RE.search(nxt):
+                            break
+                        nxt_matched, nxt_qid, _ = cls.is_question_or_requirement(nxt)
+                        if nxt_qid:
+                            break
+                        # If current prompt didn't end with sentence punctuation or next starts lowercase
+                        if not comb.rstrip().endswith((".", "?", "!", ":")) or (nxt and nxt[0].islower()):
+                            comb += " " + nxt
+                            l_idx += 1
+                            if nxt.endswith((".", "?", "!")):
+                                break
+                        else:
+                            break
+
+                    item_id = qid or f"PDF-Q{len(questions) + 1}"
+                    sections_set.add(current_section)
+                    expected_type, options = cls._infer_answer_type(comb)
+                    questions.append(
+                        ExtractedQuestion(
+                            id=item_id,
+                            question_text=comb,
+                            section=current_section,
+                            row_index=len(questions) + 1,
+                            expected_type=expected_type,
+                            options=options,
+                        )
+                    )
 
         return QuestionnaireParseResult(
             filename=filename,
@@ -443,6 +723,22 @@ class QuestionnaireParserService:
         )
 
     @classmethod
+    def _parse_pdf(cls, content: bytes, filename: str) -> QuestionnaireParseResult:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(content))
+        page_texts = [(page.extract_text() or "") for page in reader.pages]
+        combined_text = "\n\n".join(page_texts).strip()
+
+        # 1. Attempt Gemini 2.5 Flash semantic structured extraction
+        gemini_result = cls._parse_pdf_with_gemini(combined_text, filename)
+        if gemini_result and gemini_result.total_questions > 0:
+            return gemini_result
+
+        # 2. Resilient multi-pass heuristic engine fallback
+        return cls._parse_pdf_heuristics(page_texts, filename)
+
+    @classmethod
     def _infer_answer_type(cls, question_text: str) -> tuple[str, List[str]]:
         """
         Infers whether the questionnaire prompt expects a boolean (Yes/No),
@@ -451,13 +747,13 @@ class QuestionnaireParserService:
         lower = question_text.lower()
 
         # Check for binary or compliance dropdown triggers
-        if re.search(r"^(do you|does your|can you|is there|are your|have you|has your|will you)\b", lower):
+        if re.search(r"^(do you|does your|can you|is there|are your|have you|has your|will you|confirm whether|confirm if)\b", lower):
             return "choice", ["Yes", "No", "Partial", "N/A"]
 
-        if any(w in lower for w in ["compliant / non-compliant", "yes/no", "yes / no", "y/n", "comply"]):
+        if any(w in lower for w in ["compliant / non-compliant", "yes/no", "yes / no", "y/n", "comply", "compliance status"]):
             return "choice", ["Compliant", "Partially Compliant", "Non-Compliant", "Not Applicable"]
 
-        if re.search(r"\b(how many|what percentage|number of|rto|rpo|sla)\b", lower):
+        if re.search(r"\b(how many|what percentage|number of|rto|rpo|sla|latency|hours|days|retention period)\b", lower):
             return "numeric", []
 
         return "narrative", []

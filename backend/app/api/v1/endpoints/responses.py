@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -416,7 +417,7 @@ async def parse_questionnaire_file(
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-        result = QuestionnaireParserService.parse_questionnaire(content, filename)
+        result = await asyncio.to_thread(QuestionnaireParserService.parse_questionnaire, content, filename)
         logger.info(
             "Parsed %d questions from %s (format: %s) for tenant %s",
             result.total_questions,
