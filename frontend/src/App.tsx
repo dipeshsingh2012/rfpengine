@@ -80,6 +80,10 @@ export function App() {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(DEFAULT_ACTIVITY_LOGS);
 
+  // Environment & Health State
+  const [backendEnv, setBackendEnv] = useState<string>(
+    () => import.meta.env.VITE_APP_ENV || "local",
+  );
   // Health State
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
 
@@ -145,7 +149,7 @@ export function App() {
     setActivityLogs((prev) => [newEntry, ...prev]);
 
     try {
-      fetch(`${apiBaseUrl}/v1/responses/audit-logs`, {
+      fetch(`${apiBaseUrl}/api/v1/responses/audit-logs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -167,7 +171,7 @@ export function App() {
   useEffect(() => {
     async function checkHealth() {
       try {
-        const res = await fetch(`${apiBaseUrl.replace(/\/api$/, "")}/health`);
+        const res = await fetch(`${apiBaseUrl}/health`);
         if (res.ok) {
           setBackendHealth("ok");
         } else {
@@ -183,7 +187,7 @@ export function App() {
   useEffect(() => {
     async function fetchAuditLogs() {
       try {
-        const res = await fetch(`${apiBaseUrl}/v1/responses/audit-logs`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/responses/audit-logs`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (res.ok) {
@@ -214,7 +218,7 @@ export function App() {
   useEffect(() => {
     async function fetchRecentHistory() {
       try {
-        const res = await fetch(`${apiBaseUrl}/v1/responses/history`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/responses/history`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (res.ok) {
@@ -234,7 +238,7 @@ export function App() {
   async function fetchWorkspaceSummaries() {
     setIsWorkspacesLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/responses/workspaces`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/workspaces`, {
         headers: { "X-Tenant-ID": tenantId },
       });
       if (res.ok) {
@@ -250,14 +254,14 @@ export function App() {
 
   async function handleDuplicateWorkspace(id: string) {
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/responses/workspaces/${id}/duplicate`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${id}/duplicate`, {
         method: "POST",
         headers: { "X-Tenant-ID": tenantId },
       });
       if (res.ok) {
         showToast("Questionnaire duplicated in PostgreSQL");
         await fetchWorkspaceSummaries();
-        const historyRes = await fetch(`${apiBaseUrl}/v1/responses/history`, {
+        const historyRes = await fetch(`${apiBaseUrl}/api/v1/responses/history`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (historyRes.ok) {
@@ -274,14 +278,14 @@ export function App() {
 
   async function handleDeleteWorkspace(id: string) {
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/responses/workspaces/${id}`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${id}`, {
         method: "DELETE",
         headers: { "X-Tenant-ID": tenantId },
       });
       if (res.ok) {
         showToast("Questionnaire permanently deleted from PostgreSQL");
         await fetchWorkspaceSummaries();
-        const historyRes = await fetch(`${apiBaseUrl}/v1/responses/history`, {
+        const historyRes = await fetch(`${apiBaseUrl}/api/v1/responses/history`, {
           headers: { "X-Tenant-ID": tenantId },
         });
         if (historyRes.ok) {
@@ -298,7 +302,7 @@ export function App() {
 
   async function fetchWorkspaceSettings() {
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/responses/workspace/settings?tenant_id=${tenantId}`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/workspace/settings?tenant_id=${tenantId}`);
       if (res.ok) {
         const data = await res.json();
         setWorkspaceSettings((prev) => ({
@@ -320,7 +324,7 @@ export function App() {
     setSettingsSaveNotice(null);
     try {
       const payload = updates ? { ...workspaceSettings, ...updates } : workspaceSettings;
-      const res = await fetch(`${apiBaseUrl}/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -373,7 +377,7 @@ export function App() {
 
   async function fetchKBStats() {
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/stats?tenant_id=${tenantId}`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/knowledge-base/stats?tenant_id=${tenantId}`);
       if (res.ok) {
         const data = await res.json();
         setKbStats({
@@ -391,7 +395,7 @@ export function App() {
   async function fetchKBEntries() {
     setIsFetchingKB(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/knowledge-base?tenant_id=${tenantId}&limit=100`);
       if (res.ok) {
         const data = await res.json();
         setKbEntries(data);
@@ -425,7 +429,7 @@ export function App() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tenant_id", tenantId);
-      const res = await fetch(`${apiBaseUrl}/v1/knowledge-base/upload`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/knowledge-base/upload`, {
         method: "POST",
         body: formData,
       });
@@ -448,7 +452,7 @@ export function App() {
 
   async function handleDeleteKBEntry(id: string) {
     try {
-      await fetch(`${apiBaseUrl}/v1/knowledge-base/${id}`, { method: "DELETE" });
+      await fetch(`${apiBaseUrl}/api/v1/knowledge-base/${id}`, { method: "DELETE" });
       setKbEntries((prev) => prev.filter((item) => item.id !== id));
       fetchKBStats();
     } catch (e) {
@@ -472,7 +476,7 @@ export function App() {
     setPlaygroundLoading(true);
     setPlaygroundError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/v1/search`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -522,7 +526,7 @@ export function App() {
     setResponseId(id);
 
     // Hydrate workspace details directly from PostgreSQL (no localStorage)
-    fetch(`${apiBaseUrl}/v1/responses/workspaces/${id}`, {
+    fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${id}`, {
       headers: { "X-Tenant-ID": tenantId },
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -589,7 +593,7 @@ export function App() {
 
     // Persist directly to PostgreSQL database (zero localStorage)
     try {
-      await fetch(`${apiBaseUrl}/v1/responses/workspaces`, {
+      await fetch(`${apiBaseUrl}/api/v1/responses/workspaces`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -699,7 +703,7 @@ export function App() {
     saveReviewStatuses(nextStatuses);
 
     // Also persist via API to PostgreSQL
-    fetch(`${apiBaseUrl}/v1/responses/review`, {
+    fetch(`${apiBaseUrl}/api/v1/responses/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -727,7 +731,7 @@ export function App() {
     try {
       if (responseId && responseId !== "demo") {
         await fetch(
-          `${apiBaseUrl}/v1/responses/workspaces/${responseId}/questions/${index}/promote`,
+          `${apiBaseUrl}/api/v1/responses/workspaces/${responseId}/questions/${index}/promote`,
           {
             method: "POST",
             headers: {
@@ -738,7 +742,7 @@ export function App() {
           },
         );
       } else {
-        await fetch(`${apiBaseUrl}/v1/knowledge-base/entries`, {
+        await fetch(`${apiBaseUrl}/api/v1/knowledge-base/entries`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -833,7 +837,7 @@ export function App() {
     showToast(`All ${allQuestions.length} questions marked: ${nextStatus}!`);
 
     try {
-      await fetch(`${apiBaseUrl}/v1/responses/review`, {
+      await fetch(`${apiBaseUrl}/api/v1/responses/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -859,7 +863,7 @@ export function App() {
     showToast("Response status reset to In Review. Drafting enabled.");
 
     try {
-      await fetch(`${apiBaseUrl}/v1/responses/review`, {
+      await fetch(`${apiBaseUrl}/api/v1/responses/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -904,7 +908,7 @@ export function App() {
       await Promise.all(
         missing.map(async (item) => {
           try {
-            const result = await fetch(`${apiBaseUrl}/v1/search`, {
+            const result = await fetch(`${apiBaseUrl}/api/v1/search`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),
@@ -977,7 +981,7 @@ export function App() {
   ) {
     if (!responseId || responseId === "demo") return;
     try {
-      await fetch(`${apiBaseUrl}/v1/responses/workspaces/${responseId}`, {
+      await fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${responseId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1009,7 +1013,7 @@ export function App() {
     setIsGenerating(true);
     setNotice("Searching approved knowledge...");
     try {
-      const result = await fetch(`${apiBaseUrl}/v1/search`, {
+      const result = await fetch(`${apiBaseUrl}/api/v1/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenant_id: tenantId, question, top_k: topK }),
@@ -1055,7 +1059,7 @@ export function App() {
     await Promise.all(
       detectedQuestions.map(async (item) => {
         try {
-          const result = await fetch(`${apiBaseUrl}/v1/search`, {
+          const result = await fetch(`${apiBaseUrl}/api/v1/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tenant_id: tenantId, question: item, top_k: topK }),

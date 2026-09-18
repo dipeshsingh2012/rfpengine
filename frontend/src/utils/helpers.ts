@@ -1,7 +1,7 @@
 import { SearchResponse, demoResponse } from "../types";
 
-// Fixed production API base — no toggle, no env var needed.
-export const API_BASE = "https://rfpengine-api-714049712844.us-central1.run.app/api";
+// Fixed production API backend host
+export const API_BASE = "https://rfpengine-api-714049712844.us-central1.run.app";
 
 export function demoAnswerFor(question: string): SearchResponse {
   const normalized = question.toLowerCase();

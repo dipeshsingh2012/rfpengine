@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.api.v1.api import api_router
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1.api import api_router
 
 app = FastAPI(title="Autonomous Agentic Fleet API")
 
@@ -13,8 +13,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure the api_router is mounted at both /api/v1 and /v1 for full client compatibility
+# Canonical API route prefix is /api/v1
 app.include_router(api_router, prefix="/api/v1")
+
+# Also maintain /v1 alias for backward compatibility
 app.include_router(api_router, prefix="/v1")
 
 @app.get("/health")
