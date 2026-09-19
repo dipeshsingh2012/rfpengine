@@ -19,8 +19,6 @@ declare global {
   }
 }
 
-const DEFAULT_CLIENT_ID = "714049712844-h76ac4r1chlbvcsfpijoj70r8o64r8b9.apps.googleusercontent.com";
-
 export function useGoogleAuth(showToast?: (msg: string) => void) {
   const [user, setUser] = useState<GoogleUser | null>(() => {
     try {
@@ -30,7 +28,7 @@ export function useGoogleAuth(showToast?: (msg: string) => void) {
       return null;
     }
   });
-  const [googleClientId, setGoogleClientId] = useState<string>(DEFAULT_CLIENT_ID);
+  const [googleClientId, setGoogleClientId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCredentialResponse = useCallback(
