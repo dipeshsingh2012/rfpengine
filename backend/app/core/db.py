@@ -61,15 +61,60 @@ def normalize_database_url(url: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, new_query, parsed.fragment))
 
 
+def resolve_ipv4(hostname: str) -> str:
+    try:
+        import socket
+        return socket.gethostbyname(hostname)
+    except Exception:
+        try:
+            import socket, struct
+            header = b'\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00'
+            qname = b''.join(bytes([len(p)]) + p.encode() for p in hostname.split('.')) + b'\x00'
+            packet = header + qname + b'\x00\x01\x00\x01'
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(2.0)
+            sock.sendto(packet, ('8.8.8.8', 53))
+            data, _ = sock.recvfrom(512)
+            sock.close()
+            offset = 12 + len(qname) + 4
+            while offset < len(data):
+                if data[offset] & 0xc0 == 0xc0:
+                    offset += 2
+                else:
+                    while data[offset] != 0:
+                        offset += data[offset] + 1
+                    offset += 1
+                rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', data[offset:offset+10])
+                offset += 10
+                if rtype == 1 and rdlength == 4:
+                    return socket.inet_ntoa(data[offset:offset+4])
+                offset += rdlength
+        except Exception:
+            pass
+    return hostname
+
+
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
         normalized_url = normalize_database_url(settings.effective_database_url)
+        connect_args: dict = {}
+        if "neon.tech" in normalized_url:
+            parsed = urlsplit(normalized_url)
+            hostname = parsed.hostname or ""
+            match = re.match(r"^(ep-[a-z0-9-]+)", hostname)
+            if match:
+                connect_args["server_settings"] = {"options": f"endpoint={match.group(1)}"}
+            ipv4 = resolve_ipv4(hostname)
+            if ipv4 and ipv4 != hostname:
+                netloc = parsed.netloc.replace(hostname, ipv4)
+                normalized_url = normalized_url.replace(parsed.netloc, netloc)
         _engine = create_async_engine(
             normalized_url,
             echo=settings.debug,
             pool_pre_ping=True,
+            connect_args=connect_args,
         )
     return _engine
 

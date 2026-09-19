@@ -103,10 +103,12 @@ class GeminiTuningService:
     ) -> List[Dict[str, Any]]:
         """
         Extracts verified human-vetted pairs from KB Golden Q&A and approved QuestionReviews.
+        Automatically deduplicates pairs by normalized question text to ensure diverse training examples.
         """
         settings = await PostgresService.get_workspace_settings(db, tenant_id)
         company_name = settings.company_name if settings else "Acme Corporation"
         dataset: List[Dict[str, Any]] = []
+        seen_questions: set = set()
 
         # 1. Extract Golden Q&A from KB entries
         if include_golden_qa:
@@ -116,9 +118,11 @@ class GeminiTuningService:
             )
             kb_res = await db.execute(kb_stmt)
             for entry in kb_res.scalars().all():
-                q = entry.question or entry.title or ""
-                a = entry.answer or entry.content or ""
-                if q.strip() and a.strip():
+                q = (entry.question or entry.title or "").strip()
+                a = (entry.answer or entry.content or "").strip()
+                norm_q = " ".join(q.lower().split())
+                if norm_q and a and norm_q not in seen_questions:
+                    seen_questions.add(norm_q)
                     dataset.append(self.format_tuning_example(q, a, company_name))
 
         # 2. Extract Approved / Promoted QuestionReviews from tenant workspaces
@@ -133,9 +137,11 @@ class GeminiTuningService:
             )
             rev_res = await db.execute(rev_stmt)
             for rev in rev_res.scalars().all():
-                q = rev.question_text
-                a = rev.final_answer or rev.suggested_answer or ""
-                if q.strip() and a.strip():
+                q = (rev.question_text or "").strip()
+                a = ((rev.final_answer or rev.suggested_answer) or "").strip()
+                norm_q = " ".join(q.lower().split())
+                if norm_q and a and norm_q not in seen_questions:
+                    seen_questions.add(norm_q)
                     dataset.append(self.format_tuning_example(q, a, company_name))
 
         return dataset
@@ -146,35 +152,24 @@ class GeminiTuningService:
         tenant_id: str,
     ) -> TuningDatasetPreviewResponse:
         """
-        Calculates dataset metrics and sample pairs for admin inspection.
+        Calculates deduplicated dataset metrics and distinct sample pairs for admin inspection.
         """
-        golden_stmt = select(KBEntryModel).where(
-            KBEntryModel.tenant_id == tenant_id,
-            KBEntryModel.category == "Golden Q&A",
+        golden_dataset = await self.extract_tuning_dataset(
+            db, tenant_id, include_golden_qa=True, include_approved_reviews=False
         )
-        golden_res = await db.execute(golden_stmt)
-        golden_entries = golden_res.scalars().all()
-        golden_count = sum(1 for e in golden_entries if (e.question or "").strip() and (e.answer or "").strip())
-
-        rev_stmt = (
-            select(QuestionReviewModel)
-            .join(ResponseWorkspace, QuestionReviewModel.workspace_id == ResponseWorkspace.id)
-            .where(
-                ResponseWorkspace.tenant_id == tenant_id,
-                QuestionReviewModel.review_status.in_(["Approved", "Promoted"]),
-            )
+        approved_dataset = await self.extract_tuning_dataset(
+            db, tenant_id, include_golden_qa=False, include_approved_reviews=True
         )
-        rev_res = await db.execute(rev_stmt)
-        reviews = rev_res.scalars().all()
-        approved_count = sum(1 for r in reviews if (r.question_text or "").strip() and ((r.final_answer or r.suggested_answer) or "").strip())
+        full_dataset = await self.extract_tuning_dataset(
+            db, tenant_id, include_golden_qa=True, include_approved_reviews=True
+        )
 
-        full_dataset = await self.extract_tuning_dataset(db, tenant_id)
         samples = full_dataset[:5]
 
         return TuningDatasetPreviewResponse(
             total_pairs=len(full_dataset),
-            golden_qa_count=golden_count,
-            approved_reviews_count=approved_count,
+            golden_qa_count=len(golden_dataset),
+            approved_reviews_count=len(approved_dataset),
             sample_pairs=samples,
         )
 
