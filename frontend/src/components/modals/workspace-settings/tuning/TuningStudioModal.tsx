@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Sparkles, Plus, AlertCircle } from "lucide-react";
+import { X, Sparkles, Plus, AlertCircle, RefreshCw } from "lucide-react";
 import { WorkspaceSettings } from "../../../../types";
 import { useTuningStudioState } from "./useTuningStudioState";
 import { TuningDatasetStatsCard } from "./TuningDatasetStatsCard";
@@ -16,31 +16,20 @@ interface Props {
   onShowToast?: (msg: string) => void;
 }
 
-export const TuningStudioModal: React.FC<Props> = ({
-  isOpen, onClose, tenantId, settings, setSettings, onShowToast,
-}) => {
+export const TuningStudioModal: React.FC<Props> = ({ isOpen, onClose, tenantId, settings, setSettings, onShowToast }) => {
   const state = useTuningStudioState(tenantId, settings, setSettings, onShowToast, isOpen);
 
   return (
     <>
-      <ModalPortal
-        isOpen={isOpen}
-        onClose={onClose}
-        cardClassName="modal-card tuning-studio-modal"
-        ariaLabel="Gemini Supervised Tuning Studio"
-      >
+      <ModalPortal isOpen={isOpen} onClose={onClose} cardClassName="modal-card tuning-studio-modal" ariaLabel="Gemini Supervised Tuning Studio">
         <div className="modal-header">
           <div>
-            <h3 className="modal-title-row">
-              <Sparkles size={18} color="var(--blue)" /> Gemini Supervised Tuning Studio
-            </h3>
+            <h3 className="modal-title-row"><Sparkles size={18} color="var(--blue)" /> Gemini Supervised Tuning Studio</h3>
             <p className="settings-group-subtitle" style={{ marginTop: "3px" }}>
               Train Google Cloud Vertex AI base models on enterprise Q&A pairs to produce custom dedicated endpoints.
             </p>
           </div>
-          <button className="close-btn" onClick={onClose} aria-label="Close dialog">
-            <X size={18} />
-          </button>
+          <button className="close-btn" onClick={onClose} aria-label="Close dialog"><X size={18} /></button>
         </div>
 
         <div className="modal-body form-grid">
@@ -58,14 +47,24 @@ export const TuningStudioModal: React.FC<Props> = ({
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "16px 0 8px" }}>
             <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Training Jobs & Endpoints</h4>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => state.setIsNewJobModalOpen(true)}
-              style={{ padding: "6px 12px", fontSize: "12px" }}
-            >
-              <Plus size={14} /> New Tuning Job
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => state.refreshJobs()}
+                style={{ padding: "6px 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <RefreshCw size={12} className={state.isLoading ? "spin" : ""} /> Refresh
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => state.setIsNewJobModalOpen(true)}
+                style={{ padding: "6px 12px", fontSize: "12px" }}
+              >
+                <Plus size={14} /> New Tuning Job
+              </button>
+            </div>
           </div>
 
           <TuningJobsTable
@@ -77,9 +76,7 @@ export const TuningStudioModal: React.FC<Props> = ({
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="secondary-button" onClick={onClose}>
-            Done
-          </button>
+          <button type="button" className="secondary-button" onClick={onClose}>Done</button>
         </div>
       </ModalPortal>
 

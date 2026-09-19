@@ -53,6 +53,16 @@ export function useTuningStudioState(
     Promise.all([refreshJobs(), refreshPreview()]).finally(() => setIsLoading(false));
   }, [isOpen, refreshJobs, refreshPreview]);
 
+  const hasActiveJobs = jobs.some((j) => j.status === "RUNNING" || j.status === "PENDING");
+
+  useEffect(() => {
+    if (!isOpen || !hasActiveJobs) return;
+    const interval = setInterval(() => {
+      refreshJobs();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isOpen, hasActiveJobs, refreshJobs]);
+
   const startTuningJob = async (
     baseModel: string,
     epochs: number,
