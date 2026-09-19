@@ -21,14 +21,23 @@ export function assembleAppProps(p: any) {
     onReparseWithGuidance: (guidance: string) =>
       p.ingestion.handleReparseWithGuidance(guidance, p.workflow.setDetectedQuestions),
     onSubmitFeedback: p.ingestion.handleSubmitParserFeedback,
-    openWorkspace: () => p.navigate(`/response/workspace/${p.activeResponseId}`),
+    openWorkspace: () => {
+      if (p.activeResponseId) {
+        p.navigate(`/response/workspace/${p.activeResponseId}`);
+      } else {
+        p.navigate("/");
+      }
+    },
     onConfirmImport: (curated: any[]) => p.handleConfirmImport(curated),
   };
 
   const questionnaireProps = {
     onNavigateHome: () => p.navigate("/"),
     onNavigateResponses: () => p.navigate("/responses"),
-    onOpenImport: (id: string) => p.navigate(`/review/${id}`),
+    onOpenImport: (id: string) => {
+      if (id) p.navigate(`/review/${id}`);
+      else p.navigate("/");
+    },
     responseId: p.activeResponseId,
     sourceMode: p.workflow.sourceMode,
     sourceLabel: p.workflow.sourceLabel,
@@ -104,7 +113,11 @@ export function assembleAppProps(p: any) {
     setFormUrl: p.ingestion.setFormUrl,
     loadFormUrl: p.ingestion.loadFormUrl,
     loadFormFile: p.ingestion.loadFormFile,
-    openImport: (id?: string) => p.navigate(`/review/${id || p.activeResponseId}`),
+    openImport: (id?: string) => {
+      const target = id || p.activeResponseId;
+      if (target) p.navigate(`/review/${target}`);
+      else p.navigate("/");
+    },
     isParsingDocument: p.ingestion.isParsingDocument,
     parsingProgress: p.ingestion.parsingProgress,
     workspaceSummaries: p.workspaces.workspaceSummaries,

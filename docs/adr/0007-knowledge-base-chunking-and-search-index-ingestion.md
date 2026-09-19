@@ -44,7 +44,7 @@ We establish a dedicated **multi-format ingestion pipeline** and a **search-inde
    - Ingested document chunks are indexed directly and idempotently into **PostgreSQL** (`kb_entries`), **Algolia Cloud** (sparse keyword index + full text), and **Pinecone Serverless** (dense vectors + citation metadata).
    - **Idempotent Seeding Pipeline**: `scripts/seed_data.py` performs atomic pruning on existing tenant vectors and documents, guaranteeing that running the seed 1 time or 100 times always results in an exact 1:1 match across all 3 storage backends.
    - **Retrieval Playground (`/playground`)**: A dedicated testing interface allowing sellers and engineers to run ad-hoc queries, inspect Algolia (sparse) vs Pinecone (dense vector) matches, observe RRF fusion scores, and review Gemini answer generation with confidence metrics.
-   - **Demo Sample Documents (`/sample_docs/`)**: Multi-format test documents (`.md`, `.pdf`, `.json`, `.csv`, `.docx`, `.txt`) are bundled in the web app's `public/` directory for instant single-click demo downloads on any machine.
+   - **Sample Documents (`/sample_docs/`)**: Multi-format test documents (`.md`, `.pdf`, `.json`, `.csv`, `.docx`, `.txt`) are bundled in the web app's `public/` directory for instant single-click downloads on any machine.
 
 ## Consequences
 

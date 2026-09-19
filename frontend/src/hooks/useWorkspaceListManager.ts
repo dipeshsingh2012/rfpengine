@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_RECENT_RFPS, RecentRFPItem, WorkspaceSummaryItem } from "../types";
+import {RecentRFPItem, WorkspaceSummaryItem } from "../types";
 import { ExportFormat } from "../components/modals/ExportPackageModal";
 import { getApiBaseUrl } from "../utils/helpers";
 
@@ -8,7 +8,7 @@ const apiBaseUrl = getApiBaseUrl();
 export function useWorkspaceListManager(tenantId: string) {
   const [workspaceSummaries, setWorkspaceSummaries] = useState<WorkspaceSummaryItem[]>([]);
   const [isWorkspacesLoading, setIsWorkspacesLoading] = useState(false);
-  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>(DEFAULT_RECENT_RFPS);
+  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>();
 
   async function fetchWorkspaceSummaries() {
     setIsWorkspacesLoading(true);
@@ -46,7 +46,7 @@ export function useWorkspaceListManager(tenantId: string) {
       if (res.ok) {
         showToast("Questionnaire permanently deleted from PostgreSQL");
         fetchWorkspaceSummaries();
-        setRecentRFPs((prev) => prev.filter((item) => item.id !== id));
+        setRecentRFPs((prev) => (prev || []).filter((item) => item.id !== id));
       } else showToast("Failed to delete workspace");
     } catch {
       showToast("Network error deleting workspace");

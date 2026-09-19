@@ -227,11 +227,6 @@ export interface WorkspaceDetailResponse {
   questions: WorkspaceQuestionItem[];
 }
 
-export const DEFAULT_RECENT_RFPS: RecentRFPItem[] = [
-  { id: "ws-northstar", title: "Northstar security review", editedAt: "8 min ago", color: "blue", questionsCount: 12 },
-  { id: "grove-rfp", title: "Grove procurement RFP", editedAt: "Yesterday", color: "orange", questionsCount: 8 },
-  { id: "meridian-form", title: "Meridian vendor form", editedAt: "Aug 18", color: "green", questionsCount: 15 },
-];
 
 export interface ActivityLogItem {
   id: string;

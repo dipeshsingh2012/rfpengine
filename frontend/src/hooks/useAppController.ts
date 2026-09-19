@@ -46,7 +46,7 @@ export function useAppController() {
       color: mode === "url" ? "blue" : sourceName.toLowerCase().endsWith(".csv") ? "green" : "orange",
       questionsCount: questions.length,
     };
-    workspaces.setRecentRFPs((prev) => [newRfpItem, ...prev.filter((i) => i.id !== id && i.title !== sourceName)].slice(0, 5));
+    workspaces.setRecentRFPs((prev) => [newRfpItem, ...(prev || []).filter((i) => i.id !== id && i.title !== sourceName)].slice(0, 5));
     activity.logActivity("Loaded questionnaire form", `${sourceName} (${questions.length} detected questions)`, "import");
 
     try {
@@ -85,7 +85,13 @@ export function useAppController() {
     if (!id) return;
     workflow.setResponseId(id);
     fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${id}`, { headers: { "X-Tenant-ID": tenantId } })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) {
+          navigation.navigate("/");
+          return null;
+        }
+        return r.json();
+      })
       .then((data: WorkspaceDetailResponse | null) => {
         if (data?.questions?.length) {
           const qList = data.questions.map((q) => q.question_text);
@@ -150,7 +156,11 @@ export function useAppController() {
         }),
       }).then(() => workspaces.fetchWorkspaceSummaries()).catch(() => {});
     }
-    navigation.navigate(`/response/workspace/${workflow.responseId || ""}`);
+    if (workflow.responseId) {
+      navigation.navigate(`/response/workspace/${workflow.responseId}`);
+    } else {
+      navigation.navigate("/");
+    }
   }
 
   function handleRequestChanges(item: string) {
