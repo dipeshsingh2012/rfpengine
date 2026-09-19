@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from google import genai
+from google.genai import types
 from google.oauth2 import service_account
 
 from app.core.config import Settings
@@ -105,6 +106,7 @@ class HybridSearchService:
                     project=settings.gcp_project_id,
                     location="us-central1",
                     credentials=credentials,
+                    http_options=types.HttpOptions(api_version="v1") if types else None,
                 )
                 logger.info(
                     "Initialized Google Cloud Vertex AI Client (project: %s, gemini: %s, embeddings: %s)",

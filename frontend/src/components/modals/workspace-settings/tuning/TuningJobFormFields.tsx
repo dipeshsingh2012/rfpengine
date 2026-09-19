@@ -38,6 +38,7 @@ export const TuningJobFormFields: React.FC<Props> = ({
         <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast, Production Default - Recommended)</option>
         <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced Enterprise Reasoning)</option>
         <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (High Throughput)</option>
+        <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (Next-Gen Efficiency)</option>
         <option value="gemini-3.5-flash">Gemini 3.5 Flash (Next-Gen Frontier Flash)</option>
       </select>
       <span className="settings-field-hint">Vertex AI Supervised Tuning requires a supported base checkpoint.</span>

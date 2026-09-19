@@ -299,6 +299,8 @@ async def test_tuning_supported_models_endpoint():
         ids = [m["id"] for m in models]
         assert "gemini-2.5-flash" in ids
         assert "gemini-2.5-pro" in ids
+        assert "gemini-2.5-flash-lite" in ids
+        assert "gemini-3.1-flash-lite" in ids
         assert "gemini-3.5-flash" in ids
         # Check recommendation
         flash_model = next(m for m in models if m["id"] == "gemini-2.5-flash")

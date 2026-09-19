@@ -63,6 +63,12 @@ SUPPORTED_TUNING_MODELS: List[Dict[str, Any]] = [
         "recommended": False,
     },
     {
+        "id": "gemini-3.1-flash-lite",
+        "name": "Gemini 3.1 Flash-Lite",
+        "description": "Next-Gen High Efficiency",
+        "recommended": False,
+    },
+    {
         "id": "gemini-3.5-flash",
         "name": "Gemini 3.5 Flash",
         "description": "Next-Gen Frontier Flash",
@@ -97,11 +103,13 @@ class GeminiTuningService:
                         )
                 self.credentials = credentials
                 if genai:
+                    http_opts = types.HttpOptions(api_version="v1") if types else None
                     self.genai_client = genai.Client(
                         vertexai=True,
                         project=self.settings.gcp_project_id,
                         location="us-central1",
                         credentials=credentials,
+                        http_options=http_opts,
                     )
                 if storage:
                     self.storage_client = storage.Client(
@@ -300,14 +308,25 @@ class GeminiTuningService:
 
             if hasattr(tuning_job, "name") and tuning_job.name:
                 vertex_job_name = tuning_job.name
-            if hasattr(tuning_job, "tuned_model") and getattr(tuning_job.tuned_model, "model", None):
-                tuned_model_dest = tuning_job.tuned_model.model
-            status = "RUNNING"
-            error_msg = None
+            if hasattr(tuning_job, "tuned_model"):
+                tuned_model = getattr(tuning_job, "tuned_model", None)
+                if tuned_model:
+                    ep = getattr(tuned_model, "endpoint", None)
+                    mod = getattr(tuned_model, "model", None)
+                    if isinstance(ep, str) and ep:
+                        tuned_model_dest = ep
+                    elif isinstance(mod, str) and mod:
+                        tuned_model_dest = mod
+
+            state_str = str(getattr(tuning_job, "state", "RUNNING")).upper()
+            status = "PENDING" if "PENDING" in state_str else "RUNNING"
+            error_msg = str(getattr(tuning_job, "error", "")) or None
             metrics: Dict[str, Any] = {
                 "step": 0,
                 "total_examples": len(dataset),
             }
+            if hasattr(tuning_job, "experiment") and getattr(tuning_job, "experiment", None):
+                metrics["experiment"] = tuning_job.experiment
         except Exception as exc:
             logger.error("Vertex AI tuning job initiation failed: %s", exc)
             job = TuningJobModel(
@@ -354,7 +373,7 @@ class GeminiTuningService:
     ) -> List[TuningJobModel]:
         """
         Lists tuning jobs for a tenant ordered by latest first.
-        Refreshes status against Vertex AI for any active RUNNING jobs.
+        Refreshes status against Vertex AI for any active PENDING or RUNNING jobs.
         """
         stmt = (
             select(TuningJobModel)
@@ -363,12 +382,13 @@ class GeminiTuningService:
         )
         res = await db.execute(stmt)
         jobs = list(res.scalars().all())
+        active_states = {"RUNNING", "PENDING", "JOB_STATE_RUNNING", "JOB_STATE_PENDING"}
         for job in jobs:
-            if job.status == "RUNNING":
+            if job.status in active_states:
                 try:
                     await self.get_tuning_job_status(db, tenant_id, job.id)
                 except Exception as poll_err:
-                    logger.warning("Failed to refresh running job %s: %s", job.id, poll_err)
+                    logger.warning("Failed to refresh active job %s: %s", job.id, poll_err)
         return jobs
 
     async def get_tuning_job_status(
@@ -379,6 +399,7 @@ class GeminiTuningService:
     ) -> Optional[TuningJobModel]:
         """
         Fetches status for a given tuning job, updating from Vertex AI if active.
+        Captures checkpoints, endpoints, experiments, and error messages per GEAP docs.
         """
         stmt = select(TuningJobModel).where(
             TuningJobModel.tenant_id == tenant_id,
@@ -389,8 +410,9 @@ class GeminiTuningService:
         if not job:
             return None
 
-        # If live client and job is still running, check remote status
-        if self.genai_client and job.status == "RUNNING":
+        # If live client and job is still in active/pending state, check remote status
+        active_states = {"RUNNING", "PENDING", "JOB_STATE_RUNNING", "JOB_STATE_PENDING"}
+        if self.genai_client and job.status in active_states:
             try:
                 remote_job = self.genai_client.tunings.get(name=job.job_name)
                 state = getattr(remote_job, "state", None)
@@ -404,12 +426,45 @@ class GeminiTuningService:
                         job.status = "CANCELLED"
                     elif "RUNNING" in state_str or "JOB_STATE_RUNNING" in state_str:
                         job.status = "RUNNING"
+                    elif "PENDING" in state_str or "JOB_STATE_PENDING" in state_str:
+                        job.status = "PENDING"
                     else:
                         job.status = str(state)
+
                 if hasattr(remote_job, "error") and remote_job.error:
                     job.error_message = str(remote_job.error)
-                if hasattr(remote_job, "tuned_model") and getattr(remote_job.tuned_model, "model", None):
-                    job.tuned_model_name = remote_job.tuned_model.model
+
+                # Extract tuned model endpoint or model resource path
+                tuned_model = getattr(remote_job, "tuned_model", None)
+                if tuned_model:
+                    endpoint = getattr(tuned_model, "endpoint", None)
+                    model_res = getattr(tuned_model, "model", None)
+                    if isinstance(endpoint, str) and endpoint:
+                        job.tuned_model_name = endpoint
+                    elif isinstance(model_res, str) and model_res:
+                        job.tuned_model_name = model_res
+
+                    # Extract intermediate checkpoints if present
+                    checkpoints = getattr(tuned_model, "checkpoints", None)
+                    if checkpoints:
+                        metrics = dict(job.metrics or {})
+                        metrics["checkpoints"] = [
+                            {
+                                "checkpoint_id": getattr(cp, "checkpoint_id", None),
+                                "epoch": getattr(cp, "epoch", None),
+                                "step": getattr(cp, "step", None),
+                                "endpoint": getattr(cp, "endpoint", None),
+                            }
+                            for cp in checkpoints
+                        ]
+                        job.metrics = metrics
+
+                experiment = getattr(remote_job, "experiment", None)
+                if experiment:
+                    metrics = dict(job.metrics or {})
+                    metrics["experiment"] = experiment
+                    job.metrics = metrics
+
                 await db.commit()
                 await db.refresh(job)
             except Exception as exc:
@@ -417,12 +472,26 @@ class GeminiTuningService:
 
         return job
 
-    @classmethod
-    def get_supported_tuning_models(cls) -> List[Dict[str, Any]]:
+    def get_supported_tuning_models(self) -> List[Dict[str, Any]]:
         """
         Returns list of verified foundation models supported for Vertex AI Supervised Fine-Tuning in us-central1.
+        Dynamically queries Vertex AI Model Garden if genai_client is connected.
         """
-        return SUPPORTED_TUNING_MODELS
+        models = [dict(m) for m in SUPPORTED_TUNING_MODELS]
+        if self.genai_client:
+            try:
+                available_names = {
+                    m.name.replace("publishers/google/models/", "").lower()
+                    for m in self.genai_client.models.list()
+                }
+                for m in models:
+                    m["available_in_project"] = (
+                        m["id"] in available_names
+                        or f"publishers/google/models/{m['id']}" in available_names
+                    )
+            except Exception as exc:
+                logger.debug("Could not dynamically query Model Garden: %s", exc)
+        return models
 
     async def activate_tuned_model(
         self,
