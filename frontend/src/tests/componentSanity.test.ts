@@ -7,6 +7,7 @@ import { renderToString } from "react-dom/server";
 import { AppShell } from "../components/layout/AppShell.js";
 import { Topbar } from "../components/layout/Topbar.js";
 import { TopbarRoleSelector } from "../components/layout/topbar/TopbarRoleSelector.js";
+import { TopbarUserMenu } from "../components/layout/topbar/TopbarUserMenu.js";
 import { Sidebar } from "../components/layout/Sidebar.js";
 import { SidebarRecentRFPs } from "../components/layout/sidebar/SidebarRecentRFPs.js";
 
@@ -533,6 +534,38 @@ test("Component Sanity: GovernanceWaterfallSteps displays sequential stages and 
   assert.ok(html.includes("Legal Review"));
   assert.ok(html.includes("Final Sign-off"));
   assert.ok(html.includes("Active"));
+});
+
+test("Component Sanity: TopbarUserMenu renders signed-out and signed-in states", () => {
+  const unauthedHtml = renderToString(
+    React.createElement(TopbarUserMenu, {
+      user: null,
+      onLogout: () => {},
+      role: "Proposal manager",
+      googleClientId: "",
+      onCredentialSuccess: () => {},
+    })
+  );
+  assert.ok(unauthedHtml.includes("topbar-user-menu"));
+  assert.ok(unauthedHtml.includes("Sign in"));
+
+  const authedHtml = renderToString(
+    React.createElement(TopbarUserMenu, {
+      user: {
+        id: "google-123",
+        name: "Alex Chen",
+        email: "alex.chen@acme-corp.com",
+        picture: "https://lh3.googleusercontent.com/a/test",
+      },
+      onLogout: () => {},
+      role: "Security SME",
+      googleClientId: "test-client-id",
+      onCredentialSuccess: () => {},
+    })
+  );
+  assert.ok(authedHtml.includes("topbar-user-menu"));
+  assert.ok(authedHtml.includes("avatar"));
+  assert.ok(authedHtml.includes("avatar-img"));
 });
 
 

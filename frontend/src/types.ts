@@ -258,3 +258,12 @@ export const starterQuestions = [
   "What is the guaranteed latency SLA and failover mechanism for remote pilot teleoperation?",
 ];
 
+export interface GoogleUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  tenantId?: string;
+  authProvider?: string;
+}
+

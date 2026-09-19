@@ -11,6 +11,7 @@ import { useReviewGovernanceState } from "./useReviewGovernanceState";
 import { useQuestionnaireWorkflow } from "./useQuestionnaireWorkflow";
 import { useAiAnswerGenerator } from "./useAiAnswerGenerator";
 import { useDocumentIngestion } from "./useDocumentIngestion";
+import { useGoogleAuth } from "./useGoogleAuth";
 import { assembleAppProps } from "./useAppPropsAssembler";
 
 const apiBaseUrl = getApiBaseUrl();
@@ -26,6 +27,7 @@ export function useAppController() {
   const review = useReviewGovernanceState();
   const workflow = useQuestionnaireWorkflow(tenantId, navigation.activeResponseId);
   const activity = useActivityAndAudit(tenantId, workflow.role);
+  const auth = useGoogleAuth(activity.showToast);
   const settings = useWorkspaceSettingsManager(tenantId);
   const kb = useKnowledgeBaseManager(tenantId);
   const workspaces = useWorkspaceListManager(tenantId);
@@ -302,11 +304,13 @@ export function useAppController() {
     workspaces,
     ai,
     review,
+    auth,
     apiBaseUrl,
   });
 
   return {
     ...appProps,
+    auth,
     isReviewRoute: navigation.isReviewRoute,
     route: navigation.route,
     tenantId,

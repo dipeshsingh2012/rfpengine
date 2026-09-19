@@ -9,12 +9,14 @@ from app.api.v1.endpoints import (
     mcp,
     roadmap,
     parser,
+    auth,
 )
 from app.api.knowledge_base import router as kb_router
 
 api_router = APIRouter()
 
 # Mount the routers
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(feedback.router, tags=["feedback"])
 api_router.include_router(search.router, tags=["search"])
 api_router.include_router(responses.router, prefix="/responses", tags=["responses"])

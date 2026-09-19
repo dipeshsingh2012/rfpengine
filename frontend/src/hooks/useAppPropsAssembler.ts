@@ -108,6 +108,10 @@ export function assembleAppProps(p: any) {
     role: p.workflow.role,
     setRole: p.workflow.setRole,
     showToast: p.activity.showToast,
+    user: p.auth?.user,
+    onLogout: p.auth?.logout,
+    googleClientId: p.auth?.googleClientId,
+    onCredentialSuccess: p.auth?.handleCredentialResponse,
   };
 
   const mainViewProps = {

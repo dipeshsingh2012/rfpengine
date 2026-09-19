@@ -1,6 +1,6 @@
 import React from "react";
 import { Menu, X } from "lucide-react";
-import { ReviewerRole } from "../../types";
+import { GoogleUser, ReviewerRole } from "../../types";
 import { TopbarBrand } from "./topbar/TopbarBrand";
 import { TopbarHealthBadge } from "./topbar/TopbarHealthBadge";
 import { TopbarActions } from "./topbar/TopbarActions";
@@ -15,6 +15,10 @@ interface TopbarProps {
   role?: ReviewerRole;
   setRole?: (role: ReviewerRole) => void;
   showToast?: (msg: string) => void;
+  user?: GoogleUser | null;
+  onLogout?: () => void;
+  googleClientId?: string;
+  onCredentialSuccess?: (res: { credential: string }) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -27,6 +31,10 @@ export const Topbar: React.FC<TopbarProps> = ({
   role,
   setRole,
   showToast,
+  user,
+  onLogout,
+  googleClientId,
+  onCredentialSuccess,
 }) => {
   return (
     <header className="topbar">
@@ -43,7 +51,15 @@ export const Topbar: React.FC<TopbarProps> = ({
         companyName={companyName}
       />
       <TopbarHealthBadge backendHealth={backendHealth} />
-      <TopbarActions role={role} setRole={setRole} showToast={showToast} />
+      <TopbarActions
+        role={role}
+        setRole={setRole}
+        showToast={showToast}
+        user={user}
+        onLogout={onLogout}
+        googleClientId={googleClientId}
+        onCredentialSuccess={onCredentialSuccess}
+      />
     </header>
   );
 };

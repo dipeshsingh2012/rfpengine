@@ -31,6 +31,10 @@ interface AppShellProps {
   role?: ReviewerRole;
   setRole?: (r: ReviewerRole) => void;
   showToast?: (msg: string) => void;
+  user?: import("../../types").GoogleUser | null;
+  onLogout?: () => void;
+  googleClientId?: string;
+  onCredentialSuccess?: (res: { credential: string }) => void;
   children: React.ReactNode;
 }
 
@@ -47,6 +51,10 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         role={p.role}
         setRole={p.setRole}
         showToast={p.showToast}
+        user={p.user}
+        onLogout={p.onLogout}
+        googleClientId={p.googleClientId}
+        onCredentialSuccess={p.onCredentialSuccess}
       />
 
       <Sidebar

@@ -1,18 +1,27 @@
 import React from "react";
 import { TrendingUp, AlertCircle } from "lucide-react";
-import { ReviewerRole } from "../../../types";
+import { GoogleUser, ReviewerRole } from "../../../types";
 import { TopbarRoleSelector } from "./TopbarRoleSelector";
+import { TopbarUserMenu } from "./TopbarUserMenu";
 
 interface TopbarActionsProps {
   role?: ReviewerRole;
   setRole?: (role: ReviewerRole) => void;
   showToast?: (msg: string) => void;
+  user?: GoogleUser | null;
+  onLogout?: () => void;
+  googleClientId?: string;
+  onCredentialSuccess?: (res: { credential: string }) => void;
 }
 
 export const TopbarActions: React.FC<TopbarActionsProps> = ({
   role = "Proposal manager",
   setRole = () => {},
   showToast,
+  user = null,
+  onLogout = () => {},
+  googleClientId,
+  onCredentialSuccess = () => {},
 }) => {
   return (
     <>
@@ -42,9 +51,13 @@ export const TopbarActions: React.FC<TopbarActionsProps> = ({
       <button className="icon-button" title="Open notifications">
         <AlertCircle size={18} />
       </button>
-      <button className="avatar" title="Account menu">
-        JD
-      </button>
+      <TopbarUserMenu
+        user={user}
+        onLogout={onLogout}
+        role={role}
+        googleClientId={googleClientId}
+        onCredentialSuccess={onCredentialSuccess}
+      />
     </>
   );
 };

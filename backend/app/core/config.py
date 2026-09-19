@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     VERTEX_EMBEDDING_MODEL: str = Field(default="text-embedding-004")
     EMBEDDING_DIMENSION: int = Field(default=768)
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(default=None)
+    GOOGLE_CLIENT_ID: str = Field(default="")
 
     @property
     def algolia_app_id(self) -> str:
