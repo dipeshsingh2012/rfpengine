@@ -8,7 +8,7 @@ const apiBaseUrl = getApiBaseUrl();
 export function useWorkspaceListManager(tenantId: string) {
   const [workspaceSummaries, setWorkspaceSummaries] = useState<WorkspaceSummaryItem[]>([]);
   const [isWorkspacesLoading, setIsWorkspacesLoading] = useState(false);
-  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>();
+  const [recentRFPs, setRecentRFPs] = useState<RecentRFPItem[]>([]);
 
   async function fetchWorkspaceSummaries() {
     setIsWorkspacesLoading(true);

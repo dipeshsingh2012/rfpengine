@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isKbActive={isKbActive}
         isPlaygroundActive={isPlaygroundActive}
         isActivityActive={isActivityActive}
-        recentCount={recentRFPs.length}
+        recentCount={(recentRFPs || []).length}
         kbTotalSources={kbTotalSources}
         kbTotalRecords={kbTotalRecords}
         tenantId={tenantId}
@@ -71,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       <SidebarRecentRFPs
-        recentRFPs={recentRFPs}
+        recentRFPs={recentRFPs || []}
         isResponsesActive={isResponsesActive}
         activeResponseId={activeResponseId}
         currentRoute={currentRoute}

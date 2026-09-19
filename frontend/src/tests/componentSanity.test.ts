@@ -76,6 +76,40 @@ test("Component Sanity: AppShell, Topbar, and Sidebar render without crashing", 
   assert.ok(html.includes("topbar"));
   assert.ok(html.includes("sidebar"));
   assert.ok(html.includes("Test Content"));
+
+  // Verify graceful handling when recentRFPs is undefined or empty
+  const emptyHtml = renderToString(
+    React.createElement(
+      AppShell,
+      {
+        mobileNavOpen: false,
+        setMobileNavOpen: () => {},
+        companyName: "Acme Corp",
+        onOpenSettings: () => {},
+        backendHealth: "ok",
+        isOverviewActive: true,
+        isResponsesActive: false,
+        isKbActive: false,
+        isPlaygroundActive: false,
+        isActivityActive: false,
+        recentRFPs: undefined as any,
+        activeResponseId: "",
+        onNavigateHome: () => {},
+        onNavigateResponses: () => {},
+        onSelectRFP: () => {},
+        onOpenKB: () => {},
+        onOpenActivity: () => {},
+        showSettingsModal: false,
+        kbTotalRecords: 0,
+        kbTotalSources: 0,
+        tenantId: "acme-corp",
+        toastNotice: null,
+      },
+      React.createElement("div", null, "Homepage Content")
+    )
+  );
+  assert.ok(emptyHtml.includes("Homepage Content"));
+  assert.ok(emptyHtml.includes("No recent proposals"));
 });
 
 test("Component Sanity: SidebarRecentRFPs renders items, truncation, badges, and empty state", () => {
