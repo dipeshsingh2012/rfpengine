@@ -27,18 +27,18 @@ export const HomeWelcomeView: React.FC<HomeWelcomeViewProps> = ({
       <h1>Bring in your questionnaire</h1>
       <p className="home-subtitle">Choose how you want to load the buyer form.</p>
       <div className="home-feature-grid">
+        <HomeUploadFeature
+          loadFormFile={loadFormFile}
+          openImport={openImport}
+          isParsingDocument={isParsingDocument}
+          parsingProgress={parsingProgress}
+        />
         <HomeUrlFeature
           formUrl={formUrl}
           setFormUrl={setFormUrl}
           loadFormUrl={loadFormUrl}
           openImport={openImport}
           isParsingDocument={isParsingDocument}
-        />
-        <HomeUploadFeature
-          loadFormFile={loadFormFile}
-          openImport={openImport}
-          isParsingDocument={isParsingDocument}
-          parsingProgress={parsingProgress}
         />
       </div>
     </section>

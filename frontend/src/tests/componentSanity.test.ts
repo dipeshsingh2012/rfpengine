@@ -172,6 +172,9 @@ test("Component Sanity: HomeWelcomeView and features render without crashing", (
   assert.ok(html.includes("home-feature-grid"));
   assert.ok(html.includes("Paste a form URL"));
   assert.ok(html.includes("Upload questionnaire"));
+  const uploadIdx = html.indexOf("Upload questionnaire");
+  const urlIdx = html.indexOf("Paste a form URL");
+  assert.ok(uploadIdx < urlIdx, "Upload questionnaire feature should come before Paste a form URL");
 });
 
 test("Component Sanity: ResponsesDashboard and DeleteConfirmModal render properly", () => {
