@@ -24,7 +24,7 @@ All global styling tokens and variables are declared in `src/styles.css` under `
 ### Standardized Button Conventions
 - `.primary-button`: High-priority primary actions (e.g. Save, Ingest, Generate All).
 - `.secondary-button`: Clean white/subtle bordered button for secondary actions (e.g. Refresh, Cancel, Configure).
-- `.outline-button`: Transparent bordered buttons with hover states (e.g. Export Deliverable, Open Form).
+- `.outline-button`: Transparent bordered buttons with hover states (e.g. Export Matrix, Open Form).
 - `.ghost-button`: Minimal flat buttons for inline toolbar operations.
 - `.danger-button`: Destructive actions (e.g. Delete Questionnaire, Revoke Connector).
 - `.icon-btn`: Compact square icon button with subtle padding.

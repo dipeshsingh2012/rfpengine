@@ -79,7 +79,7 @@ export const ExportPackageModal: React.FC<ExportPackageModalProps> = ({
               </>
             ) : (
               <>
-                <Download size={14} /> Export Deliverable
+                <Download size={14} /> Download Package
               </>
             )}
           </button>

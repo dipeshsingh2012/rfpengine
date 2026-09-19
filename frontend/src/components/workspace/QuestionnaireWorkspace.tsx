@@ -13,12 +13,6 @@ export { type QuestionnaireWorkspaceProps } from "./questionnaire/types";
 
 export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = (props) => {
   const allCurrentQuestions = props.detectedQuestions.length > 0 ? props.detectedQuestions : [props.question];
-  const isQuestionFilled = (q: string) => Boolean(props.answersByQuestion[q]?.trim());
-  const answeredCount = props.detectedQuestions.length > 0
-    ? props.detectedQuestions.filter(isQuestionFilled).length
-    : (props.answer?.trim() ? 1 : 0);
-  const totalCount = props.detectedQuestions.length > 0 ? props.detectedQuestions.length : 1;
-  const isAllFilled = answeredCount === totalCount && totalCount > 0;
 
   return (
     <>
@@ -32,10 +26,6 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = (pr
         sourceMode={props.sourceMode}
         sourceLabel={props.sourceLabel}
         openOriginalForm={props.openOriginalForm}
-        onOpenExportModal={props.onOpenExportModal}
-        isAllFilled={isAllFilled}
-        answeredQuestionsCount={answeredCount}
-        totalQuestionsCount={totalCount}
       />
       {props.detectedQuestions.length === 0 && (
         <SingleQuestionInputPanel
