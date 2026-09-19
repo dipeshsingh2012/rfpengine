@@ -59,6 +59,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         onLogout={onLogout}
         googleClientId={googleClientId}
         onCredentialSuccess={onCredentialSuccess}
+        onOpenSettings={onOpenSettings}
       />
     </header>
   );

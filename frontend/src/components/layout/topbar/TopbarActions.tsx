@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUp, AlertCircle } from "lucide-react";
+import { TrendingUp, AlertCircle, Settings } from "lucide-react";
 import { GoogleUser, ReviewerRole } from "../../../types";
 import { TopbarRoleSelector } from "./TopbarRoleSelector";
 import { TopbarUserMenu } from "./TopbarUserMenu";
@@ -12,6 +12,7 @@ interface TopbarActionsProps {
   onLogout?: () => void;
   googleClientId?: string;
   onCredentialSuccess?: (res: { credential: string }) => void;
+  onOpenSettings?: () => void;
 }
 
 export const TopbarActions: React.FC<TopbarActionsProps> = ({
@@ -22,6 +23,7 @@ export const TopbarActions: React.FC<TopbarActionsProps> = ({
   onLogout = () => {},
   googleClientId,
   onCredentialSuccess = () => {},
+  onOpenSettings,
 }) => {
   return (
     <>
@@ -50,6 +52,14 @@ export const TopbarActions: React.FC<TopbarActionsProps> = ({
       </a>
       <button className="icon-button" title="Open notifications">
         <AlertCircle size={18} />
+      </button>
+      <button
+        className="icon-button"
+        title="Settings & Administration"
+        onClick={onOpenSettings}
+        aria-label="Settings and Administration"
+      >
+        <Settings size={18} />
       </button>
       <TopbarUserMenu
         user={user}
