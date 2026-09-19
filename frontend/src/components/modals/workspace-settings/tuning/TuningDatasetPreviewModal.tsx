@@ -15,9 +15,12 @@ export const TuningDatasetPreviewModal: React.FC<Props> = ({ isOpen, onClose, pr
   const current = samples[activeIdx];
   const isValid = (preview?.total_pairs || 0) >= 10;
 
-  const userMsg = current?.messages.find((m) => m.role === "user")?.content || "";
-  const modelMsg = current?.messages.find((m) => m.role === "model")?.content || "";
-  const sysMsg = current?.messages.find((m) => m.role === "system")?.content || "";
+  const getMsg = (role: string) =>
+    current?.contents?.find((c) => c.role === role)?.parts?.[0]?.text ||
+    current?.messages?.find((m) => m.role === role)?.content || "";
+  const userMsg = getMsg("user");
+  const modelMsg = getMsg("model");
+  const sysMsg = current?.system_instruction?.parts?.[0]?.text || getMsg("system");
 
   return (
     <ModalPortal isOpen={isOpen} onClose={onClose} cardClassName="modal-card tuning-studio-modal" ariaLabel="Dataset Preview">

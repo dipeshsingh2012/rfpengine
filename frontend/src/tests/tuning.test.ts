@@ -14,10 +14,12 @@ test("TuningDatasetPreview structure validates training pairs accurately", () =>
     approved_reviews_count: 10,
     sample_pairs: [
       {
-        messages: [
-          { role: "system", content: "You are the enterprise AI Proposal Drafter..." },
-          { role: "user", content: "What encryption standard is used?" },
-          { role: "model", content: "AES-256 is used for data at rest." },
+        system_instruction: {
+          parts: [{ text: "You are the enterprise AI Proposal Drafter..." }],
+        },
+        contents: [
+          { role: "user", parts: [{ text: "What encryption standard is used?" }] },
+          { role: "model", parts: [{ text: "AES-256 is used for data at rest." }] },
         ],
       },
     ],
@@ -25,10 +27,10 @@ test("TuningDatasetPreview structure validates training pairs accurately", () =>
 
   assert.equal(preview.total_pairs, 24);
   assert.equal(preview.golden_qa_count + preview.approved_reviews_count, preview.total_pairs);
-  assert.equal(preview.sample_pairs[0].messages.length, 3);
-  assert.equal(preview.sample_pairs[0].messages[0].role, "system");
-  assert.equal(preview.sample_pairs[0].messages[1].role, "user");
-  assert.equal(preview.sample_pairs[0].messages[2].role, "model");
+  assert.equal(preview.sample_pairs[0].contents?.length, 2);
+  assert.equal(preview.sample_pairs[0].contents?.[0].role, "user");
+  assert.equal(preview.sample_pairs[0].contents?.[1].role, "model");
+  assert.equal(preview.sample_pairs[0].system_instruction?.parts[0].text.includes("Proposal Drafter"), true);
 });
 
 test("TuningJobItem handles job statuses and metric computation", () => {

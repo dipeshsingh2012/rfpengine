@@ -526,10 +526,12 @@ test("Component Sanity: TuningStudioModal and NewTuningJobModal render cleanly",
         approved_reviews_count: 7,
         sample_pairs: [
           {
-            messages: [
-              { role: "system", content: "System context" },
-              { role: "user", content: "Sample question?" },
-              { role: "model", content: "Sample answer." },
+            system_instruction: {
+              parts: [{ text: "System context" }],
+            },
+            contents: [
+              { role: "user", parts: [{ text: "Sample question?" }] },
+              { role: "model", parts: [{ text: "Sample answer." }] },
             ],
           },
         ],
