@@ -475,6 +475,24 @@ class GeminiTuningService:
                     metrics["experiment"] = experiment
                     job.metrics = metrics
 
+                # Automatically activate endpoint for tenant as soon as job succeeds
+                if job.status == "SUCCEEDED" and job.tuned_model_name:
+                    try:
+                        await PostgresService.update_workspace_settings(
+                            db,
+                            tenant_id=tenant_id,
+                            update_data=WorkspaceSettingsUpdate(
+                                active_tuned_model_id=job.tuned_model_name,
+                            ),
+                        )
+                        logger.info(
+                            "Auto-activated tuned model endpoint %s for tenant %s",
+                            job.tuned_model_name,
+                            tenant_id,
+                        )
+                    except Exception as act_err:
+                        logger.warning("Failed to auto-activate tuned model %s: %s", job.id, act_err)
+
                 await db.commit()
                 await db.refresh(job)
             except Exception as exc:
