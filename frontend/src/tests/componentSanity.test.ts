@@ -37,6 +37,7 @@ import { KBPlaygroundTab } from "../components/modals/knowledge-base/KBPlaygroun
 import { ModalPortal } from "../components/common/ModalPortal.js";
 import { TuningStudioModal } from "../components/modals/workspace-settings/tuning/TuningStudioModal.js";
 import { NewTuningJobModal } from "../components/modals/workspace-settings/tuning/NewTuningJobModal.js";
+import { TuningDatasetPreviewModal } from "../components/modals/workspace-settings/tuning/TuningDatasetPreviewModal.js";
 import { SettingsAiTab } from "../components/modals/workspace-settings/SettingsAiTab.js";
 import { RevisionFeedbackModal } from "../components/workspace/questionnaire/RevisionFeedbackModal.js";
 import { AdminTabsNav } from "../components/admin/AdminTabsNav.js";
@@ -514,6 +515,31 @@ test("Component Sanity: TuningStudioModal and NewTuningJobModal render cleanly",
   assert.ok(jobHtml.includes("Supervised Training Datasets"));
   assert.ok(jobHtml.includes("Include Canonical Golden Q"));
   assert.ok(jobHtml.includes("Include SME Approved RFP Responses"));
+
+  const previewModalHtml = renderToString(
+    React.createElement(TuningDatasetPreviewModal, {
+      isOpen: true,
+      onClose: () => {},
+      preview: {
+        total_pairs: 15,
+        golden_qa_count: 8,
+        approved_reviews_count: 7,
+        sample_pairs: [
+          {
+            messages: [
+              { role: "system", content: "System context" },
+              { role: "user", content: "Sample question?" },
+              { role: "model", content: "Sample answer." },
+            ],
+          },
+        ],
+      },
+    })
+  );
+  assert.ok(previewModalHtml.includes("Supervised Dataset Preview"));
+  assert.ok(previewModalHtml.includes("Pass: 15 pairs"));
+  assert.ok(previewModalHtml.includes("Sample question?"));
+  assert.ok(previewModalHtml.includes("Sample answer."));
 
   const settingsAiHtml = renderToString(
     React.createElement(SettingsAiTab, {
