@@ -63,3 +63,4 @@ export const AdminPermissionsMatrix: React.FC<AdminPermissionsMatrixProps> = ({ 
     </div>
   );
 };
+

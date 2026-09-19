@@ -18,33 +18,39 @@ export const TopbarUserMenu: React.FC<TopbarUserMenuProps> = ({
   onCredentialSuccess,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [rendered, setRendered] = useState(false);
   const btnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!user && googleClientId && window.google?.accounts?.id && btnRef.current) {
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: onCredentialSuccess,
-      });
-      window.google.accounts.id.renderButton(btnRef.current, {
-        theme: "outline",
-        size: "medium",
-        shape: "pill",
-        text: "signin_with",
-      });
-    }
+    if (user || !googleClientId) return;
+    let timer: any = null;
+    const tryInit = () => {
+      if (window.google?.accounts?.id && btnRef.current) {
+        window.google.accounts.id.initialize({ client_id: googleClientId, callback: onCredentialSuccess });
+        window.google.accounts.id.renderButton(btnRef.current, { theme: "outline", size: "medium", shape: "pill", text: "signin_with" });
+        setRendered(true);
+        if (timer) clearInterval(timer);
+        return true;
+      }
+      return false;
+    };
+    if (!tryInit()) timer = setInterval(tryInit, 200);
+    return () => { if (timer) clearInterval(timer); };
   }, [user, googleClientId, onCredentialSuccess]);
+
+  const handleManualClick = () => {
+    if (window.google?.accounts?.id && googleClientId) {
+      window.google.accounts.id.initialize({ client_id: googleClientId, callback: onCredentialSuccess });
+      window.google.accounts.id.prompt();
+    }
+  };
 
   if (!user) {
     return (
       <div className="topbar-user-menu">
-        <div ref={btnRef} />
-        {!googleClientId && (
-          <button
-            className="google-signin-btn"
-            onClick={() => window.google?.accounts?.id?.prompt()}
-            title="Sign in with Google"
-          >
+        <div ref={btnRef} style={{ display: rendered ? "block" : "none" }} />
+        {!rendered && (
+          <button className="google-signin-btn" onClick={handleManualClick} title="Sign in with Google">
             <User size={14} /> Sign in
           </button>
         )}
@@ -52,24 +58,13 @@ export const TopbarUserMenu: React.FC<TopbarUserMenuProps> = ({
     );
   }
 
-  const initials = user.name
-    ? user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-    : "JD";
+  const initials = user.name ? user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "JD";
 
   return (
     <div className="topbar-user-menu">
-      <button
-        className="avatar"
-        onClick={() => setIsOpen(!isOpen)}
-        title={`${user.name} (${user.email})`}
-      >
-        {user.picture ? (
-          <img src={user.picture} alt={user.name} className="avatar-img" />
-        ) : (
-          initials
-        )}
+      <button className="avatar" onClick={() => setIsOpen(!isOpen)} title={`${user.name} (${user.email})`}>
+        {user.picture ? <img src={user.picture} alt={user.name} className="avatar-img" /> : initials}
       </button>
-
       {isOpen && (
         <div className="user-menu-popover panel">
           <div className="user-menu-header">
@@ -77,9 +72,7 @@ export const TopbarUserMenu: React.FC<TopbarUserMenuProps> = ({
             <small>{user.email}</small>
           </div>
           <div className="user-menu-meta">
-            <span className="stat-badge approved">
-              <ShieldCheck size={12} /> Google SSO
-            </span>
+            <span className="stat-badge approved"><ShieldCheck size={12} /> Google SSO</span>
             <span className="stat-badge review">{role}</span>
           </div>
           <button className="user-menu-logout" onClick={() => { setIsOpen(false); onLogout(); }}>
@@ -90,4 +83,3 @@ export const TopbarUserMenu: React.FC<TopbarUserMenuProps> = ({
     </div>
   );
 };
-

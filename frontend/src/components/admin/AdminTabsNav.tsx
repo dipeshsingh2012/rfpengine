@@ -34,3 +34,4 @@ export const AdminTabsNav: React.FC<AdminTabsNavProps> = ({ currentTab, onSelect
     </nav>
   );
 };
+

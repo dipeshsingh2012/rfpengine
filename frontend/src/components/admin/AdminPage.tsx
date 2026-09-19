@@ -70,3 +70,4 @@ export const AdminPage: React.FC<AdminPageProps> = ({ tenantId, showToast, onExp
     </div>
   );
 };
+

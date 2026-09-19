@@ -98,3 +98,4 @@ async def test_admin_governance_workflow_modes():
         assert update_resp.status_code == 200
         assert update_resp.json()["governance"]["workflow_mode"] == "parallel"
         assert update_resp.json()["governance"]["finance_sme_email"] == "cfo@acme-corp.com"
+

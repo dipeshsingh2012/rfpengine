@@ -127,3 +127,4 @@ export function useAdminManager(tenantId: string, showToast?: (msg: string) => v
     saveGovernance,
   };
 }
+

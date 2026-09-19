@@ -75,3 +75,4 @@ export const AdminSecurityTab: React.FC<AdminSecurityTabProps> = ({ governance, 
     </div>
   );
 };
+

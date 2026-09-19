@@ -83,3 +83,4 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ governance, onSave }) =>
     </div>
   );
 };
+

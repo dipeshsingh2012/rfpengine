@@ -320,3 +320,4 @@ async def update_governance_settings(payload: GovernanceSettingsPayload, x_tenan
     gov = get_tenant_governance(x_tenant_id)
     gov.update(payload.model_dump())
     return {"status": "updated", "governance": gov}
+
