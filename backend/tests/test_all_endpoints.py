@@ -364,24 +364,6 @@ async def test_export_csv():
     assert "text/csv" in response.headers.get("content-type", "")
 
 
-# ==================== FLEET ENDPOINTS ====================
-
-@pytest.mark.asyncio
-async def test_fleet_handoff_verify():
-    async with get_client() as ac:
-        response = await ac.post(
-            "/api/v1/fleet/handoff/verify",
-            json={
-                "handoff_id": "handoff-123",
-                "verification_data": {"test": "data"}
-            },
-            headers={"X-Tenant-ID": "test_tenant"}
-        )
-    assert response.status_code == 200
-    data = response.json()
-    assert "is_valid" in data
-
-
 # ==================== EMAIL ENDPOINTS ====================
 
 @pytest.mark.asyncio

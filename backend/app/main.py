@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
 
-app = FastAPI(title="Autonomous Agentic Fleet API")
+app = FastAPI(title="RFPEngine API")
 
 # Allow all origins, methods, and headers for seamless frontend, extension, and local access
 app.add_middleware(
