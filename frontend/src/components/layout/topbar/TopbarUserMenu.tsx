@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { LogOut, ShieldCheck, User } from "lucide-react";
+import React, { useState } from "react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import { GoogleUser, ReviewerRole } from "../../../types";
 
 interface TopbarUserMenuProps {
@@ -7,56 +7,17 @@ interface TopbarUserMenuProps {
   onLogout: () => void;
   role: ReviewerRole;
   googleClientId?: string;
-  onCredentialSuccess: (res: { credential: string }) => void;
+  onCredentialSuccess?: (res: { credential: string }) => void;
 }
 
 export const TopbarUserMenu: React.FC<TopbarUserMenuProps> = ({
   user,
   onLogout,
   role,
-  googleClientId,
-  onCredentialSuccess,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [rendered, setRendered] = useState(false);
-  const btnRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (user || !googleClientId) return;
-    let timer: any = null;
-    const tryInit = () => {
-      if (window.google?.accounts?.id && btnRef.current) {
-        window.google.accounts.id.initialize({ client_id: googleClientId, callback: onCredentialSuccess });
-        window.google.accounts.id.renderButton(btnRef.current, { theme: "outline", size: "medium", shape: "pill", text: "signin_with" });
-        setRendered(true);
-        if (timer) clearInterval(timer);
-        return true;
-      }
-      return false;
-    };
-    if (!tryInit()) timer = setInterval(tryInit, 200);
-    return () => { if (timer) clearInterval(timer); };
-  }, [user, googleClientId, onCredentialSuccess]);
-
-  const handleManualClick = () => {
-    if (window.google?.accounts?.id && googleClientId) {
-      window.google.accounts.id.initialize({ client_id: googleClientId, callback: onCredentialSuccess });
-      window.google.accounts.id.prompt();
-    }
-  };
-
-  if (!user) {
-    return (
-      <div className="topbar-user-menu">
-        <div ref={btnRef} style={{ display: rendered ? "block" : "none" }} />
-        {!rendered && (
-          <button className="google-signin-btn" onClick={handleManualClick} title="Sign in with Google">
-            <User size={14} /> Sign in
-          </button>
-        )}
-      </div>
-    );
-  }
+  if (!user) return null;
 
   const initials = user.name ? user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "JD";
 

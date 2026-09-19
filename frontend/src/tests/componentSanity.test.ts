@@ -551,8 +551,7 @@ test("Component Sanity: TopbarUserMenu renders signed-out and signed-in states",
       onCredentialSuccess: () => {},
     })
   );
-  assert.ok(unauthedHtml.includes("topbar-user-menu"));
-  assert.ok(unauthedHtml.includes("Sign in"));
+  assert.equal(unauthedHtml, "");
 
   const authedHtml = renderToString(
     React.createElement(TopbarUserMenu, {
