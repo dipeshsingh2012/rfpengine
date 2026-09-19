@@ -26,7 +26,7 @@ export const TopbarActions: React.FC<TopbarActionsProps> = ({
   return (
     <>
       <div className="topbar-spacer" />
-      <TopbarRoleSelector role={role} setRole={setRole} showToast={showToast} />
+      {user && <TopbarRoleSelector role={role} setRole={setRole} showToast={showToast} />}
       <a
         href="https://rfpengine.aroadmap.dev/"
         target="_blank"

@@ -118,6 +118,9 @@ export function assembleAppProps(p: any) {
 
   const mainViewProps = {
     route: p.route,
+    user: p.auth?.user,
+    googleClientId: p.auth?.googleClientId,
+    onCredentialSuccess: p.auth?.handleCredentialResponse,
     formUrl: p.ingestion.formUrl,
     setFormUrl: p.ingestion.setFormUrl,
     loadFormUrl: p.ingestion.loadFormUrl,

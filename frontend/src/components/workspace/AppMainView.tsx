@@ -2,11 +2,15 @@ import React from "react";
 import { HomeWelcomeView } from "./HomeWelcomeView";
 import { ResponsesDashboard } from "../responses/ResponsesDashboard";
 import { QuestionnaireWorkspace, QuestionnaireWorkspaceProps } from "./QuestionnaireWorkspace";
-import { WorkspaceSummaryItem } from "../../types";
+import { WorkspaceSummaryItem, GoogleUser } from "../../types";
 import { AdminPage } from "../admin/AdminPage";
+import { LandingAuthGate } from "./home/LandingAuthGate";
 
 interface AppMainViewProps {
   route: string;
+  user?: GoogleUser | null;
+  googleClientId?: string;
+  onCredentialSuccess?: (res: { credential: string }) => void;
   formUrl: string;
   setFormUrl: (url: string) => void;
   loadFormUrl: () => Promise<string | void>;
@@ -26,64 +30,49 @@ interface AppMainViewProps {
   onExportTenantData?: () => void;
 }
 
-export const AppMainView: React.FC<AppMainViewProps> = ({
-  route,
-  formUrl,
-  setFormUrl,
-  loadFormUrl,
-  loadFormFile,
-  openImport,
-  isParsingDocument,
-  parsingProgress,
-  workspaceSummaries,
-  isWorkspacesLoading,
-  onSelectWorkspace,
-  handleDuplicateWorkspace,
-  handleDeleteWorkspace,
-  handleExportWorkspace,
-  onNewQuestionnaire,
-  fetchWorkspaceSummaries,
-  questionnaireProps,
-  onExportTenantData,
-}) => {
-  if (route === "/") {
+export const AppMainView: React.FC<AppMainViewProps> = (p) => {
+  if (!p.user) {
+    return <LandingAuthGate googleClientId={p.googleClientId} onCredentialSuccess={p.onCredentialSuccess} />;
+  }
+
+  if (p.route === "/") {
     return (
       <HomeWelcomeView
-        formUrl={formUrl}
-        setFormUrl={setFormUrl}
-        loadFormUrl={loadFormUrl}
-        loadFormFile={loadFormFile}
-        openImport={openImport}
-        isParsingDocument={isParsingDocument}
-        parsingProgress={parsingProgress}
+        formUrl={p.formUrl}
+        setFormUrl={p.setFormUrl}
+        loadFormUrl={p.loadFormUrl}
+        loadFormFile={p.loadFormFile}
+        openImport={p.openImport}
+        isParsingDocument={p.isParsingDocument}
+        parsingProgress={p.parsingProgress}
       />
     );
   }
 
-  if (route === "/responses") {
+  if (p.route === "/responses") {
     return (
       <ResponsesDashboard
-        workspaces={workspaceSummaries}
-        isLoading={isWorkspacesLoading}
-        onSelectWorkspace={onSelectWorkspace}
-        onDuplicateWorkspace={handleDuplicateWorkspace}
-        onDeleteWorkspace={handleDeleteWorkspace}
-        onExportWorkspace={handleExportWorkspace}
-        onNewQuestionnaire={onNewQuestionnaire}
-        onRefresh={fetchWorkspaceSummaries}
+        workspaces={p.workspaceSummaries}
+        isLoading={p.isWorkspacesLoading}
+        onSelectWorkspace={p.onSelectWorkspace}
+        onDuplicateWorkspace={p.handleDuplicateWorkspace}
+        onDeleteWorkspace={p.handleDeleteWorkspace}
+        onExportWorkspace={p.handleExportWorkspace}
+        onNewQuestionnaire={p.onNewQuestionnaire}
+        onRefresh={p.fetchWorkspaceSummaries}
       />
     );
   }
 
-  if (route === "/admin") {
+  if (p.route === "/admin") {
     return (
       <AdminPage
-        tenantId={questionnaireProps.tenantId}
-        showToast={questionnaireProps.showToast}
-        onExport={onExportTenantData}
+        tenantId={p.questionnaireProps.tenantId}
+        showToast={p.questionnaireProps.showToast}
+        onExport={p.onExportTenantData}
       />
     );
   }
 
-  return <QuestionnaireWorkspace {...questionnaireProps} />;
+  return <QuestionnaireWorkspace {...p.questionnaireProps} />;
 };

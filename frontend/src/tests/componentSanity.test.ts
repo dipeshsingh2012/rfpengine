@@ -42,6 +42,7 @@ import { AdminTabsNav } from "../components/admin/AdminTabsNav.js";
 import { AdminMembersTable } from "../components/admin/tabs/team/AdminMembersTable.js";
 import { AdminPermissionsMatrix } from "../components/admin/tabs/team/AdminPermissionsMatrix.js";
 import { AdminGovernanceTab } from "../components/admin/tabs/AdminGovernanceTab.js";
+import { LandingAuthGate } from "../components/workspace/home/LandingAuthGate.js";
 
 import { DEFAULT_WORKSPACE_SETTINGS } from "../types.js";
 
@@ -665,6 +666,20 @@ test("Component Sanity: AdminGovernanceTab displays workflow modes and SME routi
   assert.ok(html.includes("Hybrid Routing"));
   assert.ok(html.includes("Active Engine"));
   assert.ok(html.includes("Settings saved"));
+});
+
+test("Component Sanity: LandingAuthGate renders authentication gate when user is not logged in", () => {
+  const html = renderToString(
+    React.createElement(LandingAuthGate, {
+      googleClientId: "test-client-id",
+      onCredentialSuccess: () => {},
+    })
+  );
+  assert.ok(html.includes("auth-gate-container"));
+  assert.ok(html.includes("Sign in to RFPEngine"));
+  assert.ok(html.includes("Enterprise Access Control"));
+  assert.ok(html.includes("Grounded AI Synthesis"));
+  assert.ok(html.includes("Enterprise RBAC Governance"));
 });
 
 
