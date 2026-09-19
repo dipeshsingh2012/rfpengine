@@ -35,9 +35,10 @@ export const TuningJobFormFields: React.FC<Props> = ({
     <div className="form-group">
       <label>Base Gemini Model</label>
       <select value={baseModel} onChange={(e) => setBaseModel(e.target.value)}>
-        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Recommended for Enterprise Reasoning)</option>
-        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast, Cost-efficient)</option>
-        <option value="gemini-1.0-pro-002">Gemini 1.0 Pro-002 (Stable Checkpoint)</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast, Production Default - Recommended)</option>
+        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced Enterprise Reasoning)</option>
+        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (High Throughput)</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash (Next-Gen Frontier Flash)</option>
       </select>
       <span className="settings-field-hint">Vertex AI Supervised Tuning requires a supported base checkpoint.</span>
     </div>

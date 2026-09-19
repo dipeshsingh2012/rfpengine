@@ -19,6 +19,14 @@ router = APIRouter(prefix="/tuning", tags=["Gemini Supervised Tuning"])
 tuning_service = GeminiTuningService()
 
 
+@router.get("/supported-models")
+async def get_supported_models() -> List[dict]:
+    """
+    Returns verified Gemini base models supported for Vertex AI Supervised Fine-Tuning in us-central1.
+    """
+    return tuning_service.get_supported_tuning_models()
+
+
 @router.get("/dataset-preview", response_model=TuningDatasetPreviewResponse)
 async def get_dataset_preview(
     x_tenant_id: str = Header(alias="X-Tenant-ID", default="acme-corp"),
@@ -42,6 +50,12 @@ async def create_tuning_job(
     try:
         job = await tuning_service.create_tuning_job(db, x_tenant_id, payload)
         return TuningJobResponse.model_validate(job)
+    except ValueError as exc:
+        logger.warning("Invalid tuning request parameter: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
     except Exception as exc:
         logger.error("Failed to initiate Vertex AI Gemini tuning job: %s", exc)
         raise HTTPException(

@@ -80,7 +80,7 @@ test("SFT options: selective dataset toggles correctly compute training pairs", 
 });
 
 test("SFT options: model selection differentiates between base models and tuned endpoints", () => {
-  const baseModels = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
+  const baseModels = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.5-flash"];
   const tunedEndpoint = "projects/123/locations/us-central1/models/tuned-abc123";
 
   const isTunedModel = (model: string) =>

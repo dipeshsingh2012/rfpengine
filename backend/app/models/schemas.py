@@ -418,7 +418,7 @@ class WorkspaceSettingsSchema(BaseModel):
 # --- Supervised Tuning Schemas ---
 
 class TuningJobCreate(BaseModel):
-    base_model: str = Field(default="gemini-1.5-pro", description="Base Gemini model to fine-tune")
+    base_model: str = Field(default="gemini-2.5-flash", description="Base Gemini model to fine-tune")
     epochs: int = Field(default=4, ge=1, le=20, description="Training epochs")
     learning_rate_multiplier: float = Field(default=1.0, ge=0.01, le=10.0, description="Learning rate multiplier")
     include_golden_qa: bool = Field(default=True, description="Include Golden Q&A canonical pairs")

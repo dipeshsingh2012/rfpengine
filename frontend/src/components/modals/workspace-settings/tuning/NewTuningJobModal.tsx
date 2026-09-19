@@ -28,7 +28,7 @@ export const NewTuningJobModal: React.FC<Props> = ({
   onClose,
   onSubmit,
 }) => {
-  const [baseModel, setBaseModel] = useState("gemini-1.5-pro");
+  const [baseModel, setBaseModel] = useState("gemini-2.5-flash");
   const [epochs, setEpochs] = useState(4);
   const [lrMultiplier, setLrMultiplier] = useState(1.0);
   const [includeGoldenQa, setIncludeGoldenQa] = useState(true);

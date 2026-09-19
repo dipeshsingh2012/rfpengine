@@ -43,6 +43,34 @@ except ImportError:
     storage = None  # type: ignore
 
 
+SUPPORTED_TUNING_MODELS: List[Dict[str, Any]] = [
+    {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash",
+        "description": "Fast, Production Default (Recommended)",
+        "recommended": True,
+    },
+    {
+        "id": "gemini-2.5-pro",
+        "name": "Gemini 2.5 Pro",
+        "description": "Advanced Enterprise Reasoning",
+        "recommended": False,
+    },
+    {
+        "id": "gemini-2.5-flash-lite",
+        "name": "Gemini 2.5 Flash-Lite",
+        "description": "High Throughput, Low Latency",
+        "recommended": False,
+    },
+    {
+        "id": "gemini-3.5-flash",
+        "name": "Gemini 3.5 Flash",
+        "description": "Next-Gen Frontier Flash",
+        "recommended": False,
+    },
+]
+
+
 class GeminiTuningService:
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or get_settings()
@@ -204,6 +232,16 @@ class GeminiTuningService:
             include_approved_reviews=request.include_approved_reviews,
         )
 
+        base_model_id = (request.base_model or "gemini-2.5-flash").strip()
+        clean_model_id = base_model_id.replace("publishers/google/models/", "").strip()
+        valid_ids = {m["id"] for m in SUPPORTED_TUNING_MODELS}
+        if not base_model_id.startswith("projects/") and clean_model_id not in valid_ids:
+            supported_str = ", ".join(sorted(valid_ids))
+            raise ValueError(
+                f"Base model '{request.base_model}' is not supported for Vertex AI Supervised Fine-Tuning. "
+                f"Supported models in us-central1 are: {supported_str}."
+            )
+
         bucket_name = self.settings.gcs_bucket_name or "rfpengine-tuning-us-central1"
         blob_path = f"datasets/{tenant_id}/{job_id}.jsonl"
         dataset_uri = request.custom_dataset_uri or f"gs://{bucket_name}/{blob_path}"
@@ -229,16 +267,37 @@ class GeminiTuningService:
 
         logger.info("Triggering Vertex AI tuning job: %s with %d examples", job_id, len(dataset))
         training_dataset_arg = types.TuningDataset(gcs_uri=dataset_uri) if types else dataset_uri
+        tuning_config = types.CreateTuningJobConfig(
+            epoch_count=request.epochs,
+            learning_rate_multiplier=request.learning_rate_multiplier,
+            tuned_model_display_name=f"rfp-gemini-{tenant_id}-{job_id}",
+        ) if types else None
+
+        base_model_id = request.base_model.strip()
+        target_model = (
+            f"publishers/google/models/{base_model_id}"
+            if not base_model_id.startswith(("publishers/", "projects/"))
+            else base_model_id
+        )
+
         try:
-            tuning_job = self.genai_client.tunings.tune(
-                base_model=request.base_model,
-                training_dataset=training_dataset_arg,
-                config=types.CreateTuningJobConfig(
-                    epoch_count=request.epochs,
-                    learning_rate_multiplier=request.learning_rate_multiplier,
-                    tuned_model_display_name=f"rfp-gemini-{tenant_id}-{job_id}",
-                ) if types else None,
-            )
+            try:
+                tuning_job = self.genai_client.tunings.tune(
+                    base_model=target_model,
+                    training_dataset=training_dataset_arg,
+                    config=tuning_config,
+                )
+            except Exception as first_exc:
+                if target_model != base_model_id:
+                    logger.info("Retrying Vertex AI tune with short model name: %s", base_model_id)
+                    tuning_job = self.genai_client.tunings.tune(
+                        base_model=base_model_id,
+                        training_dataset=training_dataset_arg,
+                        config=tuning_config,
+                    )
+                else:
+                    raise first_exc
+
             if hasattr(tuning_job, "name") and tuning_job.name:
                 vertex_job_name = tuning_job.name
             if hasattr(tuning_job, "tuned_model") and getattr(tuning_job.tuned_model, "model", None):
@@ -347,6 +406,8 @@ class GeminiTuningService:
                         job.status = "RUNNING"
                     else:
                         job.status = str(state)
+                if hasattr(remote_job, "error") and remote_job.error:
+                    job.error_message = str(remote_job.error)
                 if hasattr(remote_job, "tuned_model") and getattr(remote_job.tuned_model, "model", None):
                     job.tuned_model_name = remote_job.tuned_model.model
                 await db.commit()
@@ -355,6 +416,13 @@ class GeminiTuningService:
                 logger.warning("Failed to refresh Vertex AI tuning status: %s", exc)
 
         return job
+
+    @classmethod
+    def get_supported_tuning_models(cls) -> List[Dict[str, Any]]:
+        """
+        Returns list of verified foundation models supported for Vertex AI Supervised Fine-Tuning in us-central1.
+        """
+        return SUPPORTED_TUNING_MODELS
 
     async def activate_tuned_model(
         self,

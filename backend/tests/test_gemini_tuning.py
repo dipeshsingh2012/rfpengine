@@ -75,7 +75,7 @@ async def test_create_and_list_tuning_jobs():
         id="tune-12345",
         tenant_id="acme-corp",
         job_name="projects/test/locations/us-central1/tuningJobs/tune-12345",
-        base_model="gemini-1.5-flash-002",
+        base_model="gemini-2.5-flash",
         tuned_model_name="projects/test/locations/us-central1/models/tuned-12345",
         status="SUCCEEDED",
         training_dataset_uri="gs://bucket/tuning/dataset.jsonl",
@@ -96,7 +96,7 @@ async def test_create_and_list_tuning_jobs():
             res_create = await ac.post(
                 "/api/v1/tuning/jobs",
                 json={
-                    "base_model": "gemini-1.5-flash-002",
+                    "base_model": "gemini-2.5-flash",
                     "epochs": 4,
                     "learning_rate_multiplier": 1.0,
                     "include_golden_qa": True,
@@ -107,7 +107,7 @@ async def test_create_and_list_tuning_jobs():
             assert res_create.status_code == 201
             created_data = res_create.json()
             assert created_data["id"] == "tune-12345"
-            assert created_data["base_model"] == "gemini-1.5-flash-002"
+            assert created_data["base_model"] == "gemini-2.5-flash"
             assert created_data["status"] == "SUCCEEDED"
 
             # 2. List jobs
@@ -216,7 +216,7 @@ async def test_gemini_tuning_service_gcs_upload_and_vertex_tune():
 
     with patch.object(service, "extract_tuning_dataset", new=AsyncMock(return_value=mock_dataset)):
         req = TuningJobCreate(
-            base_model="gemini-1.5-flash-002",
+            base_model="gemini-2.5-flash",
             epochs=3,
             learning_rate_multiplier=1.0,
             include_golden_qa=True,
@@ -230,8 +230,26 @@ async def test_gemini_tuning_service_gcs_upload_and_vertex_tune():
         assert mock_blob.upload_from_string.called
         assert mock_genai.tunings.tune.called
         _, kwargs = mock_genai.tunings.tune.call_args
-        assert kwargs["base_model"] == "gemini-1.5-flash-002"
+        assert kwargs["base_model"] in ("gemini-2.5-flash", "publishers/google/models/gemini-2.5-flash")
         assert hasattr(kwargs["training_dataset"], "gcs_uri") or isinstance(kwargs["training_dataset"], str)
+
+
+@pytest.mark.asyncio
+async def test_gemini_tuning_service_unsupported_model_validation():
+    service = GeminiTuningService()
+    mock_db = AsyncMock()
+
+    mock_dataset = [
+        {"messages": [{"role": "system", "content": "test"}, {"role": "user", "content": "q"}, {"role": "model", "content": "a"}]}
+    ]
+
+    with patch.object(service, "extract_tuning_dataset", new=AsyncMock(return_value=mock_dataset)):
+        req = TuningJobCreate(
+            base_model="gemini-1.5-flash-002",  # Deprecated / unsupported
+            epochs=3,
+        )
+        with pytest.raises(ValueError, match="is not supported for Vertex AI Supervised Fine-Tuning"):
+            await service.create_tuning_job(mock_db, "acme-corp", req)
 
 
 @pytest.mark.asyncio
@@ -259,7 +277,7 @@ async def test_gemini_tuning_service_error_handling_no_fallback():
 
     with patch.object(service, "extract_tuning_dataset", new=AsyncMock(return_value=mock_dataset)):
         req = TuningJobCreate(
-            base_model="unsupported-model",
+            base_model="gemini-2.5-flash",
             epochs=3,
         )
         with pytest.raises(RuntimeError, match="Vertex AI tuning initiation failed"):
@@ -269,4 +287,21 @@ async def test_gemini_tuning_service_error_handling_no_fallback():
         saved_job = mock_db.add.call_args[0][0]
         assert saved_job.status == "FAILED"
         assert "400 INVALID_ARGUMENT" in saved_job.error_message
+
+
+@pytest.mark.asyncio
+async def test_tuning_supported_models_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get("/api/v1/tuning/supported-models")
+        assert response.status_code == 200
+        models = response.json()
+        assert len(models) >= 4
+        ids = [m["id"] for m in models]
+        assert "gemini-2.5-flash" in ids
+        assert "gemini-2.5-pro" in ids
+        assert "gemini-3.5-flash" in ids
+        # Check recommendation
+        flash_model = next(m for m in models if m["id"] == "gemini-2.5-flash")
+        assert flash_model["recommended"] is True
+
 
