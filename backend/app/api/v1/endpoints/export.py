@@ -22,7 +22,7 @@ DEFAULT_TENANT_DATA: List[Dict[str, Any]] = [
     {"id": "2", "name": "Bob", "email": "bob@example.com", "notes": "-100"},
 ]
 
-@router.get("/export/csv")
+@router.get("/csv")
 async def export_csv(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     fields: List[str] = Query(default=["id", "name", "email", "notes"])

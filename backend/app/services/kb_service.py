@@ -2,9 +2,10 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 class KBDocument(BaseModel):
-    id: str
-    content: str
-    metadata: Dict[str, Any]
+    id: Optional[str] = None
+    title: Optional[str] = None
+    content: str = ""
+    metadata: Dict[str, Any] = {}
 
 class KBService:
     def __init__(self):

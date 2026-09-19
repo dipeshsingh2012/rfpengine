@@ -12,7 +12,7 @@ export function useWorkspaceSettingsManager(tenantId: string) {
   const [settingsSaveNotice, setSettingsSaveNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/v1/responses/settings?tenant_id=${tenantId}`, {
+    fetch(`${apiBaseUrl}/api/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
       headers: { "X-Tenant-ID": tenantId },
     })
       .then((r) => (r.ok ? r.json() : null))
@@ -26,8 +26,8 @@ export function useWorkspaceSettingsManager(tenantId: string) {
     setIsSavingSettings(true);
     const updated = { ...workspaceSettings, ...(updates || {}) };
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/responses/settings`, {
-        method: "POST",
+      const res = await fetch(`${apiBaseUrl}/api/v1/responses/workspace/settings`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json", "X-Tenant-ID": tenantId },
         body: JSON.stringify(updated),
       });

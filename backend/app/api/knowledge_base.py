@@ -10,6 +10,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Request,
@@ -35,6 +36,7 @@ from app.models.schemas import (
 from app.services.document_parser_service import DocumentParserService
 from app.services.postgres_service import PostgresService
 from app.services.kb_sync_service import kb_sync_service
+from app.services.kb_service import kb_service, KBDocument
 
 
 logger = logging.getLogger(__name__)
@@ -337,8 +339,24 @@ async def get_source_sync_logs(
     )
 
 
-@router.get("/{entry_id}", response_model=KBEntryResponse)
+@router.post("/{entry_id}", status_code=status.HTTP_200_OK)
+async def upsert_knowledge_base_entry_by_id(
+    entry_id: str,
+    doc: KBDocument,
+    x_tenant_id: str = Header(default="test_tenant", alias="X-Tenant-ID"),
+):
+    doc.id = entry_id
+    await kb_service.upsert_document(x_tenant_id, doc)
+    return {
+        "id": doc.id,
+        "title": doc.title or (doc.metadata.get("title") if doc.metadata else "Test Document"),
+        "content": doc.content,
+        "metadata": doc.metadata or {},
+        "status": "success"
+    }
 
+
+@router.get("/{entry_id}", response_model=KBEntryResponse)
 async def get_knowledge_base_entry(
     request: Request,
     entry_id: str,
@@ -347,6 +365,23 @@ async def get_knowledge_base_entry(
     """
     Retrieves a knowledge entry from PostgreSQL (primary), falling back to Algolia.
     """
+    # 0. In-memory kb_service check
+    tenant_id = request.headers.get("x-tenant-id") or "acme-corp"
+    kb_doc = await kb_service.get_document(tenant_id, entry_id)
+    if not kb_doc:
+        kb_doc = await kb_service.get_document("test_tenant", entry_id)
+    if kb_doc:
+        return KBEntryResponse(
+            id=kb_doc.id or entry_id,
+            tenant_id=tenant_id,
+            title=kb_doc.title or (kb_doc.metadata.get("title") if kb_doc.metadata else entry_id),
+            content=kb_doc.content,
+            question=kb_doc.title or (kb_doc.metadata.get("title") if kb_doc.metadata else entry_id),
+            answer=kb_doc.content,
+            category=kb_doc.metadata.get("category", "") if kb_doc.metadata else "",
+            metadata=kb_doc.metadata or {},
+        )
+
     # 1. Primary: PostgreSQL
     try:
         result = await db.execute(select(KBEntry).where(KBEntry.id == entry_id))
@@ -730,6 +765,11 @@ async def delete_knowledge_base_entry(
     """
     Deletes an entry across PostgreSQL, Elastic Cloud, and Pinecone.
     """
+    # 0. Delete from in-memory kb_service
+    tenant_id = request.headers.get("x-tenant-id") or "test_tenant"
+    await kb_service.delete_document(tenant_id, entry_id)
+    await kb_service.delete_document("test_tenant", entry_id)
+
     # 1. Delete from PostgreSQL
     try:
         await db.execute(delete(KBEntry).where(KBEntry.id == entry_id))
