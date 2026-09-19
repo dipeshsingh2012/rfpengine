@@ -116,3 +116,9 @@ variable "embedding_dimension" {
   description = "Vector embedding dimensionality (768 for Vertex AI text-embedding-004)"
   default     = 768
 }
+
+variable "google_client_id" {
+  type        = string
+  description = "Google OAuth 2.0 Client ID for Google Identity Services SSO"
+  default     = ""
+}

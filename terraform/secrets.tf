@@ -56,3 +56,18 @@ resource "google_secret_manager_secret_version" "pinecone_api_key_val" {
   secret      = google_secret_manager_secret.pinecone_api_key.id
   secret_data = var.pinecone_api_key
 }
+
+# 4. GOOGLE_CLIENT_ID Secret (Google Identity Services SSO)
+resource "google_secret_manager_secret" "google_client_id" {
+  secret_id = "${var.app_name}-google-client-id"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "google_client_id_val" {
+  count       = var.google_client_id != "" ? 1 : 0
+  secret      = google_secret_manager_secret.google_client_id.id
+  secret_data = var.google_client_id
+}

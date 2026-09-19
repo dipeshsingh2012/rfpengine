@@ -135,6 +135,16 @@ resource "google_cloud_run_v2_service" "backend" {
           }
         }
       }
+
+      env {
+        name = "GOOGLE_CLIENT_ID"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.google_client_id.secret_id
+            version = "latest"
+          }
+        }
+      }
     }
   }
 
@@ -143,6 +153,7 @@ resource "google_cloud_run_v2_service" "backend" {
     google_secret_manager_secret_iam_member.algolia_app_id_access,
     google_secret_manager_secret_iam_member.algolia_api_key_access,
     google_secret_manager_secret_iam_member.pinecone_key_access,
+    google_secret_manager_secret_iam_member.google_client_id_access,
   ]
 }
 

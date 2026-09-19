@@ -29,6 +29,12 @@ resource "google_secret_manager_secret_iam_member" "pinecone_key_access" {
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "google_client_id_access" {
+  secret_id = google_secret_manager_secret.google_client_id.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
 # Grant Vertex AI User role to Cloud Run Service Account for Gemini and text-embedding-004
 resource "google_project_iam_member" "vertex_ai_user" {
   project = var.project_id

@@ -1,54 +1,30 @@
-import React, { useEffect, useRef } from "react";
-import { ShieldCheck, Sparkles, Lock, User } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { ShieldCheck, Sparkles, Lock } from "lucide-react";
 
 interface LoginPageProps {
   googleClientId?: string;
   onCredentialSuccess?: (res: { credential: string }) => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({
-  googleClientId,
-  onCredentialSuccess = () => {},
-}) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ googleClientId, onCredentialSuccess = () => {} }) => {
   const gateBtnRef = useRef<HTMLDivElement>(null);
+  const [errorMsg] = useState("");
 
   useEffect(() => {
     if (!googleClientId) return;
     let timer: any = null;
     const tryInit = () => {
       if (window.google?.accounts?.id && gateBtnRef.current) {
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: onCredentialSuccess,
-        });
-        window.google.accounts.id.renderButton(gateBtnRef.current, {
-          theme: "filled_blue",
-          size: "large",
-          shape: "pill",
-          text: "continue_with",
-          width: 280,
-        });
+        window.google.accounts.id.initialize({ client_id: googleClientId, callback: onCredentialSuccess });
+        window.google.accounts.id.renderButton(gateBtnRef.current, { theme: "filled_blue", size: "large", shape: "pill", text: "continue_with", width: 280 });
         if (timer) clearInterval(timer);
         return true;
       }
       return false;
     };
-
-    if (!tryInit()) {
-      timer = setInterval(tryInit, 200);
-    }
+    if (!tryInit()) timer = setInterval(tryInit, 200);
     return () => { if (timer) clearInterval(timer); };
   }, [googleClientId, onCredentialSuccess]);
-
-  const handleManualPrompt = () => {
-    if (window.google?.accounts?.id && googleClientId) {
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: onCredentialSuccess,
-      });
-      window.google.accounts.id.prompt();
-    }
-  };
 
   return (
     <div className="auth-gate-container">
@@ -63,9 +39,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         <div className="auth-gate-action">
           <div ref={gateBtnRef} className="gate-google-slot" />
-          <button className="primary-btn gate-fallback-btn" onClick={handleManualPrompt}>
-            <User size={15} /> Sign in with Google
-          </button>
+          {!googleClientId && (
+            <small style={{ color: "var(--muted)", fontSize: 12 }}>
+              Connecting to Google Identity...
+            </small>
+          )}
+          {errorMsg && (
+            <small style={{ color: "var(--coral)", maxWidth: 360, textAlign: "center", lineHeight: 1.4 }}>
+              {errorMsg}
+            </small>
+          )}
         </div>
 
         <div className="auth-gate-features">

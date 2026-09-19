@@ -131,7 +131,7 @@ class Settings(BaseSettings):
         return self.GCP_SECRET_PREFIX
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore"  # Ignore extra env vars to prevent validation errors
     )
