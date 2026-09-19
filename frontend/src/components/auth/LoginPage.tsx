@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from "react";
 import { ShieldCheck, Sparkles, Lock, User } from "lucide-react";
 
-interface LandingAuthGateProps {
+interface LoginPageProps {
   googleClientId?: string;
   onCredentialSuccess?: (res: { credential: string }) => void;
 }
 
-export const LandingAuthGate: React.FC<LandingAuthGateProps> = ({
+export const LoginPage: React.FC<LoginPageProps> = ({
   googleClientId,
   onCredentialSuccess = () => {},
 }) => {
@@ -58,7 +58,7 @@ export const LandingAuthGate: React.FC<LandingAuthGateProps> = ({
         </div>
         <h1 className="auth-gate-title">Sign in to RFPEngine</h1>
         <p className="auth-gate-desc">
-          Authenticate with your corporate Google Identity to access proposal drafting, SME review queues, and enterprise knowledge base retrieval.
+          Authenticate with your corporate Google Identity to access proposal drafting, SME reviews, and knowledge base retrieval.
         </p>
 
         <div className="auth-gate-action">

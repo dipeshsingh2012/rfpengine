@@ -2,15 +2,11 @@ import React from "react";
 import { HomeWelcomeView } from "./HomeWelcomeView";
 import { ResponsesDashboard } from "../responses/ResponsesDashboard";
 import { QuestionnaireWorkspace, QuestionnaireWorkspaceProps } from "./QuestionnaireWorkspace";
-import { WorkspaceSummaryItem, GoogleUser } from "../../types";
+import { WorkspaceSummaryItem } from "../../types";
 import { AdminPage } from "../admin/AdminPage";
-import { LandingAuthGate } from "./home/LandingAuthGate";
 
 interface AppMainViewProps {
   route: string;
-  user?: GoogleUser | null;
-  googleClientId?: string;
-  onCredentialSuccess?: (res: { credential: string }) => void;
   formUrl: string;
   setFormUrl: (url: string) => void;
   loadFormUrl: () => Promise<string | void>;
@@ -31,10 +27,6 @@ interface AppMainViewProps {
 }
 
 export const AppMainView: React.FC<AppMainViewProps> = (p) => {
-  if (!p.user) {
-    return <LandingAuthGate googleClientId={p.googleClientId} onCredentialSuccess={p.onCredentialSuccess} />;
-  }
-
   if (p.route === "/") {
     return (
       <HomeWelcomeView

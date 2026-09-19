@@ -42,7 +42,7 @@ import { AdminTabsNav } from "../components/admin/AdminTabsNav.js";
 import { AdminMembersTable } from "../components/admin/tabs/team/AdminMembersTable.js";
 import { AdminPermissionsMatrix } from "../components/admin/tabs/team/AdminPermissionsMatrix.js";
 import { AdminGovernanceTab } from "../components/admin/tabs/AdminGovernanceTab.js";
-import { LandingAuthGate } from "../components/workspace/home/LandingAuthGate.js";
+import { LoginPage } from "../components/auth/LoginPage.js";
 
 import { DEFAULT_WORKSPACE_SETTINGS } from "../types.js";
 
@@ -668,9 +668,9 @@ test("Component Sanity: AdminGovernanceTab displays workflow modes and SME routi
   assert.ok(html.includes("Settings saved"));
 });
 
-test("Component Sanity: LandingAuthGate renders authentication gate when user is not logged in", () => {
+test("Component Sanity: LoginPage renders authentication gate when user is not logged in", () => {
   const html = renderToString(
-    React.createElement(LandingAuthGate, {
+    React.createElement(LoginPage, {
       googleClientId: "test-client-id",
       onCredentialSuccess: () => {},
     })
