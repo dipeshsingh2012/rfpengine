@@ -212,47 +212,62 @@ class GeminiTuningService:
 
         # Stage JSONL dataset to Google Cloud Storage
         jsonl_data = "\n".join(json.dumps(ex) for ex in dataset)
-        if self.storage_client and not request.custom_dataset_uri:
+        if not request.custom_dataset_uri:
+            if not self.storage_client:
+                raise RuntimeError("Google Cloud Storage client is not initialized. Cannot stage tuning dataset.")
             try:
                 bucket = self.storage_client.bucket(bucket_name)
                 blob = bucket.blob(blob_path)
                 blob.upload_from_string(jsonl_data, content_type="application/jsonl")
                 logger.info("Uploaded %d examples to gs://%s/%s", len(dataset), bucket_name, blob_path)
             except Exception as gcs_err:
-                logger.warning("GCS dataset upload failed or offline fallback: %s", gcs_err)
+                logger.error("GCS dataset upload failed: %s", gcs_err)
+                raise RuntimeError(f"Failed to upload tuning dataset to gs://{bucket_name}/{blob_path}: {gcs_err}") from gcs_err
 
-        status = "SUCCEEDED"
-        error_msg = None
-        metrics: Dict[str, Any] = {
-            "train_loss": 0.28,
-            "eval_loss": 0.31,
-            "step": request.epochs * max(len(dataset), 10),
-            "total_examples": len(dataset),
-        }
+        if not self.genai_client:
+            raise RuntimeError("Vertex AI Gemini client is not initialized. Cannot invoke tuning job.")
 
-        # Attempt real Vertex AI job creation if client is live
-        if self.genai_client:
-            try:
-                logger.info("Triggering Vertex AI tuning job: %s with %d examples", job_id, len(dataset))
-                training_dataset_arg = types.TuningDataset(gcs_uri=dataset_uri) if types else dataset_uri
-                tuning_job = self.genai_client.tunings.tune(
-                    base_model=request.base_model,
-                    training_dataset=training_dataset_arg,
-                    config=types.CreateTuningJobConfig(
-                        epoch_count=request.epochs,
-                        learning_rate_multiplier=request.learning_rate_multiplier,
-                        tuned_model_display_name=f"rfp-gemini-{tenant_id}-{job_id}",
-                    ) if types else None,
-                )
-                if hasattr(tuning_job, "name") and tuning_job.name:
-                    vertex_job_name = tuning_job.name
-                if hasattr(tuning_job, "tuned_model") and getattr(tuning_job.tuned_model, "model", None):
-                    tuned_model_dest = tuning_job.tuned_model.model
-                status = "RUNNING"
-            except Exception as exc:
-                logger.warning("Vertex AI remote tuning invocation fallback: %s", exc)
-                # Graceful offline / test fallback maintains functional state
-                status = "SUCCEEDED"
+        logger.info("Triggering Vertex AI tuning job: %s with %d examples", job_id, len(dataset))
+        training_dataset_arg = types.TuningDataset(gcs_uri=dataset_uri) if types else dataset_uri
+        try:
+            tuning_job = self.genai_client.tunings.tune(
+                base_model=request.base_model,
+                training_dataset=training_dataset_arg,
+                config=types.CreateTuningJobConfig(
+                    epoch_count=request.epochs,
+                    learning_rate_multiplier=request.learning_rate_multiplier,
+                    tuned_model_display_name=f"rfp-gemini-{tenant_id}-{job_id}",
+                ) if types else None,
+            )
+            if hasattr(tuning_job, "name") and tuning_job.name:
+                vertex_job_name = tuning_job.name
+            if hasattr(tuning_job, "tuned_model") and getattr(tuning_job.tuned_model, "model", None):
+                tuned_model_dest = tuning_job.tuned_model.model
+            status = "RUNNING"
+            error_msg = None
+            metrics: Dict[str, Any] = {
+                "step": 0,
+                "total_examples": len(dataset),
+            }
+        except Exception as exc:
+            logger.error("Vertex AI tuning job initiation failed: %s", exc)
+            job = TuningJobModel(
+                id=job_id,
+                tenant_id=tenant_id,
+                job_name=vertex_job_name,
+                base_model=request.base_model,
+                tuned_model_name=None,
+                status="FAILED",
+                training_dataset_uri=dataset_uri,
+                dataset_examples_count=len(dataset),
+                epochs=request.epochs,
+                learning_rate_multiplier=request.learning_rate_multiplier,
+                metrics={"total_examples": len(dataset)},
+                error_message=str(exc),
+            )
+            db.add(job)
+            await db.commit()
+            raise RuntimeError(f"Vertex AI tuning initiation failed: {exc}") from exc
 
         job = TuningJobModel(
             id=job_id,

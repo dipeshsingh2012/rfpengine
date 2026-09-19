@@ -233,3 +233,40 @@ async def test_gemini_tuning_service_gcs_upload_and_vertex_tune():
         assert kwargs["base_model"] == "gemini-1.5-flash-002"
         assert hasattr(kwargs["training_dataset"], "gcs_uri") or isinstance(kwargs["training_dataset"], str)
 
+
+@pytest.mark.asyncio
+async def test_gemini_tuning_service_error_handling_no_fallback():
+    service = GeminiTuningService()
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.commit = AsyncMock()
+
+    mock_blob = MagicMock()
+    mock_bucket = MagicMock()
+    mock_bucket.blob.return_value = mock_blob
+    mock_storage = MagicMock()
+    mock_storage.bucket.return_value = mock_bucket
+    service.storage_client = mock_storage
+
+    mock_genai = MagicMock()
+    mock_genai.tunings.tune.side_effect = Exception("400 INVALID_ARGUMENT: Base model not supported")
+    service.genai_client = mock_genai
+
+    mock_dataset = [
+        {"messages": [{"role": "system", "content": "test"}, {"role": "user", "content": "q"}, {"role": "model", "content": "a"}]}
+    ]
+
+    with patch.object(service, "extract_tuning_dataset", new=AsyncMock(return_value=mock_dataset)):
+        req = TuningJobCreate(
+            base_model="unsupported-model",
+            epochs=3,
+        )
+        with pytest.raises(RuntimeError, match="Vertex AI tuning initiation failed"):
+            await service.create_tuning_job(mock_db, "acme-corp", req)
+
+        assert mock_db.add.called
+        saved_job = mock_db.add.call_args[0][0]
+        assert saved_job.status == "FAILED"
+        assert "400 INVALID_ARGUMENT" in saved_job.error_message
+
