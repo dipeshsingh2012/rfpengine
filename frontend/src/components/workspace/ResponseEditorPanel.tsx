@@ -47,7 +47,12 @@ export const ResponseEditorPanel: React.FC<ResponseEditorPanelProps> = ({
           <span className="source-label" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600, color: "var(--blue)" }}>
             <Sparkles size={14} /> ✍️ Proposal Drafter
           </span>
-          <button className="ghost-button" onClick={generateAnswer}>
+          <button
+            className="ghost-button"
+            onClick={generateAnswer}
+            disabled={isApproved}
+            title={isApproved ? "Response is already approved" : "Re-draft response with AI"}
+          >
             <RefreshCw size={14} /> Re-draft
           </button>
         </div>

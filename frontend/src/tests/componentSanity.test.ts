@@ -254,6 +254,49 @@ test("Component Sanity: SingleQuestionInputPanel, BatchQuestionsHeaderBar, and E
   );
   assert.ok(evidenceHtml.includes("sources-column"));
   assert.ok(evidenceHtml.includes("source-card"));
+
+  // Verify disabled states when questionnaire is approved
+  const approvedBatchHtml = renderToString(
+    React.createElement(BatchQuestionsHeaderBar, {
+      questionsCount: 45,
+      tenantId: "acme-corp",
+      setTenantId: () => {},
+      generateAllAnswers: () => {},
+      isGenerating: false,
+      isBatchApproved: true,
+    })
+  );
+  assert.ok(approvedBatchHtml.includes("disabled"), "Generate all answers button must be disabled when approved");
+
+  const approvedInputHtml = renderToString(
+    React.createElement(SingleQuestionInputPanel, {
+      question: "How is data protected?",
+      setQuestion: () => {},
+      tenantId: "acme-corp",
+      setTenantId: () => {},
+      generateAnswer: () => {},
+      isGenerating: false,
+      isApproved: true,
+    })
+  );
+  assert.ok(approvedInputHtml.includes("disabled"), "Generate single answer button must be disabled when approved");
+
+  const govBarHtml = renderToString(
+    React.createElement(GovernanceBar, {
+      role: "Proposal manager",
+      setRole: () => {},
+      showToast: () => {},
+      approvedCount: 45,
+      allQuestionsCount: 45,
+      inReviewCount: 0,
+      changesRequestedCount: 0,
+      isBatchApproved: false,
+      handleBatchApproveAll: () => {},
+      handleReviewReset: () => {},
+    })
+  );
+  assert.ok(govBarHtml.includes("disabled"), "Approve all button must be disabled when 45/45 questions are approved");
+  assert.ok(govBarHtml.includes("Approve All as") && govBarHtml.includes("Drafter"));
 });
 
 test("Component Sanity: KnowledgeBaseModal tabs render with correct design classes", () => {

@@ -8,6 +8,7 @@ interface SingleQuestionInputPanelProps {
   setTenantId: (id: string) => void;
   generateAnswer: () => void;
   isGenerating: boolean;
+  isApproved?: boolean;
 }
 
 export const SingleQuestionInputPanel: React.FC<SingleQuestionInputPanelProps> = ({
@@ -17,6 +18,7 @@ export const SingleQuestionInputPanel: React.FC<SingleQuestionInputPanelProps> =
   setTenantId,
   generateAnswer,
   isGenerating,
+  isApproved = false,
 }) => {
   return (
     <section className="question-panel panel">
@@ -49,7 +51,8 @@ export const SingleQuestionInputPanel: React.FC<SingleQuestionInputPanelProps> =
         <button
           className="primary-button"
           onClick={generateAnswer}
-          disabled={isGenerating}
+          disabled={isGenerating || isApproved}
+          title={isApproved ? "Response has already been approved" : "Draft answer with AI"}
         >
           {isGenerating ? (
             <RefreshCw className="spin" size={16} />

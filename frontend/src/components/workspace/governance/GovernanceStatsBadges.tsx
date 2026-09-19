@@ -38,14 +38,15 @@ export const GovernanceStatsBadges: React.FC<GovernanceStatsBadgesProps> = ({
           <MessageSquare size={12} /> {changesRequestedCount} Changes Requested
         </span>
       )}
-      {isBatchApproved ? (
+      {isBatchApproved || (allQuestionsCount > 0 && approvedCount === allQuestionsCount) ? (
         <>
           <button
             className="outline-button"
             disabled
-            style={{ padding: "5px 10px", fontSize: "11px", opacity: 0.6 }}
+            style={{ padding: "5px 10px", fontSize: "11px", opacity: 0.6, cursor: "not-allowed" }}
+            title="All questions have already been approved"
           >
-            <Check size={12} /> Approved as Drafter
+            <Check size={12} /> Approve All as {role === "Proposal manager" ? "Drafter" : role}
           </button>
           <button
             className="primary-button"

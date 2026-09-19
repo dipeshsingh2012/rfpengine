@@ -256,6 +256,10 @@ export function useAppController() {
     },
     openSendForReviewModal: (scope: any) => review.openSendForReviewModal(scope, workflow.question),
     generateAnswer: () => {
+      if (workflow.isAllApproved || workflow.isBatchApproved) {
+        activity.showToast("Cannot generate: response is already approved.");
+        return;
+      }
       const opts = {
         model: settings.workspaceSettings.active_tuned_model_id || settings.workspaceSettings.default_model,
         tone: settings.workspaceSettings.response_tone,
@@ -264,6 +268,10 @@ export function useAppController() {
       return ai.generateAnswer(workflow.question, tenantId, workflow.answersByQuestion, workflow.saveAnswers, opts);
     },
     generateAllAnswers: () => {
+      if (workflow.isAllApproved || workflow.isBatchApproved) {
+        activity.showToast("Cannot generate answers: questionnaire is already approved.");
+        return;
+      }
       const opts = {
         model: settings.workspaceSettings.active_tuned_model_id || settings.workspaceSettings.default_model,
         tone: settings.workspaceSettings.response_tone,

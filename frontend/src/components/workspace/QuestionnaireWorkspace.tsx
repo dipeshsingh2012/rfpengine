@@ -45,6 +45,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = (pr
           setTenantId={props.setTenantId}
           generateAnswer={props.generateAnswer}
           isGenerating={props.isGenerating}
+          isApproved={props.isBatchApproved || props.isAllApproved}
         />
       )}
       <GovernanceBar
@@ -55,7 +56,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = (pr
         allQuestionsCount={allCurrentQuestions.length}
         inReviewCount={props.inReviewCount}
         changesRequestedCount={props.changesRequestedCount}
-        isBatchApproved={props.isBatchApproved}
+        isBatchApproved={props.isBatchApproved || props.isAllApproved}
         handleBatchApproveAll={props.handleBatchApproveAll}
         handleReviewReset={props.handleReviewReset}
       />
@@ -75,7 +76,7 @@ export const QuestionnaireWorkspace: React.FC<QuestionnaireWorkspaceProps> = (pr
           setTenantId={props.setTenantId}
           generateAllAnswers={props.generateAllAnswers}
           isGenerating={props.isGenerating}
-          isBatchApproved={props.isBatchApproved}
+          isBatchApproved={props.isBatchApproved || props.isAllApproved}
         />
       )}
       <QuestionnaireContentGrid {...props} />

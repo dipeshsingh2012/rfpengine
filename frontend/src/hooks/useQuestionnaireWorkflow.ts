@@ -74,7 +74,9 @@ export function useQuestionnaireWorkflow(tenantId: string, initialResponseId?: s
   }
 
   const allCurrentQuestions = detectedQuestions.length > 0 ? detectedQuestions : [question];
-  const approvedCount = allCurrentQuestions.filter((q) => ["Approved", "Approved by SME", "Approved by Legal", "Final approved"].includes(reviewStatusByQuestion[q])).length;
+  const approvedCount = allCurrentQuestions.filter((q) =>
+    (reviewStatusByQuestion[q] || "").toLowerCase().includes("approve")
+  ).length;
   const inReviewCount = allCurrentQuestions.filter((q) => ["SME review", "Legal review", "Ready for Final Approval"].includes(reviewStatusByQuestion[q])).length;
   const changesRequestedCount = allCurrentQuestions.filter((q) => reviewStatusByQuestion[q] === "Changes requested").length;
   const isAllApproved = allCurrentQuestions.length > 0 && approvedCount === allCurrentQuestions.length;

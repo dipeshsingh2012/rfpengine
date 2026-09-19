@@ -50,6 +50,7 @@ export const BatchQuestionsHeaderBar: React.FC<BatchQuestionsHeaderBarProps> = (
           className="primary-button"
           onClick={generateAllAnswers}
           disabled={isGenerating || isBatchApproved}
+          title={isBatchApproved ? "Questionnaire has already been approved" : "Generate answers for all questions with AI"}
         >
           {isGenerating ? (
             <RefreshCw className="spin" size={16} />
