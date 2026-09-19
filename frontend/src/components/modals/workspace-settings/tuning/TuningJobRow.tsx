@@ -16,7 +16,7 @@ export const TuningJobRow: React.FC<Props> = ({ job, isActive, onActivate, onCan
 
   return (
     <tr style={{ borderBottom: "1px solid var(--border-color)", fontSize: "13px" }}>
-      <td style={{ padding: "10px 12px" }}>
+      <td style={{ padding: "14px 16px" }}>
         <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
           <span>{job.base_model}</span>
           {isActive && (
@@ -27,7 +27,7 @@ export const TuningJobRow: React.FC<Props> = ({ job, isActive, onActivate, onCan
         </div>
         <div style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "'DM Mono', monospace" }}>{job.id}</div>
       </td>
-      <td style={{ padding: "10px 12px" }}>
+      <td style={{ padding: "14px 16px" }}>
         <span style={{
           display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", padding: "2px 8px", borderRadius: "12px", fontWeight: 600,
           background: isSucceeded ? "rgba(16,185,129,0.12)" : isRunning ? "rgba(59,130,246,0.12)" : "rgba(239,68,68,0.12)",
@@ -37,14 +37,14 @@ export const TuningJobRow: React.FC<Props> = ({ job, isActive, onActivate, onCan
           {job.status}
         </span>
       </td>
-      <td style={{ padding: "10px 12px" }}>
+      <td style={{ padding: "14px 16px" }}>
         <div>{job.dataset_examples_count} pairs ({job.epochs} epochs)</div>
         {lossText && <div style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "'DM Mono', monospace" }}>{lossText}</div>}
       </td>
-      <td style={{ padding: "10px 12px", color: "var(--muted)", fontSize: "12px" }}>
+      <td style={{ padding: "14px 16px", color: "var(--muted)", fontSize: "12px" }}>
         {new Date(job.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
       </td>
-      <td style={{ padding: "10px 12px", textAlign: "right" }}>
+      <td style={{ padding: "14px 16px", textAlign: "right" }}>
         {isSucceeded && !isActive && (
           <button
             type="button"

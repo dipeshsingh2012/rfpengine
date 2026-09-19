@@ -2922,9 +2922,9 @@ button:disabled { cursor: wait; opacity: .7; }
 
 /* --- Refined Tuning Studio & Modal Dialog Classes --- */
 .tuning-studio-modal {
-  max-width: 820px;
-  width: 100%;
-  max-height: 90vh;
+  max-width: 980px;
+  width: 95vw;
+  max-height: 92vh;
 }
 
 .new-tuning-modal {
