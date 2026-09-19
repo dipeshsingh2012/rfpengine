@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, Workflow, Cpu, Shield, Database } from "lucide-react";
+import { Building2, Users, Workflow, Cpu, Shield, Database } from "lucide-react";
 import { AdminTabKey } from "../../hooks/useAdminManager";
 
 interface AdminTabsNavProps {
@@ -8,6 +8,7 @@ interface AdminTabsNavProps {
 }
 
 const TABS: Array<{ id: AdminTabKey; label: string; icon: React.ReactNode }> = [
+  { id: "profile", label: "Profile & Company", icon: <Building2 size={15} /> },
   { id: "team", label: "Team & RBAC", icon: <Users size={15} /> },
   { id: "governance", label: "Workflow & Governance", icon: <Workflow size={15} /> },
   { id: "ai", label: "AI & Models", icon: <Cpu size={15} /> },

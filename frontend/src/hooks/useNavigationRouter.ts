@@ -14,7 +14,13 @@ function isInvalidPath(p: string): boolean {
 
 export function useNavigationRouter(currentResponseId?: string | null) {
   const [route, setRoute] = useState<string>(() => {
-    const p = (typeof window !== "undefined" && window.location.pathname) || "/";
+    let p = (typeof window !== "undefined" && window.location.pathname) || "/";
+    if (p === "/admin" || p === "/admin/") {
+      if (typeof window !== "undefined" && window.history?.replaceState) {
+        window.history.replaceState({}, "", "/settings");
+      }
+      return "/settings";
+    }
     if (isInvalidPath(p)) {
       if (typeof window !== "undefined" && window.history?.replaceState) {
         window.history.replaceState({}, "", "/");
@@ -25,7 +31,11 @@ export function useNavigationRouter(currentResponseId?: string | null) {
   });
 
   function navigate(path: string) {
-    const target = isInvalidPath(path) ? "/" : path;
+    let target = path;
+    if (target === "/admin" || target === "/admin/") {
+      target = "/settings";
+    }
+    target = isInvalidPath(target) ? "/" : target;
     if (target === "/") {
       if (typeof window !== "undefined" && window.history?.replaceState) {
         window.history.replaceState({}, "", "/");
@@ -38,7 +48,13 @@ export function useNavigationRouter(currentResponseId?: string | null) {
 
   useEffect(() => {
     const handlePopState = () => {
-      const p = (typeof window !== "undefined" && window.location.pathname) || "/";
+      let p = (typeof window !== "undefined" && window.location.pathname) || "/";
+      if (p === "/admin" || p === "/admin/") {
+        p = "/settings";
+        if (typeof window !== "undefined" && window.history?.replaceState) {
+          window.history.replaceState({}, "", "/settings");
+        }
+      }
       if (isInvalidPath(p)) {
         if (typeof window !== "undefined" && window.history?.replaceState) {
           window.history.replaceState({}, "", "/");
@@ -54,7 +70,8 @@ export function useNavigationRouter(currentResponseId?: string | null) {
 
   const reviewId = reviewIdFromPath(route);
   const isReviewRoute = (route.startsWith("/review/") && Boolean(reviewId)) || route === "/import";
-  const isAdminRoute = route === "/admin";
+  const isSettingsRoute = route === "/settings" || route === "/admin";
+  const isAdminRoute = isSettingsRoute;
   const activeResponseId =
     responseIdFromPath(route) ||
     reviewId ||
@@ -66,6 +83,7 @@ export function useNavigationRouter(currentResponseId?: string | null) {
     setRoute,
     navigate,
     isReviewRoute,
+    isSettingsRoute,
     isAdminRoute,
     activeResponseId,
   };

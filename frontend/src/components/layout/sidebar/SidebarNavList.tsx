@@ -1,5 +1,5 @@
 import React from "react";
-import { LayoutGrid, FileText, FolderOpen, Zap, TrendingUp, History, ShieldCheck } from "lucide-react";
+import { LayoutGrid, FileText, FolderOpen, Zap, TrendingUp, History, Settings } from "lucide-react";
 
 interface SidebarNavListProps {
   isOverviewActive: boolean;
@@ -7,6 +7,7 @@ interface SidebarNavListProps {
   isKbActive: boolean;
   isPlaygroundActive: boolean;
   isAdminActive?: boolean;
+  isSettingsActive?: boolean;
   isActivityActive: boolean;
   recentCount: number;
   kbTotalRecords: number;
@@ -15,6 +16,7 @@ interface SidebarNavListProps {
   onNavigateHome: () => void;
   onNavigateResponses: () => void;
   onNavigateAdmin?: () => void;
+  onNavigateSettings?: () => void;
   onOpenKB: (tab: "upload" | "connectors" | "playground") => void;
   onOpenActivity: () => void;
   onCloseMobile: () => void;
@@ -26,6 +28,7 @@ export const SidebarNavList: React.FC<SidebarNavListProps> = ({
   isKbActive,
   isPlaygroundActive,
   isAdminActive,
+  isSettingsActive,
   isActivityActive,
   recentCount,
   kbTotalRecords,
@@ -34,6 +37,7 @@ export const SidebarNavList: React.FC<SidebarNavListProps> = ({
   onNavigateHome,
   onNavigateResponses,
   onNavigateAdmin,
+  onNavigateSettings,
   onOpenKB,
   onOpenActivity,
   onCloseMobile,
@@ -59,8 +63,8 @@ export const SidebarNavList: React.FC<SidebarNavListProps> = ({
         <button className={`nav-item ${isPlaygroundActive ? "active" : ""}`} onClick={() => { onCloseMobile(); onOpenKB("playground"); }}>
           <Zap size={17} /> KB Playground
         </button>
-        <button className={`nav-item ${isAdminActive ? "active" : ""}`} onClick={() => { onCloseMobile(); onNavigateAdmin?.(); }}>
-          <ShieldCheck size={17} /> Admin Console
+        <button className={`nav-item ${isAdminActive || isSettingsActive ? "active" : ""}`} onClick={() => { onCloseMobile(); (onNavigateSettings || onNavigateAdmin)?.(); }}>
+          <Settings size={17} /> Settings & Admin
         </button>
         <a href="https://rfpengine.aroadmap.dev/" target="_blank" rel="noopener noreferrer" className="nav-item" style={{ textDecoration: "none" }} onClick={onCloseMobile}>
           <TrendingUp size={17} /> Product Roadmap

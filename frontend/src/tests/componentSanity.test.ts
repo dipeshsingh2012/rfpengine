@@ -44,6 +44,8 @@ import { AdminMembersTable } from "../components/admin/tabs/team/AdminMembersTab
 import { AdminPermissionsMatrix } from "../components/admin/tabs/team/AdminPermissionsMatrix.js";
 import { AdminGovernanceTab } from "../components/admin/tabs/AdminGovernanceTab.js";
 import { LoginPage } from "../components/auth/LoginPage.js";
+import { AdminPage } from "../components/admin/AdminPage.js";
+import { SidebarNavList } from "../components/layout/sidebar/SidebarNavList.js";
 
 import { DEFAULT_WORKSPACE_SETTINGS } from "../types.js";
 
@@ -699,6 +701,75 @@ test("Component Sanity: LoginPage renders authentication gate when user is not l
   assert.ok(html.includes("Enterprise Access Control"));
   assert.ok(html.includes("Grounded AI Synthesis"));
   assert.ok(html.includes("Enterprise RBAC Governance"));
+});
+
+test("Component Sanity: SidebarRecentRFPs strictly limits display to 3 items", () => {
+  const items = [
+    { id: "1", title: "RFP 1", editedAt: "1m ago" },
+    { id: "2", title: "RFP 2", editedAt: "2m ago" },
+    { id: "3", title: "RFP 3", editedAt: "3m ago" },
+    { id: "4", title: "RFP 4", editedAt: "4m ago" },
+    { id: "5", title: "RFP 5", editedAt: "5m ago" },
+  ];
+  const html = renderToString(
+    React.createElement(SidebarRecentRFPs, {
+      recentRFPs: items,
+      isResponsesActive: false,
+      activeResponseId: "",
+      onSelectRFP: () => {},
+      onNavigateHome: () => {},
+      onCloseMobile: () => {},
+    })
+  );
+  assert.ok(html.includes("RFP 1"));
+  assert.ok(html.includes("RFP 2"));
+  assert.ok(html.includes("RFP 3"));
+  assert.ok(!html.includes("RFP 4"));
+  assert.ok(!html.includes("RFP 5"));
+});
+
+test("Component Sanity: SidebarNavList renders unified Settings & Admin item", () => {
+  const html = renderToString(
+    React.createElement(SidebarNavList, {
+      isOverviewActive: false,
+      isResponsesActive: false,
+      isKbActive: false,
+      isPlaygroundActive: false,
+      isAdminActive: true,
+      isActivityActive: false,
+      recentCount: 3,
+      kbTotalRecords: 10,
+      kbTotalSources: 2,
+      tenantId: "acme-corp",
+      onNavigateHome: () => {},
+      onNavigateResponses: () => {},
+      onNavigateAdmin: () => {},
+      onOpenKB: () => {},
+      onOpenActivity: () => {},
+      onCloseMobile: () => {},
+    })
+  );
+  assert.ok(html.includes("Settings &amp; Admin") || html.includes("Settings & Admin"));
+  assert.ok(!html.includes("Admin Console"));
+});
+
+test("Component Sanity: Unified AdminPage renders combined Settings & Administration console", () => {
+  const html = renderToString(
+    React.createElement(AdminPage, {
+      tenantId: "acme-corp",
+      workspaceSettings: DEFAULT_WORKSPACE_SETTINGS,
+      setWorkspaceSettings: () => {},
+      kbRecordsCount: 15,
+      kbDocumentsCount: 3,
+      recentRfpsCount: 2,
+    })
+  );
+  assert.ok(html.includes("Settings &amp; Administration") || html.includes("Settings & Administration"));
+  assert.ok(html.includes("Profile &amp; Company") || html.includes("Profile & Company"));
+  assert.ok(html.includes("Team &amp; RBAC") || html.includes("Team & RBAC"));
+  assert.ok(html.includes("AI &amp; Models") || html.includes("AI & Models"));
+  assert.ok(html.includes("Security &amp; SSO") || html.includes("Security & SSO"));
+  assert.ok(html.includes("Data &amp; Storage") || html.includes("Data & Storage"));
 });
 
 

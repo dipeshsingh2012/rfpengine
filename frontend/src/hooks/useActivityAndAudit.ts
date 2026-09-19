@@ -4,7 +4,7 @@ import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
 
-export function useActivityAndAudit(tenantId: string, role: ReviewerRole) {
+export function useActivityAndAudit(tenantId: string, role: ReviewerRole, enabled: boolean = true) {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
@@ -33,10 +33,11 @@ export function useActivityAndAudit(tenantId: string, role: ReviewerRole) {
   }
 
   useEffect(() => {
+    if (!enabled) return;
     fetch(`${apiBaseUrl}/health`)
       .then((r) => setBackendHealth(r.ok ? "ok" : "degraded"))
       .catch(() => setBackendHealth("degraded"));
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     if (!showActivityModal) return;

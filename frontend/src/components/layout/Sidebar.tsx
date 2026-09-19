@@ -63,6 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isKbActive={isKbActive}
         isPlaygroundActive={isPlaygroundActive}
         isAdminActive={isAdminActive}
+        isSettingsActive={isAdminActive}
         isActivityActive={isActivityActive}
         recentCount={(recentRFPs || []).length}
         kbTotalSources={kbTotalSources}
@@ -72,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onNavigateHome={onNavigateHome}
         onNavigateResponses={onNavigateResponses}
         onNavigateAdmin={onNavigateAdmin}
+        onNavigateSettings={onNavigateAdmin}
         onOpenKB={onOpenKB}
         onOpenActivity={onOpenActivity}
       />

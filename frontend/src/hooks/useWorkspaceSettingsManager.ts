@@ -4,7 +4,7 @@ import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
 
-export function useWorkspaceSettingsManager(tenantId: string) {
+export function useWorkspaceSettingsManager(tenantId: string, enabled: boolean = true) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"profile" | "ai" | "governance" | "data">("profile");
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
@@ -12,6 +12,7 @@ export function useWorkspaceSettingsManager(tenantId: string) {
   const [settingsSaveNotice, setSettingsSaveNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     fetch(`${apiBaseUrl}/api/v1/responses/workspace/settings?tenant_id=${tenantId}`, {
       headers: { "X-Tenant-ID": tenantId },
     })
@@ -20,7 +21,7 @@ export function useWorkspaceSettingsManager(tenantId: string) {
         if (data) setWorkspaceSettings(data);
       })
       .catch((e) => console.warn("Failed to fetch settings:", e));
-  }, [tenantId]);
+  }, [tenantId, enabled]);
 
   async function saveWorkspaceSettings(updates?: Partial<WorkspaceSettings>) {
     setIsSavingSettings(true);

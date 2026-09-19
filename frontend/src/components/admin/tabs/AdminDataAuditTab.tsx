@@ -5,9 +5,18 @@ import { getApiBaseUrl } from "../../../utils/helpers";
 interface AdminDataAuditTabProps {
   tenantId: string;
   onExport?: () => void;
+  kbRecordsCount?: number;
+  kbDocumentsCount?: number;
+  recentRfpsCount?: number;
 }
 
-export const AdminDataAuditTab: React.FC<AdminDataAuditTabProps> = ({ tenantId, onExport }) => {
+export const AdminDataAuditTab: React.FC<AdminDataAuditTabProps> = ({
+  tenantId,
+  onExport,
+  kbRecordsCount = 0,
+  kbDocumentsCount = 0,
+  recentRfpsCount = 0,
+}) => {
   const [resetting, setResetting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
 
@@ -35,6 +44,39 @@ export const AdminDataAuditTab: React.FC<AdminDataAuditTabProps> = ({ tenantId, 
           <p className="admin-section-desc">
             Audit tenant-isolated database volumes, download full JSON archives, and manage data life cycles.
           </p>
+        </div>
+      </div>
+
+      <div className="admin-card">
+        <h4 className="card-title">Tenant Storage Snapshot & Metrics</h4>
+        <p className="card-hint">
+          Live overview of PostgreSQL partitioned tables, vector embeddings, and questionnaire records.
+        </p>
+        <div className="activity-stats-bar" style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+          <div style={{ flex: 1, background: "#f8fafc", padding: "12px 14px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+            <span className="eyebrow" style={{ color: "var(--muted)" }}>Tenant ID</span>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", fontFamily: "'DM Mono', monospace" }}>
+              {tenantId}
+            </div>
+          </div>
+          <div style={{ flex: 1, background: "#f0fdf4", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+            <span className="eyebrow" style={{ color: "#166534" }}>Indexed KB Records</span>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>
+              {kbRecordsCount}
+            </div>
+          </div>
+          <div style={{ flex: 1, background: "#f5f3ff", padding: "12px 14px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
+            <span className="eyebrow" style={{ color: "#6d28d9" }}>Indexed Documents</span>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#7c3aed" }}>
+              {kbDocumentsCount}
+            </div>
+          </div>
+          <div style={{ flex: 1, background: "#eff6ff", padding: "12px 14px", borderRadius: "6px", border: "1px solid #bfdbfe" }}>
+            <span className="eyebrow" style={{ color: "#1e40af" }}>Recent Questionnaires</span>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#1d4ed8" }}>
+              {recentRfpsCount}
+            </div>
+          </div>
         </div>
       </div>
 

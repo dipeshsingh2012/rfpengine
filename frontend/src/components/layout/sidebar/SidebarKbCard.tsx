@@ -29,7 +29,7 @@ export const SidebarKbCard: React.FC<SidebarKbCardProps> = ({
           onOpenSettings();
         }}
       >
-        <Settings size={17} /> Workspace settings
+        <Settings size={17} /> Settings & Admin
       </button>
       <div
         className="kb-summary-card"

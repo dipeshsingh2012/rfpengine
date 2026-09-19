@@ -1,5 +1,5 @@
-import React from "react";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import React, { useState } from "react";
+import { Settings, Loader2 } from "lucide-react";
 import { useAdminManager } from "../../hooks/useAdminManager";
 import { AdminTabsNav } from "./AdminTabsNav";
 import { AdminTeamTab } from "./tabs/AdminTeamTab";
@@ -7,23 +7,44 @@ import { AdminGovernanceTab } from "./tabs/AdminGovernanceTab";
 import { AdminAiTab } from "./tabs/AdminAiTab";
 import { AdminSecurityTab } from "./tabs/AdminSecurityTab";
 import { AdminDataAuditTab } from "./tabs/AdminDataAuditTab";
+import { SettingsProfileTab } from "../modals/workspace-settings/SettingsProfileTab";
+import { DEFAULT_WORKSPACE_SETTINGS, WorkspaceSettings } from "../../types";
 
 interface AdminPageProps {
   tenantId: string;
   showToast?: (msg: string) => void;
   onExport?: () => void;
+  workspaceSettings?: WorkspaceSettings;
+  setWorkspaceSettings?: React.Dispatch<React.SetStateAction<WorkspaceSettings>>;
+  onSaveWorkspaceSettings?: (updates?: Partial<WorkspaceSettings>) => Promise<void>;
+  kbRecordsCount?: number;
+  kbDocumentsCount?: number;
+  recentRfpsCount?: number;
 }
 
-export const AdminPage: React.FC<AdminPageProps> = ({ tenantId, showToast, onExport }) => {
+export const AdminPage: React.FC<AdminPageProps> = ({
+  tenantId,
+  showToast,
+  onExport,
+  workspaceSettings,
+  setWorkspaceSettings,
+  onSaveWorkspaceSettings,
+  kbRecordsCount = 0,
+  kbDocumentsCount = 0,
+  recentRfpsCount = 0,
+}) => {
   const admin = useAdminManager(tenantId, showToast);
+  const [localSettings, setLocalSettings] = useState<WorkspaceSettings>(workspaceSettings || DEFAULT_WORKSPACE_SETTINGS);
+  const activeSettings = workspaceSettings || localSettings;
+  const updateSettings = setWorkspaceSettings || setLocalSettings;
 
   return (
     <div className="admin-page-container">
       <header className="admin-page-header">
         <div className="admin-title-row">
           <div className="admin-title-badge">
-            <ShieldCheck size={22} color="var(--blue, #3b82f6)" />
-            <h2>Enterprise Administration</h2>
+            <Settings size={22} color="var(--blue, #3b82f6)" />
+            <h2>Settings & Administration</h2>
           </div>
           <span className="tenant-id-tag">Tenant: {tenantId}</span>
         </div>
@@ -38,6 +59,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ tenantId, showToast, onExp
           </div>
         ) : (
           <>
+            {admin.activeTab === "profile" && (
+              <div className="admin-tab-content">
+                <SettingsProfileTab settings={activeSettings} setSettings={updateSettings} />
+              </div>
+            )}
             {admin.activeTab === "team" && (
               <AdminTeamTab
                 members={admin.members}
@@ -56,13 +82,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ tenantId, showToast, onExp
               />
             )}
             {admin.activeTab === "ai" && (
-              <AdminAiTab governance={admin.governance} onSave={admin.saveGovernance} />
+              <AdminAiTab
+                governance={admin.governance}
+                onSave={admin.saveGovernance}
+                settings={activeSettings}
+                setSettings={updateSettings}
+              />
             )}
             {admin.activeTab === "security" && (
               <AdminSecurityTab governance={admin.governance} onSave={admin.saveGovernance} />
             )}
             {admin.activeTab === "data" && (
-              <AdminDataAuditTab tenantId={tenantId} onExport={onExport} />
+              <AdminDataAuditTab
+                tenantId={tenantId}
+                onExport={onExport}
+                kbRecordsCount={kbRecordsCount}
+                kbDocumentsCount={kbDocumentsCount}
+                recentRfpsCount={recentRfpsCount}
+              />
             )}
           </>
         )}

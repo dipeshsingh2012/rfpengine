@@ -4,7 +4,7 @@ import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
 
-export function useKnowledgeBaseManager(tenantId: string) {
+export function useKnowledgeBaseManager(tenantId: string, enabled: boolean = true) {
   const [showKBModal, setShowKBModal] = useState(false);
   const [kbModalTab, setKbModalTab] = useState<"upload" | "connectors" | "playground">("upload");
   const [kbEntries, setKbEntries] = useState<KBItem[]>([]);
@@ -22,13 +22,14 @@ export function useKnowledgeBaseManager(tenantId: string) {
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     fetch(`${apiBaseUrl}/api/v1/knowledge-base/stats?tenant_id=${tenantId}`, { headers: { "X-Tenant-ID": tenantId } })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setKbStats({ totalRecords: d.total_records ?? d.total_entries ?? 0, totalSources: d.total_sources ?? 0 });
       })
       .catch((e) => console.warn("Failed KB stats fetch:", e));
-  }, [showKBModal, tenantId]);
+  }, [showKBModal, tenantId, enabled]);
 
   async function fetchKBEntries() {
     setIsFetchingKB(true);

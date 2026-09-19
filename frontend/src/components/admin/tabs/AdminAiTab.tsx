@@ -1,49 +1,56 @@
 import React from "react";
-import { Cpu, Sparkles, ExternalLink } from "lucide-react";
-import { AdminGovernanceSettings } from "../../../types";
+import { Sparkles, ExternalLink } from "lucide-react";
+import { AdminGovernanceSettings, WorkspaceSettings } from "../../../types";
+import { SettingsAiTab } from "../../modals/workspace-settings/SettingsAiTab";
 
 interface AdminAiTabProps {
   governance: AdminGovernanceSettings;
   onSave: (updates: Partial<AdminGovernanceSettings>) => void;
+  settings?: WorkspaceSettings;
+  setSettings?: React.Dispatch<React.SetStateAction<WorkspaceSettings>>;
 }
 
-export const AdminAiTab: React.FC<AdminAiTabProps> = ({ governance, onSave }) => {
+export const AdminAiTab: React.FC<AdminAiTabProps> = ({ governance, onSave, settings, setSettings }) => {
   return (
     <div className="admin-tab-content">
       <div className="admin-section-header">
         <div>
           <h3 className="admin-section-title">AI Engine & Model Synthesis</h3>
           <p className="admin-section-desc">
-            Configure default foundational LLM parameters and continuous RAG learning loops.
+            Configure foundational LLM parameters, Supervised Fine-Tuning (SFT), and continuous RAG learning loops.
           </p>
         </div>
       </div>
 
-      <div className="admin-card">
-        <h4 className="card-title">Default Synthesis Model</h4>
-        <div className="form-grid-2">
-          <div className="form-group">
-            <label className="input-label">Production LLM Engine</label>
-            <select className="text-input" defaultValue="gemini-2.5-flash">
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Sub-second RAG)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Complex Multimodal & Reasoning)</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy Fast)</option>
-            </select>
-            <span className="input-hint">Ultra-fast synthesis tuned with ground-truth citations.</span>
-          </div>
+      {settings && setSettings ? (
+        <SettingsAiTab settings={settings} setSettings={setSettings} />
+      ) : (
+        <div className="admin-card">
+          <h4 className="card-title">Default Synthesis Model</h4>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="input-label">Production LLM Engine</label>
+              <select className="text-input" defaultValue="gemini-2.5-flash">
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Sub-second RAG)</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Complex Multimodal & Reasoning)</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy Fast)</option>
+              </select>
+              <span className="input-hint">Ultra-fast synthesis tuned with ground-truth citations.</span>
+            </div>
 
-          <div className="form-group">
-            <label className="input-label">Default RFP Response Tone</label>
-            <select className="text-input" defaultValue="concise">
-              <option value="concise">Concise & Direct (Audit / Enterprise Style)</option>
-              <option value="detailed">Comprehensive & Detailed</option>
-              <option value="technical">Technical & Architecture-focused</option>
-              <option value="executive">Executive & Commercial</option>
-            </select>
-            <span className="input-hint">Governs synthesis verbosity and structure.</span>
+            <div className="form-group">
+              <label className="input-label">Default RFP Response Tone</label>
+              <select className="text-input" defaultValue="concise">
+                <option value="concise">Concise & Direct (Audit / Enterprise Style)</option>
+                <option value="detailed">Comprehensive & Detailed</option>
+                <option value="technical">Technical & Architecture-focused</option>
+                <option value="executive">Executive & Commercial</option>
+              </select>
+              <span className="input-hint">Governs synthesis verbosity and structure.</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="admin-card">
         <h4 className="card-title">Continuous Feedback & Golden QA Learning</h4>

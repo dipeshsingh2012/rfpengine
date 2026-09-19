@@ -4,9 +4,9 @@ import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
 
-export type AdminTabKey = "team" | "governance" | "ai" | "security" | "data";
+export type AdminTabKey = "profile" | "team" | "governance" | "ai" | "security" | "data";
 
-export function useAdminManager(tenantId: string, showToast?: (msg: string) => void) {
+export function useAdminManager(tenantId: string, showToast?: (msg: string) => void, enabled: boolean = true) {
   const [activeTab, setActiveTab] = useState<AdminTabKey>("team");
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -42,8 +42,9 @@ export function useAdminManager(tenantId: string, showToast?: (msg: string) => v
   }, [tenantId]);
 
   useEffect(() => {
+    if (!enabled) return;
     fetchAdminData();
-  }, [fetchAdminData]);
+  }, [fetchAdminData, enabled]);
 
   const reassignMemberRole = async (memberId: string, newRole: string) => {
     try {

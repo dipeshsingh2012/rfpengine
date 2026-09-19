@@ -24,6 +24,12 @@ interface AppMainViewProps {
   fetchWorkspaceSummaries: () => void;
   questionnaireProps: QuestionnaireWorkspaceProps;
   onExportTenantData?: () => void;
+  workspaceSettings?: any;
+  setWorkspaceSettings?: any;
+  onSaveWorkspaceSettings?: (updates?: any) => Promise<void>;
+  kbRecordsCount?: number;
+  kbDocumentsCount?: number;
+  recentRfpsCount?: number;
 }
 
 export const AppMainView: React.FC<AppMainViewProps> = (p) => {
@@ -56,12 +62,18 @@ export const AppMainView: React.FC<AppMainViewProps> = (p) => {
     );
   }
 
-  if (p.route === "/admin") {
+  if (p.route === "/settings" || p.route === "/admin") {
     return (
       <AdminPage
         tenantId={p.questionnaireProps.tenantId}
         showToast={p.questionnaireProps.showToast}
         onExport={p.onExportTenantData}
+        workspaceSettings={p.workspaceSettings}
+        setWorkspaceSettings={p.setWorkspaceSettings}
+        onSaveWorkspaceSettings={p.onSaveWorkspaceSettings}
+        kbRecordsCount={p.kbRecordsCount}
+        kbDocumentsCount={p.kbDocumentsCount}
+        recentRfpsCount={p.recentRfpsCount}
       />
     );
   }

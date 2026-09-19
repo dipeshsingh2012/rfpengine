@@ -23,13 +23,21 @@ export function useAppController() {
   const [revisionItem, setRevisionItem] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
+  function showToast(text: string) {
+    setToastNotice(text);
+    setTimeout(() => setToastNotice(null), 3500);
+  }
+
+  const auth = useGoogleAuth(showToast);
+  const isAuthed = Boolean(auth.user);
+
   const navigation = useNavigationRouter();
   const review = useReviewGovernanceState();
   const workflow = useQuestionnaireWorkflow(tenantId, navigation.activeResponseId);
-  const activity = useActivityAndAudit(tenantId, workflow.role);
-  const auth = useGoogleAuth(activity.showToast);
-  const settings = useWorkspaceSettingsManager(tenantId);
-  const kb = useKnowledgeBaseManager(tenantId);
+  const activity = useActivityAndAudit(tenantId, workflow.role, isAuthed);
+  const settings = useWorkspaceSettingsManager(tenantId, isAuthed);
+  const kb = useKnowledgeBaseManager(tenantId, isAuthed);
   const workspaces = useWorkspaceListManager(tenantId);
   const ai = useAiAnswerGenerator();
 
@@ -48,7 +56,7 @@ export function useAppController() {
       color: mode === "url" ? "blue" : sourceName.toLowerCase().endsWith(".csv") ? "green" : "orange",
       questionsCount: questions.length,
     };
-    workspaces.setRecentRFPs((prev) => [newRfpItem, ...(prev || []).filter((i) => i.id !== id && i.title !== sourceName)].slice(0, 5));
+    workspaces.setRecentRFPs((prev) => [newRfpItem, ...(prev || []).filter((i) => i.id !== id && i.title !== sourceName)].slice(0, 3));
     activity.logActivity("Loaded questionnaire form", `${sourceName} (${questions.length} detected questions)`, "import");
 
     try {
@@ -73,14 +81,16 @@ export function useAppController() {
   const ingestion = useDocumentIngestion(tenantId, onQuestionsLoaded);
 
   useEffect(() => {
+    if (!isAuthed) return;
     fetch(`${apiBaseUrl}/api/v1/responses/history`, { headers: { "X-Tenant-ID": tenantId } })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (Array.isArray(data?.history)) workspaces.setRecentRFPs(data.history); })
+      .then((data) => { if (Array.isArray(data?.history)) workspaces.setRecentRFPs(data.history.slice(0, 3)); })
       .catch(() => {});
     workspaces.fetchWorkspaceSummaries();
-  }, [tenantId, navigation.route]);
+  }, [tenantId, navigation.route, isAuthed]);
 
   useEffect(() => {
+    if (!isAuthed) return;
     if (navigation.route === "/knowledge-base") { kb.setKbModalTab("upload"); kb.setShowKBModal(true); return; }
     if (navigation.route === "/playground") { kb.setKbModalTab("playground"); kb.setShowKBModal(true); return; }
     const id = responseIdFromPath(navigation.route) || reviewIdFromPath(navigation.route);
@@ -116,7 +126,7 @@ export function useAppController() {
         }
       })
       .catch(() => {});
-  }, [navigation.route, tenantId]);
+  }, [navigation.route, tenantId, isAuthed]);
 
   function submitSendForReview() {
     const targets = review.reviewSelectedQuestion
@@ -216,7 +226,8 @@ export function useAppController() {
   const isActivityActive = activity.showActivityModal;
   const isResponsesActive = !kb.showKBModal && !activity.showActivityModal && (navigation.route === "/responses" || navigation.route.startsWith("/response"));
   const isOverviewActive = !kb.showKBModal && !activity.showActivityModal && navigation.route === "/";
-  const isAdminActive = !kb.showKBModal && !activity.showActivityModal && navigation.route === "/admin";
+  const isSettingsActive = !kb.showKBModal && !activity.showActivityModal && (navigation.route === "/settings" || navigation.route === "/admin");
+  const isAdminActive = isSettingsActive;
 
   const appProps = assembleAppProps({
     navigate: navigation.navigate,

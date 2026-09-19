@@ -49,7 +49,7 @@ export const SidebarRecentRFPs: React.FC<SidebarRecentRFPsProps> = ({
         </div>
       ) : (
         <div className="recent-list">
-          {recentRFPs.map((rfp) => {
+          {recentRFPs.slice(0, 3).map((rfp) => {
             const isSelected = isResponsesActive && activeResponseId === rfp.id && currentRoute !== "/responses";
             const qCount = rfp.questionsCount ?? (rfp as any).count;
             const timeLabel = rfp.editedAt || (rfp as any).date || "Recently";
