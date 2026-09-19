@@ -19,7 +19,7 @@ interface Props {
 export const TuningStudioModal: React.FC<Props> = ({
   isOpen, onClose, tenantId, settings, setSettings, onShowToast,
 }) => {
-  const state = useTuningStudioState(tenantId, settings, setSettings, onShowToast);
+  const state = useTuningStudioState(tenantId, settings, setSettings, onShowToast, isOpen);
 
   return (
     <>
@@ -87,6 +87,8 @@ export const TuningStudioModal: React.FC<Props> = ({
         isOpen={state.isNewJobModalOpen}
         isStarting={state.isStartingJob}
         totalPairs={state.preview?.total_pairs || 0}
+        goldenQaCount={state.preview?.golden_qa_count}
+        approvedReviewsCount={state.preview?.approved_reviews_count}
         onClose={() => state.setIsNewJobModalOpen(false)}
         onSubmit={state.startTuningJob}
       />

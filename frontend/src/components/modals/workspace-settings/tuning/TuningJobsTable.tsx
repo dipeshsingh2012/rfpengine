@@ -36,7 +36,13 @@ export const TuningJobsTable: React.FC<Props> = ({ jobs, activeModelId, onActiva
             <TuningJobRow
               key={job.id}
               job={job}
-              isActive={activeModelId !== null && (job.tuned_model_name === activeModelId || job.id === activeModelId)}
+              isActive={Boolean(
+                activeModelId !== null &&
+                (job.tuned_model_name === activeModelId ||
+                  job.id === activeModelId ||
+                  (job.tuned_model_name && job.tuned_model_name.endsWith(activeModelId)) ||
+                  (job.tuned_model_name && activeModelId.endsWith(job.tuned_model_name.split("/").pop() || "")))
+              )}
               onActivate={onActivate}
               onCancel={onCancel}
             />

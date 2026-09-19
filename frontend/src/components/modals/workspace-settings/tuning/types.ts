@@ -10,7 +10,13 @@ export interface TuningStudioState {
   error: string | null;
   refreshJobs: () => Promise<void>;
   refreshPreview: () => Promise<void>;
-  startTuningJob: (baseModel: string, epochs: number, lrMultiplier: number) => Promise<boolean>;
+  startTuningJob: (
+    baseModel: string,
+    epochs: number,
+    lrMultiplier: number,
+    includeGoldenQa?: boolean,
+    includeApprovedReviews?: boolean
+  ) => Promise<boolean>;
   activateTunedModel: (jobId: string) => Promise<boolean>;
   cancelTuningJob: (jobId: string) => Promise<boolean>;
   setIsNewJobModalOpen: (open: boolean) => void;

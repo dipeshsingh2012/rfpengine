@@ -9,7 +9,8 @@ export function useTuningStudioState(
   tenantId: string,
   settings: WorkspaceSettings,
   setSettings: React.Dispatch<React.SetStateAction<WorkspaceSettings>>,
-  onShowToast?: (msg: string) => void
+  onShowToast?: (msg: string) => void,
+  isOpen?: boolean
 ): TuningStudioState {
   const [jobs, setJobs] = useState<TuningJobItem[]>([]);
   const [preview, setPreview] = useState<TuningDatasetPreview | null>(null);
@@ -47,11 +48,18 @@ export function useTuningStudioState(
   }, [tenantId]);
 
   useEffect(() => {
+    if (isOpen === false) return;
     setIsLoading(true);
     Promise.all([refreshJobs(), refreshPreview()]).finally(() => setIsLoading(false));
-  }, [refreshJobs, refreshPreview]);
+  }, [isOpen, refreshJobs, refreshPreview]);
 
-  const startTuningJob = async (baseModel: string, epochs: number, lrMultiplier: number): Promise<boolean> => {
+  const startTuningJob = async (
+    baseModel: string,
+    epochs: number,
+    lrMultiplier: number,
+    includeGoldenQa: boolean = true,
+    includeApprovedReviews: boolean = true
+  ): Promise<boolean> => {
     setIsStartingJob(true);
     setError(null);
     try {
@@ -62,8 +70,8 @@ export function useTuningStudioState(
           base_model: baseModel,
           epochs,
           learning_rate_multiplier: lrMultiplier,
-          include_golden_qa: true,
-          include_approved_reviews: true,
+          include_golden_qa: includeGoldenQa,
+          include_approved_reviews: includeApprovedReviews,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

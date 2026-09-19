@@ -5,21 +5,38 @@ import { ModalPortal } from "../../../common/ModalPortal";
 interface Props {
   isOpen: boolean;
   isStarting: boolean;
-  totalPairs: number;
+  totalPairs?: number;
+  goldenQaCount?: number;
+  approvedReviewsCount?: number;
   onClose: () => void;
-  onSubmit: (baseModel: string, epochs: number, lrMultiplier: number) => Promise<boolean>;
+  onSubmit: (
+    baseModel: string,
+    epochs: number,
+    lrMultiplier: number,
+    includeGoldenQa?: boolean,
+    includeApprovedReviews?: boolean
+  ) => Promise<boolean>;
 }
 
 export const NewTuningJobModal: React.FC<Props> = ({
   isOpen,
   isStarting,
-  totalPairs,
+  totalPairs = 0,
+  goldenQaCount,
+  approvedReviewsCount,
   onClose,
   onSubmit,
 }) => {
   const [baseModel, setBaseModel] = useState("gemini-1.5-flash-002");
   const [epochs, setEpochs] = useState(4);
   const [lrMultiplier, setLrMultiplier] = useState(1.0);
+  const [includeGoldenQa, setIncludeGoldenQa] = useState(true);
+  const [includeApprovedReviews, setIncludeApprovedReviews] = useState(true);
+
+  const effectiveGoldenQa = goldenQaCount !== undefined ? goldenQaCount : Math.floor(totalPairs * 0.6);
+  const effectiveApprovedReviews = approvedReviewsCount !== undefined ? approvedReviewsCount : Math.ceil(totalPairs * 0.4);
+  const calculatedPairs =
+    (includeGoldenQa ? effectiveGoldenQa : 0) + (includeApprovedReviews ? effectiveApprovedReviews : 0);
 
   return (
     <ModalPortal
@@ -50,6 +67,31 @@ export const NewTuningJobModal: React.FC<Props> = ({
           </span>
         </div>
 
+        <div className="form-group">
+          <label>Supervised Training Datasets</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", fontWeight: "normal" }}>
+              <input
+                type="checkbox"
+                checked={includeGoldenQa}
+                onChange={(e) => setIncludeGoldenQa(e.target.checked)}
+              />
+              <span>Include Canonical Golden Q&A ({effectiveGoldenQa} pairs)</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", fontWeight: "normal" }}>
+              <input
+                type="checkbox"
+                checked={includeApprovedReviews}
+                onChange={(e) => setIncludeApprovedReviews(e.target.checked)}
+              />
+              <span>Include SME Approved RFP Responses ({effectiveApprovedReviews} pairs)</span>
+            </label>
+          </div>
+          <span className="settings-field-hint">
+            Curate human-vetted ground truth to tailor the tuned model's answers.
+          </span>
+        </div>
+
         <div className="settings-grid-2">
           <div className="form-group">
             <label>Epochs ({epochs})</label>
@@ -75,7 +117,7 @@ export const NewTuningJobModal: React.FC<Props> = ({
         </div>
 
         <div className="revision-question-preview">
-          Dataset: <strong>{totalPairs} supervised pairs</strong> will be staged to Google Cloud Vertex AI in multi-turn JSONL format.
+          Dataset: <strong>{calculatedPairs} supervised pairs</strong> will be staged to Google Cloud Vertex AI in multi-turn JSONL format.
         </div>
       </div>
 
@@ -86,8 +128,8 @@ export const NewTuningJobModal: React.FC<Props> = ({
         <button
           type="button"
           className="primary-button"
-          onClick={() => onSubmit(baseModel, epochs, lrMultiplier)}
-          disabled={isStarting || totalPairs === 0}
+          onClick={() => onSubmit(baseModel, epochs, lrMultiplier, includeGoldenQa, includeApprovedReviews)}
+          disabled={isStarting || calculatedPairs === 0}
         >
           {isStarting ? "Submitting Job..." : "Start Vertex AI Tuning"}
         </button>

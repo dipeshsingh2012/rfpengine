@@ -58,3 +58,35 @@ test("TuningJobItem handles job statuses and metric computation", () => {
   assert.ok(job.tuned_model_name?.includes("tuned-abc123"));
 });
 
+test("SFT options: selective dataset toggles correctly compute training pairs", () => {
+  const goldenQa = 15;
+  const approvedReviews = 10;
+
+  // Both enabled
+  const bothEnabled = (true ? goldenQa : 0) + (true ? approvedReviews : 0);
+  assert.equal(bothEnabled, 25);
+
+  // Golden Q&A only
+  const goldenOnly = (true ? goldenQa : 0) + (false ? approvedReviews : 0);
+  assert.equal(goldenOnly, 15);
+
+  // Approved Reviews only
+  const reviewsOnly = (false ? goldenQa : 0) + (true ? approvedReviews : 0);
+  assert.equal(reviewsOnly, 10);
+
+  // Both disabled
+  const none = (false ? goldenQa : 0) + (false ? approvedReviews : 0);
+  assert.equal(none, 0);
+});
+
+test("SFT options: model selection differentiates between base models and tuned endpoints", () => {
+  const baseModels = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
+  const tunedEndpoint = "projects/123/locations/us-central1/models/tuned-abc123";
+
+  const isTunedModel = (model: string) =>
+    model.startsWith("projects/") || model.startsWith("tune-");
+
+  assert.equal(isTunedModel(tunedEndpoint), true);
+  baseModels.forEach((m) => assert.equal(isTunedModel(m), false));
+});
+

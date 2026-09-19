@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Cpu } from "lucide-react";
-import { WorkspaceSettings } from "../../../types";
+import { TuningJobItem, WorkspaceSettings } from "../../../types";
+import { getApiBaseUrl } from "../../../utils/helpers";
 import { AiDisclaimerCard } from "./AiDisclaimerCard";
 import { CustomTuningCard } from "./CustomTuningCard";
 
@@ -9,7 +10,48 @@ interface SettingsAiTabProps {
   setSettings: React.Dispatch<React.SetStateAction<WorkspaceSettings>>;
 }
 
+const apiBaseUrl = getApiBaseUrl();
+
 export const SettingsAiTab: React.FC<SettingsAiTabProps> = ({ settings, setSettings }) => {
+  const [tuningJobs, setTuningJobs] = useState<TuningJobItem[]>([]);
+
+  const fetchTuningJobs = useCallback(() => {
+    fetch(`${apiBaseUrl}/api/v1/tuning/jobs`, {
+      headers: { "X-Tenant-ID": settings.tenant_id || "acme-corp" },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setTuningJobs(data);
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch tuning jobs:", err));
+  }, [settings.tenant_id]);
+
+  useEffect(() => {
+    fetchTuningJobs();
+  }, [fetchTuningJobs]);
+
+  const completedTunedModels = tuningJobs.filter(
+    (j) => (j.status === "SUCCEEDED" || j.status === "COMPLETED") && (j.tuned_model_name || j.id)
+  );
+
+  const handleModelChange = (val: string) => {
+    const isTuned =
+      val.startsWith("projects/") ||
+      val.startsWith("tune-") ||
+      completedTunedModels.some((j) => (j.tuned_model_name || j.id) === val) ||
+      val === settings.active_tuned_model_id;
+
+    if (isTuned) {
+      setSettings({ ...settings, active_tuned_model_id: val });
+    } else {
+      setSettings({ ...settings, default_model: val, active_tuned_model_id: null });
+    }
+  };
+
+  const currentSelectValue = settings.active_tuned_model_id || settings.default_model;
+
   return (
     <>
       <div className="settings-group-card">
@@ -26,15 +68,43 @@ export const SettingsAiTab: React.FC<SettingsAiTabProps> = ({ settings, setSetti
           <div className="settings-field">
             <label>Default AI Model</label>
             <select
-              value={settings.default_model}
-              onChange={(e) => setSettings({ ...settings, default_model: e.target.value })}
+              value={currentSelectValue}
+              onChange={(e) => handleModelChange(e.target.value)}
             >
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Fast & Accurate)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning & Analysis)</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
+              <optgroup label="Base Foundation Models">
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Fast & Accurate)</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning & Analysis)</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
+              </optgroup>
+
+              {(completedTunedModels.length > 0 || settings.active_tuned_model_id) && (
+                <optgroup label="Custom SFT Tuned Models">
+                  {completedTunedModels.map((job) => {
+                    const modelId = job.tuned_model_name || job.id;
+                    const shortName = job.tuned_model_name
+                      ? job.tuned_model_name.split("/").pop()
+                      : job.id;
+                    return (
+                      <option key={job.id} value={modelId}>
+                        {`Custom SFT: ${shortName} (${job.base_model} - ${job.dataset_examples_count} pairs)`}
+                      </option>
+                    );
+                  })}
+                  {settings.active_tuned_model_id &&
+                    !completedTunedModels.some(
+                      (j) => (j.tuned_model_name || j.id) === settings.active_tuned_model_id
+                    ) && (
+                      <option value={settings.active_tuned_model_id}>
+                        {`Custom SFT: ${settings.active_tuned_model_id.split("/").pop()}`}
+                      </option>
+                    )}
+                </optgroup>
+              )}
             </select>
             <span className="settings-field-hint">
-              Gemini 2.5 Flash is tuned for sub-second RAG generation with high factual precision.
+              {settings.active_tuned_model_id
+                ? "Custom SFT endpoint active. Grounded RFP generation routes through this fine-tuned checkpoint."
+                : "Gemini 2.5 Flash is tuned for sub-second RAG generation with high factual precision."}
             </span>
           </div>
 
@@ -80,7 +150,12 @@ export const SettingsAiTab: React.FC<SettingsAiTabProps> = ({ settings, setSetti
         </div>
       </div>
 
-      <CustomTuningCard settings={settings} setSettings={setSettings} />
+      <CustomTuningCard
+        settings={settings}
+        setSettings={setSettings}
+        tuningJobs={tuningJobs}
+        onRefreshJobs={fetchTuningJobs}
+      />
       <AiDisclaimerCard settings={settings} setSettings={setSettings} />
     </>
   );

@@ -1,19 +1,34 @@
 import React, { useState } from "react";
 import { Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
-import { WorkspaceSettings } from "../../../types";
+import { TuningJobItem, WorkspaceSettings } from "../../../types";
 import { TuningStudioModal } from "./tuning/TuningStudioModal";
 
 interface Props {
   settings: WorkspaceSettings;
   setSettings: React.Dispatch<React.SetStateAction<WorkspaceSettings>>;
+  tuningJobs?: TuningJobItem[];
+  onRefreshJobs?: () => void;
 }
 
-export const CustomTuningCard: React.FC<Props> = ({ settings, setSettings }) => {
+export const CustomTuningCard: React.FC<Props> = ({
+  settings,
+  setSettings,
+  tuningJobs = [],
+  onRefreshJobs,
+}) => {
   const [isStudioOpen, setIsStudioOpen] = useState(false);
   const activeModel = settings.active_tuned_model_id;
 
+  const completedTunedModels = tuningJobs.filter(
+    (j) => (j.status === "SUCCEEDED" || j.status === "COMPLETED") && (j.tuned_model_name || j.id)
+  );
+
   const handleResetToBase = () => {
     setSettings({ ...settings, active_tuned_model_id: null });
+  };
+
+  const handleSelectModel = (val: string) => {
+    setSettings({ ...settings, active_tuned_model_id: val || null });
   };
 
   return (
@@ -52,20 +67,44 @@ export const CustomTuningCard: React.FC<Props> = ({ settings, setSettings }) => 
           </div>
         </div>
 
-        {activeModel && (
-          <button
-            type="button"
-            onClick={handleResetToBase}
-            style={{ background: "none", border: "1px solid var(--border-color)", borderRadius: "4px", padding: "4px 8px", fontSize: "11px", color: "var(--muted)", cursor: "pointer" }}
-          >
-            Revert to Base Model
-          </button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {completedTunedModels.length > 0 && (
+            <select
+              value={activeModel || ""}
+              onChange={(e) => handleSelectModel(e.target.value)}
+              style={{ fontSize: "12px", padding: "4px 8px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "transparent" }}
+            >
+              <option value="">Base Model ({settings.default_model})</option>
+              {completedTunedModels.map((job) => {
+                const id = job.tuned_model_name || job.id;
+                const name = job.tuned_model_name ? job.tuned_model_name.split("/").pop() : job.id;
+                return (
+                  <option key={job.id} value={id}>
+                    {name} ({job.dataset_examples_count} pairs)
+                  </option>
+                );
+              })}
+            </select>
+          )}
+
+          {activeModel && (
+            <button
+              type="button"
+              onClick={handleResetToBase}
+              style={{ background: "none", border: "1px solid var(--border-color)", borderRadius: "4px", padding: "4px 8px", fontSize: "11px", color: "var(--muted)", cursor: "pointer" }}
+            >
+              Revert to Base Model
+            </button>
+          )}
+        </div>
       </div>
 
       <TuningStudioModal
         isOpen={isStudioOpen}
-        onClose={() => setIsStudioOpen(false)}
+        onClose={() => {
+          setIsStudioOpen(false);
+          onRefreshJobs?.();
+        }}
         tenantId={settings.tenant_id}
         settings={settings}
         setSettings={setSettings}

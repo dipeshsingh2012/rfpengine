@@ -37,6 +37,7 @@ import { KBPlaygroundTab } from "../components/modals/knowledge-base/KBPlaygroun
 import { ModalPortal } from "../components/common/ModalPortal.js";
 import { TuningStudioModal } from "../components/modals/workspace-settings/tuning/TuningStudioModal.js";
 import { NewTuningJobModal } from "../components/modals/workspace-settings/tuning/NewTuningJobModal.js";
+import { SettingsAiTab } from "../components/modals/workspace-settings/SettingsAiTab.js";
 import { RevisionFeedbackModal } from "../components/workspace/questionnaire/RevisionFeedbackModal.js";
 import { AdminTabsNav } from "../components/admin/AdminTabsNav.js";
 import { AdminMembersTable } from "../components/admin/tabs/team/AdminMembersTable.js";
@@ -500,12 +501,31 @@ test("Component Sanity: TuningStudioModal and NewTuningJobModal render cleanly",
       isOpen: true,
       isStarting: false,
       totalPairs: 45,
+      goldenQaCount: 25,
+      approvedReviewsCount: 20,
       onClose: () => {},
       onSubmit: async () => true,
     })
   );
   assert.ok(jobHtml.includes("new-tuning-modal"));
   assert.ok(jobHtml.includes("Launch Gemini Tuning Job"));
+  assert.ok(jobHtml.includes("Supervised Training Datasets"));
+  assert.ok(jobHtml.includes("Include Canonical Golden Q"));
+  assert.ok(jobHtml.includes("Include SME Approved RFP Responses"));
+
+  const settingsAiHtml = renderToString(
+    React.createElement(SettingsAiTab, {
+      settings: {
+        ...DEFAULT_WORKSPACE_SETTINGS,
+        active_tuned_model_id: "projects/123/locations/us-central1/models/tuned-abc123",
+      },
+      setSettings: () => {},
+    })
+  );
+  assert.ok(settingsAiHtml.includes("Model Selection"));
+  assert.ok(settingsAiHtml.includes("Base Foundation Models"));
+  assert.ok(settingsAiHtml.includes("Custom SFT Tuned Models"));
+  assert.ok(settingsAiHtml.includes("Custom Tuned Endpoint Active"));
 });
 
 test("Component Sanity: TopbarRoleSelector renders all roles cleanly", () => {
