@@ -128,20 +128,30 @@ class GeminiTuningService:
     ) -> Dict[str, Any]:
         """
         Formats a single Q&A pair into Google Vertex AI Gemini multi-turn JSONL format.
+        Conforms strictly to Vertex AI SFT schema with system_instruction and contents.
         """
         return {
-            "messages": [
+            "system_instruction": {
+                "parts": [
+                    {
+                        "text": (
+                            f"You are the enterprise AI Proposal Drafter for {company_name}, "
+                            "specializing in technical, security, and compliance RFP questionnaires. "
+                            "Deliver concise, authoritative, and standard-compliant responses."
+                        )
+                    }
+                ]
+            },
+            "contents": [
                 {
-                    "role": "system",
-                    "content": (
-                        f"You are the enterprise AI Proposal Drafter for {company_name}, "
-                        "specializing in technical, security, and compliance RFP questionnaires. "
-                        "Deliver concise, authoritative, and standard-compliant responses."
-                    ),
+                    "role": "user",
+                    "parts": [{"text": question.strip()}],
                 },
-                {"role": "user", "content": question.strip()},
-                {"role": "model", "content": answer.strip()},
-            ]
+                {
+                    "role": "model",
+                    "parts": [{"text": answer.strip()}],
+                },
+            ],
         }
 
     async def extract_tuning_dataset(

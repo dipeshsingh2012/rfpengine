@@ -29,14 +29,15 @@ def test_format_tuning_example():
         answer="Yes, Acme Corporation supports SAML 2.0 with Okta, Azure AD, and Ping.",
         company_name="Acme Corp",
     )
-    assert "messages" in ex
-    assert len(ex["messages"]) == 3
-    assert ex["messages"][0]["role"] == "system"
-    assert "Acme Corp" in ex["messages"][0]["content"]
-    assert ex["messages"][1]["role"] == "user"
-    assert "SAML 2.0" in ex["messages"][1]["content"]
-    assert ex["messages"][2]["role"] == "model"
-    assert "Yes, Acme Corporation" in ex["messages"][2]["content"]
+    assert "system_instruction" in ex
+    assert "contents" in ex
+    assert "parts" in ex["system_instruction"]
+    assert "Acme Corp" in ex["system_instruction"]["parts"][0]["text"]
+    assert len(ex["contents"]) == 2
+    assert ex["contents"][0]["role"] == "user"
+    assert "SAML 2.0" in ex["contents"][0]["parts"][0]["text"]
+    assert ex["contents"][1]["role"] == "model"
+    assert "Yes, Acme Corporation" in ex["contents"][1]["parts"][0]["text"]
 
 
 @pytest.mark.asyncio
@@ -47,11 +48,13 @@ async def test_tuning_dataset_preview_endpoint():
         approved_reviews_count=4,
         sample_pairs=[
             {
-                "messages": [
-                    {"role": "system", "content": "You are the AI Proposal Drafter..."},
-                    {"role": "user", "content": "What encryption standard is used at rest?"},
-                    {"role": "model", "content": "All data at rest is encrypted using AES-256."},
-                ]
+                "system_instruction": {
+                    "parts": [{"text": "You are the AI Proposal Drafter..."}]
+                },
+                "contents": [
+                    {"role": "user", "parts": [{"text": "What encryption standard is used at rest?"}]},
+                    {"role": "model", "parts": [{"text": "All data at rest is encrypted using AES-256."}]},
+                ],
             }
         ],
     )
