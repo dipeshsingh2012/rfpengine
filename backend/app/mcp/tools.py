@@ -14,7 +14,7 @@ from app.models.schemas import (
     RoadmapInitiativeUpdate,
     RICEScoreSchema,
 )
-from app.services.postgres_service import PostgresService, DEFAULT_ROADMAP_INITIATIVES
+from app.services.postgres_service import PostgresService
 
 logger = logging.getLogger("rfpengine.mcp.tools")
 
@@ -183,7 +183,7 @@ class MCPTools:
                         })
             except Exception as exc:
                 logger.warning("MCP manage_roadmap DB query failed, falling back to seed items: %s", exc)
-                for init in DEFAULT_ROADMAP_INITIATIVES:
+                for init in PostgresService.load_roadmap_seeds():
                     items.append({
                         "id": init["id"],
                         "title": init["title"],

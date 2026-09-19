@@ -37,30 +37,6 @@ from app.services.postgres_service import PostgresService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-DEFAULT_SEED_HISTORY = [
-    {
-        "id": "ws-northstar",
-        "title": "Northstar security review",
-        "editedAt": "8 min ago",
-        "color": "blue",
-        "questionsCount": 12,
-    },
-    {
-        "id": "grove-rfp",
-        "title": "Grove procurement RFP",
-        "editedAt": "Yesterday",
-        "color": "orange",
-        "questionsCount": 8,
-    },
-    {
-        "id": "meridian-form",
-        "title": "Meridian vendor form",
-        "editedAt": "Aug 18",
-        "color": "green",
-        "questionsCount": 15,
-    },
-]
-
 
 @router.get("/history")  # This is relative to the prefix in the main router
 async def get_responses_history(
@@ -72,22 +48,21 @@ async def get_responses_history(
     """
     try:
         workspaces = await PostgresService.list_workspaces(db, tenant_id=x_tenant_id, limit=10)
-        if workspaces:
-            history = [
-                {
-                    "id": w.id,
-                    "title": w.title,
-                    "editedAt": w.updated_at.strftime("%b %d, %H:%M") if w.updated_at else "Just now",
-                    "color": "blue" if w.source_mode == "url" else ("green" if w.title.lower().endswith(".csv") else "orange"),
-                    "questionsCount": len(w.reviews) if w.reviews else 0,
-                }
-                for w in workspaces
-            ]
-            return {"history": history}
+        history = [
+            {
+                "id": w.id,
+                "title": w.title,
+                "editedAt": w.updated_at.strftime("%b %d, %H:%M") if w.updated_at else "Just now",
+                "color": "blue" if w.source_mode == "url" else ("green" if w.title.lower().endswith(".csv") else "orange"),
+                "questionsCount": len(w.reviews) if w.reviews else 0,
+            }
+            for w in workspaces
+        ]
+        return {"history": history}
     except Exception as e:
         logger.warning("Failed to fetch workspaces from PostgreSQL: %s", e)
 
-    return {"history": DEFAULT_SEED_HISTORY}
+    return {"history": []}
 
 
 @router.post("/history")
@@ -117,7 +92,16 @@ async def add_response_history(
         logger.warning("PostgreSQL workspace save fallback: %s", e)
 
     history_list = await get_responses_history(x_tenant_id=x_tenant_id, db=db)
-    return {"status": "success", "history": history_list.get("history", [])}
+    items = history_list.get("history", [])
+    if not items:
+        items = [{
+            "id": item_id,
+            "title": title,
+            "editedAt": "Just now",
+            "color": payload.get("color", "blue" if source_mode == "url" else "orange"),
+            "questionsCount": payload.get("questionsCount", 0),
+        }]
+    return {"status": "success", "history": items}
 
 
 @router.post("/review")

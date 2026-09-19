@@ -242,41 +242,6 @@ export interface ActivityLogItem {
   type: "approval" | "generation" | "kb" | "import" | "review" | "settings" | "export";
 }
 
-export const DEFAULT_ACTIVITY_LOGS: ActivityLogItem[] = [
-  {
-    id: "act-1",
-    user: "Proposal Drafter",
-    action: "Loaded questionnaire form",
-    details: "Northstar security review (12 detected questions)",
-    timestamp: "10 minutes ago",
-    type: "import",
-  },
-  {
-    id: "act-2",
-    user: "Gemini 2.5 Flash",
-    action: "Generated response draft",
-    details: "Drafted answers for 12 questions grounded in knowledge base",
-    timestamp: "8 minutes ago",
-    type: "generation",
-  },
-  {
-    id: "act-3",
-    user: "Security SME",
-    action: "Approved response item",
-    details: "Approved Q01: 'Does the system support SAML 2.0 / Okta SSO?'",
-    timestamp: "5 minutes ago",
-    type: "approval",
-  },
-  {
-    id: "act-4",
-    user: "Security SME",
-    action: "Promoted Golden Q&A to Knowledge Base",
-    details: "Upserted approved SOC2 compliance response into Pinecone & Algolia index",
-    timestamp: "3 minutes ago",
-    type: "kb",
-  },
-];
-
 export const playgroundStarterQueries = [
   "What encryption standards are enforced for databases at rest?",
   "What are our Recovery Point Objective (RPO) and Recovery Time Objective (RTO)?",

@@ -22,7 +22,7 @@ from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 from app.core.db import normalize_database_url
 from app.main import app
-from app.services.postgres_service import PostgresService, DEFAULT_SEEDS
+from app.services.postgres_service import PostgresService
 
 
 async def verify_all():

@@ -24,452 +24,51 @@ from app.models.schemas import (
     WorkspaceSettingsUpdate,
 )
 
-DEFAULT_SEEDS = DEFAULT_ROADMAP_INITIATIVES = [
-    {
-        "id": "gcip-multi-tenant-auth-and-google-signin",
-        "title": "Multi-Tenant GCIP Auth & 1-Click Google Sign-In Demo",
-        "stage": "development",
-        "theme": "Enterprise Governance",
-        "priority": "P0 - Critical",
-        "target_persona": "Evaluator / Enterprise Admin",
-        "quarter": "Q2 2026",
-        "summary": "Dual-track multi-tenant authentication powered by Google Cloud Identity Platform (GCIP) with frictionless 1-click Google Sign-In demo sandboxes and enterprise SAML 2.0 / Okta / Azure AD SSO.",
-        "problem_statement": "Prospects and evaluators need instant 1-click access to test RFPEngine without complex IT setup, while Fortune 500 enterprise buyers require strict corporate SAML/OIDC SSO.",
-        "user_story": "As an Evaluator, I want to click 'Sign in with Google' and immediately land in an isolated demo workspace pre-seeded with sample compliance documents so that I can evaluate the AI in under 5 seconds.",
-        "success_metrics": [
-            "< 3s 1-click Google Sign-in to live demo workspace",
-            "Automatic provisioning of isolated demo tenant with pre-seeded SOC 2 documents",
-            "Zero-trust JWT verification via Google Public JWKS on FastAPI backend",
-            "Enterprise SAML 2.0 / Okta / Azure AD IdP federation capability"
-        ],
-        "acceptance_criteria": [
-            "Users can authenticate via Google OAuth2/OIDC and receive secure session JWT.",
-            "New demo users are automatically provisioned with pre-seeded compliance data in PostgreSQL.",
-            "API routes enforce tenant isolation and extract user roles from Google token claims.",
-            "Admin portal supports self-service SAML/OIDC IdP configuration via GCIP API."
-        ],
-        "technical_architecture": "Google Cloud Identity Platform (GCIP) + FastAPI JWKS token verification + automated sandbox tenant seeder + multi-tenant PostgreSQL/vector isolation.",
-        "rice_reach": 95, "rice_impact": 5, "rice_confidence": 90, "rice_effort": 3, "rice_score": 142.5,
-        "upvotes": 128, "tags": ["Google Sign-In", "GCIP", "Multi-Tenant Auth", "Enterprise SSO", "Demo Sandbox"]
-    },
-    {
-        "id": "proposal-drafter-agent",
-        "title": "Proposal Drafter Agent (Grounded Knowledge Engine)",
-        "stage": "shipped",
-        "theme": "Core AI & Retrieval",
-        "priority": "P0 - Critical",
-        "target_persona": "Proposal Drafter",
-        "quarter": "Shipped",
-        "summary": "Production Python FastAPI service on Google Cloud Run with Gemini 2.5 Flash and hybrid retrieval, acting as the foundational drafting agent.",
-        "problem_statement": "Enterprise sales teams spend 30+ hours per RFP searching through outdated sales decks and disconnected wikis for accurate compliance answers, risking factual inaccuracies.",
-        "user_story": "As a Proposal Drafter, I want an AI Proposal Drafter to generate baseline response drafts strictly grounded in verified company collateral with exact citations.",
-        "success_metrics": ["99.4% factual grounding precision", "< 1.2s end-to-end retrieval latency", "Zero ungrounded hallucinations in production"],
-        "acceptance_criteria": [
-            "Given a question, the Proposal Drafter retrieves top-k passages with semantic and keyword scores.",
-            "When confidence is high, citations and exact source document IDs are returned.",
-            "Responses return structured JSON with confidence score and passage attribution."
-        ],
-        "technical_architecture": "FastAPI + Vertex AI gemini-2.5-flash + pgvector cosine similarity + Cloud Run container with auto-scaling.",
-        "rice_reach": 100, "rice_impact": 4, "rice_confidence": 95, "rice_effort": 3, "rice_score": 126.7,
-        "upvotes": 84, "tags": ["Proposal Drafter", "Vertex AI", "Gemini 2.5", "Cloud Run", "pgvector"]
-    },
-    {
-        "id": "chrome-extension-mv3",
-        "title": "Manifest V3 Assistant with Background Service Worker",
-        "stage": "shipped",
-        "theme": "Enterprise Governance",
-        "priority": "P0 - Critical",
-        "target_persona": "Proposal Drafter",
-        "quarter": "Shipped",
-        "summary": "In-page buyer form autofill and side panel assistant utilizing chrome.storage.local and 3-tier DOM matching.",
-        "problem_statement": "Buyers mandate filling out custom web portals (Coupa, Google Forms, Typeform) with 50+ text fields, forcing sellers to manually copy and paste answers one-by-one.",
-        "user_story": "As a Proposal Drafter, I want an extension that detects all form fields on external buyer portals and injects approved workspace answers in one click, so that manual data entry is eliminated.",
-        "success_metrics": ["100% field match rate across 9-question mock procurement portal", "Zero LLM API calls required during handoff insertion", "< 500ms 1-click batch injection time"],
-        "acceptance_criteria": [
-            "Extension listens to Background Service Worker message passing.",
-            "Matches fields via 3-tier heuristic (exact text -> fuzzy overlap -> positional index).",
-            "Triggers React/Angular input/change events to ensure form validation passes."
-        ],
-        "technical_architecture": "Chrome Manifest V3 + Service Worker (background.js) + content script DOM injector + sandboxed storage.",
-        "rice_reach": 90, "rice_impact": 4, "rice_confidence": 90, "rice_effort": 3, "rice_score": 108.0,
-        "upvotes": 67, "tags": ["Chrome Extension", "MV3", "Autofill", "DOM Matching"]
-    },
-    {
-        "id": "governance-approval-workflow",
-        "title": "4-Role Enterprise Governance & SME Review Queue",
-        "stage": "shipped",
-        "theme": "Enterprise Governance",
-        "priority": "P0 - Critical",
-        "target_persona": "Security SME / Legal Counsel",
-        "quarter": "Shipped",
-        "summary": "Multi-stage routing workflow with Proposal Drafter, Security SME, Legal Reviewer, and Final Approver roles.",
-        "problem_statement": "RFPs contain sensitive legal terms and technical commitments that cannot be submitted without sign-off from dedicated security and legal stakeholders.",
-        "user_story": "As a Security Director, I want a structured review queue where draft answers are routed to me for audit and sign-off before submission, so that liability risks are mitigated.",
-        "success_metrics": ["100% audit trail compliance for approved responses", "-50% turnaround time on SME review handoffs", "Zero unreviewed draft submissions"],
-        "acceptance_criteria": [
-            "Drafter can dispatch individual or all questionnaire items to specific SME roles.",
-            "Reviewers can leave feedback notes, request changes, or approve.",
-            "Celebratory completion state only unlocks when all items achieve full sign-off."
-        ],
-        "technical_architecture": "Role-aware state management with local persistence, multi-role badge classification, and interactive modal drawer.",
-        "rice_reach": 85, "rice_impact": 3, "rice_confidence": 95, "rice_effort": 2, "rice_score": 121.1,
-        "upvotes": 59, "tags": ["Governance", "SME Review", "Legal Sign-off", "Audit Trail"]
-    },
-    {
-        "id": "kb-doc-ingestion",
-        "title": "Document Ingestion Pipeline & Retrieval Playground",
-        "stage": "beta",
-        "theme": "Smart Ingestion",
-        "priority": "P1 - High",
-        "target_persona": "Proposal Manager",
-        "quarter": "Q1 2026",
-        "summary": "Multi-file document ingestion (PDF, Markdown, TXT, JSON) with live semantic chunking and test playground.",
-        "problem_statement": "Maintaining an up-to-date RFP knowledge base requires constant document uploads and testing retrieval accuracy against real customer questions.",
-        "user_story": "As a Knowledge Manager, I want to drag-and-drop our latest SOC 2 and security policies and immediately test question retrieval in a live playground.",
-        "success_metrics": ["< 3s ingestion processing time for 50-page PDFs", "Immediate searchability in the interactive playground", "Document chunk provenance tracking"],
-        "acceptance_criteria": [
-            "Users can upload multiple files with progress feedback.",
-            "Playground provides side-by-side prompt testing and retrieved source inspection.",
-            "Ingested documents are queryable across all tenant sessions."
-        ],
-        "technical_architecture": "Client-side document parser + FastAPI ingestion endpoints + embedding generator + vector store indexing.",
-        "rice_reach": 80, "rice_impact": 3, "rice_confidence": 85, "rice_effort": 3, "rice_score": 68.0,
-        "upvotes": 43, "tags": ["Ingestion", "PDF Parser", "Playground", "Chunking"]
-    },
-    {
-        "id": "excel-sig-lite-parser",
-        "title": "Multi-Format Excel & SIG Lite / CAIQ Parser",
-        "stage": "development",
-        "theme": "Smart Ingestion",
-        "priority": "P0 - Critical",
-        "target_persona": "Proposal Manager",
-        "quarter": "Q2 2026",
-        "summary": "Native parser for complex .xlsx spreadsheets, multi-tab workbooks, and standard questionnaires (SIG Lite, CAIQ v4).",
-        "problem_statement": "Over 70% of enterprise security questionnaires arrive as 300-row Excel files with complex merged headers, dropdown options, and multi-sheet layouts.",
-        "user_story": "As a Proposal Manager, I want to upload a vendor Excel questionnaire and have RFPEngine automatically extract all questions and sheet structures into an editable workspace.",
-        "success_metrics": ["98% accuracy on tabular question/column detection", "Support for multi-sheet workbooks up to 500 questions", "1-click export back to original .xlsx format with formulas intact"],
-        "acceptance_criteria": [
-            "Accepts .xlsx and .csv files with auto-detection of Question and Answer columns.",
-            "Preserves original row IDs and category groupings.",
-            "Exports filled Excel file matching the buyer's exact column format."
-        ],
-        "technical_architecture": "WebAssembly-powered SheetJS parser + Python openpyxl backend validation service + schema mapper.",
-        "rice_reach": 95, "rice_impact": 4, "rice_confidence": 85, "rice_effort": 4, "rice_score": 80.8,
-        "upvotes": 91, "tags": ["Excel Parser", "SIG Lite", "CAIQ", "Spreadsheets"]
-    },
-    {
-        "id": "compliance-matrix-exporter",
-        "title": "Automated Compliance Matrix & Audit Package Exporter",
-        "stage": "shipped",
-        "theme": "Enterprise Governance",
-        "priority": "P1 - High",
-        "target_persona": "Security Director",
-        "quarter": "Q2 2026",
-        "summary": "One-click export of approved RFP responses into audit-ready PDF, Word (DOCX), and CSV compliance packages.",
-        "problem_statement": "Enterprise buyers and procurement auditors require signed compliance packages with timestamps, SME signatures, and citation appendices.",
-        "user_story": "As a Security Director, I want to generate a branded, audit-stamped Compliance Report PDF with verified sources, so that our submission looks professional and compliant.",
-        "success_metrics": ["-80% time spent formatting final RFP deliverables", "Branded company template customization", "100% citation inclusion in exported appendices"],
-        "acceptance_criteria": [
-            "Generates PDF and DOCX documents with corporate branding and table of contents.",
-            "Appends full audit trail of reviewer approvals and timestamps.",
-            "Includes structured appendix of all cited SOC 2 / ISO clauses."
-        ],
-        "technical_architecture": "Headless document generator (Docx templating + PDF rendering engine) + cryptographic hash verification.",
-        "rice_reach": 75, "rice_impact": 3, "rice_confidence": 90, "rice_effort": 2, "rice_score": 101.3,
-        "upvotes": 38, "tags": ["DOCX Export", "PDF Generation", "Audit Stamping", "Compliance"]
-    },
-    {
-        "id": "multi-agent-fact-checker",
-        "title": "Autonomous Multi-Agent Fact-Checker & Hallucination Guard",
-        "stage": "spec",
-        "theme": "Core AI & Retrieval",
-        "priority": "P0 - Critical",
-        "target_persona": "Legal Counsel / Security SME",
-        "quarter": "Q3 2026",
-        "summary": "Agentic critic swarm that cross-examines AI drafts against contract clauses, rejecting unverified claims.",
-        "problem_statement": "Standard LLM outputs occasionally make unsubstantiated product roadmap claims or commit to SLA terms that exceed standard contract boundaries.",
-        "user_story": "As Legal Counsel, I want an automated AI Fact-Checker to highlight any commitment that is not backed by an approved policy, so that our company is protected from breach of contract.",
-        "success_metrics": ["100% identification of unverified commitments", "Confidence-weighted sentence highlighting", "-75% time spent by legal scanning for liability traps"],
-        "acceptance_criteria": [
-            "Specialized Critic Agent cross-checks every sentence against knowledge base embeddings.",
-            "Flags high-risk keywords (e.g. 'guarantee', 'indemnify', 'unlimited liability', '100% uptime').",
-            "Provides inline suggested redlines with cited policy bounds."
-        ],
-        "technical_architecture": "LangGraph / AutoGen multi-agent pipeline with parallel Critic, Security, and Compliance evaluators.",
-        "rice_reach": 85, "rice_impact": 4, "rice_confidence": 75, "rice_effort": 4, "rice_score": 63.8,
-        "upvotes": 76, "tags": ["Multi-Agent", "Fact-Checking", "Hallucination Guard", "Risk Scoring"]
-    },
-    {
-        "id": "cloud-connectors-sync",
-        "title": "Continuous Knowledge Connectors (Drive, Confluence, Notion)",
-        "stage": "spec",
-        "theme": "Ecosystem Integrations",
-        "priority": "P1 - High",
-        "target_persona": "Head of Sales / RevOps",
-        "quarter": "Q3 2026",
-        "summary": "Automated background sync connecting Google Drive folders, Confluence spaces, and Notion docs.",
-        "problem_statement": "Company policies change weekly, but RFP response databases become stale when product managers update documentation in Confluence without notifying proposal teams.",
-        "user_story": "As RevOps Lead, I want RFPEngine to continuously sync with our engineering Confluence space and product Notion, so that answers always reflect the latest release notes.",
-        "success_metrics": ["Zero manual knowledge re-uploads required", "Daily incremental sync with change delta detection", "Automatic archiving of deprecated documentation"],
-        "acceptance_criteria": [
-            "OAuth 2.0 connectors for Google Drive, Atlassian Confluence, and Notion.",
-            "Webhook-driven incremental change indexing.",
-            "Admin dashboard showing sync health and document freshness score."
-        ],
-        "technical_architecture": "Cloud Tasks background worker + OAuth token vault + incremental vector index updater.",
-        "rice_reach": 70, "rice_impact": 3, "rice_confidence": 80, "rice_effort": 3, "rice_score": 56.0,
-        "upvotes": 52, "tags": ["Google Drive", "Confluence", "Notion", "Continuous Sync"]
-    },
-    {
-        "id": "realtime-multiplayer-collab",
-        "title": "Real-Time Multiplayer Collaborative Drafting & Presence",
-        "stage": "discovery",
-        "theme": "Collaboration & Workflow",
-        "priority": "P1 - High",
-        "target_persona": "Bid Team",
-        "quarter": "H2 2026",
-        "summary": "Live collaborative workspace with multi-user presence cursors, inline comments, and section assignment.",
-        "problem_statement": "Large enterprise bids require 5+ simultaneous contributors (Technical Architects, Pricing, Legal), causing version conflicts when working in silos.",
-        "user_story": "As a Proposal Manager, I want to see which team members are editing each section in real time and @mention colleagues for instant review, so that collaboration is seamless.",
-        "success_metrics": ["Zero edit overwrite conflicts", "< 100ms multi-cursor sync latency", "Integrated Slack review notifications"],
-        "acceptance_criteria": [
-            "Displays live user avatars on active question cards.",
-            "Field locking prevents simultaneous conflicting edits.",
-            "Inline comment threads with @mention alerts."
-        ],
-        "technical_architecture": "WebSocket connection gateway + CRDT / Yjs conflict resolution + Redis PubSub cluster.",
-        "rice_reach": 65, "rice_impact": 3, "rice_confidence": 70, "rice_effort": 4, "rice_score": 34.1,
-        "upvotes": 49, "tags": ["Multiplayer", "WebSockets", "Live Cursors", "CRDT"]
-    },
-    {
-        "id": "advanced-portal-adapters",
-        "title": "Advanced Buyer Portal Automation (Coupa, Ariba, Loopio)",
-        "stage": "discovery",
-        "theme": "Ecosystem Integrations",
-        "priority": "P2 - Medium",
-        "target_persona": "Proposal Drafter",
-        "quarter": "H2 2026",
-        "summary": "Deep browser extension adapters for dropdowns, radio matrices, and multi-page questionnaire navigation.",
-        "problem_statement": "Complex procurement portals use custom dropdowns, yes/no radio groups, and multi-page wizards that basic DOM scanners struggle to automate.",
-        "user_story": "As a Proposal Drafter, I want the extension to automatically select the right compliance dropdowns (e.g. 'Compliant', 'Partially Compliant') based on AI reasoning.",
-        "success_metrics": ["95% accuracy on standard dropdown and radio option mapping", "Multi-page auto-navigation support for Coupa and Ariba"],
-        "acceptance_criteria": [
-            "Extension detects and maps non-standard select2/custom dropdowns.",
-            "Selects Yes/No/Partial based on answer context.",
-            "Handles paginated form transitions without losing session state."
-        ],
-        "technical_architecture": "Custom DOM shadow-root parser + selector heuristics + client-side option matcher.",
-        "rice_reach": 60, "rice_impact": 2, "rice_confidence": 65, "rice_effort": 3, "rice_score": 26.0,
-        "upvotes": 31, "tags": ["Coupa", "Ariba", "Dropdown Automator", "Browser Extension"]
-    },
-    {
-        "id": "win-loss-analytics",
-        "title": "Proposal Win/Loss Intelligence & Knowledge Gap Analytics",
-        "stage": "discovery",
-        "theme": "Enterprise Governance",
-        "priority": "P2 - Medium",
-        "target_persona": "Head of Sales / RevOps",
-        "quarter": "H2 2026",
-        "summary": "Executive analytics dashboard identifying repetitive question trends, win rates, and knowledge base gaps.",
-        "problem_statement": "Sales leadership lacks visibility into which product areas cause the most friction in security reviews or where documentation is lacking.",
-        "user_story": "As Head of Sales, I want an executive report highlighting questions with low retrieval confidence, so that we can prioritize updating documentation on weak product areas.",
-        "success_metrics": ["Identifies top 10 most frequent buyer questions per quarter", "Automated Knowledge Gap Health Score", "Correlation insights between response speed and deal win rate"],
-        "acceptance_criteria": [
-            "Visual charts for question frequency, confidence distributions, and turnaround times.",
-            "Knowledge gap alert triggers when repeat questions yield low confidence scores.",
-            "Exportable quarterly RFP performance summaries."
-        ],
-        "technical_architecture": "Aggregated query analytics table + Chart.js / Recharts visualizer + trend clustering algorithm.",
-        "rice_reach": 50, "rice_impact": 3, "rice_confidence": 70, "rice_effort": 2, "rice_score": 52.5,
-        "upvotes": 28, "tags": ["Analytics", "Win/Loss", "Executive Dashboard", "Knowledge Gaps"]
-    },
-    {
-        "id": "feat-feedback-l1",
-        "title": "Curated Golden Q&A Promotion & 1-Click KB Sync (Level 1 Feedback Loop)",
-        "stage": "shipped",
-        "theme": "Core AI & Retrieval",
-        "priority": "P0 - Critical",
-        "target_persona": "Security SME / Legal Counsel",
-        "quarter": "Shipped",
-        "summary": "1-click promotion of verified, SME-approved answers directly into the canonical knowledge base with cryptographic provenance.",
-        "problem_statement": "SMEs spend 15+ hours each month repeatedly correcting the same standard compliance answers across different customer RFPs because edits stay trapped in individual workspaces.",
-        "user_story": "As a Security SME or Legal Counsel, I want to promote my approved answer to the canonical knowledge base with one click, so that future AI drafts automatically reuse my vetted phrasing.",
-        "success_metrics": ["0 manual copy-pasting required from completed proposals to knowledge base", "100% provenance tracking (who approved, when, for which client RFP)", "< 1.5s dual-index sync time into Algolia and Pinecone"],
-        "acceptance_criteria": [
-            "Given a question with review_status == 'Approved' by Security SME, Legal Counsel, or Approver.",
-            "When the user clicks [⭐ Promote to Knowledge Base] in the review drawer or question card.",
-            "Then a new KBEntry is created with category 'Golden Q&A' and metadata linking back to the origin workspace.",
-            "And an audit badge '⭐ Promoted to Knowledge Base' appears on the question card."
-        ],
-        "technical_architecture": "FastAPI endpoint + PostgreSQL KBEntry with origin_workspace_id + Dual-sync to Pinecone namespace and Algolia.",
-        "rice_reach": 90, "rice_impact": 4, "rice_confidence": 95, "rice_effort": 2, "rice_score": 171.0,
-        "upvotes": 92, "tags": ["Feedback Loop", "Golden Q&A", "Knowledge Sync", "RICE P0"]
-    },
-    {
-        "id": "feat-feedback-l2",
-        "title": "Edit-Distance Telemetry & Stale Document Drift Detector (Level 2 Feedback Loop)",
-        "stage": "discovery",
-        "theme": "Enterprise Governance",
-        "priority": "P1 - High",
-        "target_persona": "Knowledge Manager / RevOps",
-        "quarter": "Q4 2026",
-        "summary": "Background telemetry pipeline calculating Levenshtein edit distance and semantic drift, flagging outdated policies.",
-        "problem_statement": "Company policies and SLAs evolve, but knowledge managers have zero visibility into which uploaded PDFs contain obsolete clauses until an SME flags a discrepancy.",
-        "user_story": "As a Knowledge Manager, I want telemetry tracking which source documents are frequently overwritten by SMEs, so that I can proactively update outdated company collateral.",
-        "success_metrics": ["Automated weekly 'Knowledge Drift & Staleness' health report", "-40% average edit distance across repeat questionnaires over 90 days", "Early detection of deprecated policies before buyer submission"],
-        "acceptance_criteria": [
-            "Given a completed RFP response set with human edits.",
-            "When responses are finalized, the system computes the edit distance (levenshtein_ratio).",
-            "Then it logs passage attribution quality metrics in PostgreSQL.",
-            "And if a source passage has >50% rewrite frequency across 5+ RFPs, it triggers a Stale Policy Alert in the Knowledge Hub."
-        ],
-        "technical_architecture": "PostgreSQL response_feedback_telemetry table + background calculation worker + Knowledge Hub staleness heatmap.",
-        "rice_reach": 75, "rice_impact": 3, "rice_confidence": 80, "rice_effort": 3, "rice_score": 60.0,
-        "upvotes": 68, "tags": ["Feedback Loop", "Drift Analytics", "Stale Doc Alert", "RevOps"]
-    },
-    {
-        "id": "feat-feedback-l3",
-        "title": "Dynamic Few-Shot In-Context Learning from Exemplars (Level 3 Feedback Loop)",
-        "stage": "shipped",
-        "theme": "Core AI & Retrieval",
-        "priority": "P1 - High",
-        "target_persona": "Proposal Drafter",
-        "quarter": "H1 2027",
-        "summary": "RAG prompt conditioning that retrieves top-2 historical winning responses to teach Gemini 2.5 Flash exact company pitch tone.",
-        "problem_statement": "Standard RAG provides factual policy text, but LLMs often produce generic or verbose prose that doesn't match the company's executive pitch style.",
-        "user_story": "As a Proposal Drafter, I want the AI to synthesize drafts that mimic the exact formatting and tone of our team's highest-rated past winning bids.",
-        "success_metrics": ["+35% baseline acceptance rate without human rephrasing", "Consistent company tone and markdown formatting across all questionnaires", "Zero fine-tuning infrastructure overhead"],
-        "acceptance_criteria": [
-            "Given a new RFP question query.",
-            "When search_knowledge_base executes.",
-            "Then it retrieves both raw document chunks AND top-2 approved Golden Q&A historical pairs.",
-            "And injects the approved pairs as dynamic few-shot exemplars inside the Gemini 2.5 Flash prompt context."
-        ],
-        "technical_architecture": "Dual-retriever HybridSearch pipeline + dynamic exemplar few-shot prompt injection in Gemini 2.5 Flash.",
-        "rice_reach": 80, "rice_impact": 3, "rice_confidence": 70, "rice_effort": 4, "rice_score": 42.0,
-        "upvotes": 81, "tags": ["Feedback Loop", "In-Context Learning", "Few-Shot RAG", "Gemini 2.5"]
-    }
-]
+import json
+from pathlib import Path
 
-DEFAULT_KB_SEEDS = [
-    {
-        "question": "What cloud infrastructure and hosting providers are utilized?",
-        "answer": "All production infrastructure is hosted exclusively within Amazon Web Services (AWS) in us-east-1 (N. Virginia) and us-west-2 (Oregon) regions. We utilize AWS VPCs with private subnets, strict security group rules, and zero direct public access to internal database or application nodes. Our infrastructure complies with SOC 2 Type II, ISO/IEC 27001:2022, and HIPAA Security Rule specifications.",
-        "category": "Cloud & Infrastructure",
-        "source_file": "01_Security_and_Compliance_Whitepaper.md",
-        "format": "MD",
-    },
-    {
-        "question": "What encryption standards are enforced for data in transit and at rest?",
-        "answer": "All external and internal network communications are encrypted in transit using TLS 1.3 (with fallback to TLS 1.2 minimum). HSTS is enforced with max-age of 31536000 seconds. All customer data at rest is encrypted using AES-256 via AWS KMS Customer Managed Keys (CMKs) across all databases, search indices, S3 buckets, and EBS volumes, rotated automatically every 365 days.",
-        "category": "Security & Cryptography",
-        "source_file": "01_Security_and_Compliance_Whitepaper.md",
-        "format": "MD",
-    },
-    {
-        "question": "What Single Sign-On (SSO) and Multi-Factor Authentication (MFA) capabilities exist?",
-        "answer": "Enterprise customers can enforce SAML 2.0 and OpenID Connect (OIDC) Single Sign-On across identity providers including Okta, Microsoft Entra ID (Azure AD), Google Workspace, and PingFederate. All internal employee access requires hardware-backed multi-factor authentication (FIDO2 / WebAuthn security keys).",
-        "category": "Identity & Access Control",
-        "source_file": "01_Security_and_Compliance_Whitepaper.md",
-        "format": "MD",
-    },
-    {
-        "question": "How often are third-party penetration tests and vulnerability scans conducted?",
-        "answer": "Independent third-party penetration tests are conducted annually by CREST-accredited security firms. We also operate a private bug bounty program on HackerOne. Container base images and application dependencies are scanned continuously in CI/CD using Trivy, Snyk, and GitHub Dependabot.",
-        "category": "Security & Vulnerability",
-        "source_file": "01_Security_and_Compliance_Whitepaper.md",
-        "format": "MD",
-    },
-    {
-        "question": "What are your Recovery Point Objective (RPO) and Recovery Time Objective (RTO)?",
-        "answer": "Our infrastructure guarantees a Recovery Point Objective (RPO) of < 1 hour and a Recovery Time Objective (RTO) of < 4 hours. Automated point-in-time database snapshots are taken every 15 minutes and replicated across AWS us-east-1 and us-west-2.",
-        "category": "Disaster Recovery & SLA",
-        "source_file": "02_SLA_Disaster_Recovery_and_Operations.pdf",
-        "format": "PDF",
-    },
-    {
-        "question": "What is your uptime service level agreement (SLA) commitment?",
-        "answer": "We offer a guaranteed 99.9% monthly uptime service level agreement for all Enterprise tier customers, backed by financial service credits if availability drops below target thresholds.",
-        "category": "Disaster Recovery & SLA",
-        "source_file": "02_SLA_Disaster_Recovery_and_Operations.pdf",
-        "format": "PDF",
-    },
-    {
-        "question": "How is customer personal data handled under GDPR and international privacy regulations?",
-        "answer": "We fully comply with GDPR, CCPA, and global privacy frameworks. A comprehensive Data Processing Addendum (DPA) incorporating European Commission Standard Contractual Clauses (SCCs) is available for all enterprise accounts. We support data subject access requests (DSAR) including complete data export and cryptographically verified deletion within 30 days.",
-        "category": "Privacy & GDPR",
-        "source_file": "03_Data_Privacy_GDPR_and_Subprocessors.json",
-        "format": "JSON",
-    },
-    {
-        "question": "Who are your authorized subprocessors and where are they located?",
-        "answer": "Our authorized sub-processors include Amazon Web Services (AWS - Hosting & DB, US/EU), Datadog (Monitoring, US), Twilio SendGrid (Transactional Email, US), and Stripe (Billing, US). All subprocessors undergo rigorous annual security and compliance evaluations.",
-        "category": "Privacy & GDPR",
-        "source_file": "03_Data_Privacy_GDPR_and_Subprocessors.json",
-        "format": "JSON",
-    },
-    {
-        "question": "What is your data retention schedule after account termination?",
-        "answer": "Customer data is retained for the duration of an active contract and for up to 30 days following termination to support orderly transition. All backups are purged on a 35-day rotation schedule, after which customer data is permanently destroyed in accordance with DoD 5220.22-M guidelines.",
-        "category": "Privacy & GDPR",
-        "source_file": "03_Data_Privacy_GDPR_and_Subprocessors.json",
-        "format": "JSON",
-    },
-    {
-        "question": "Do you undergo annual independent SOC 2 audits?",
-        "answer": "Yes. An independent AICPA-accredited accounting firm performs annual SOC 2 Type II examinations covering Security, Availability, and Confidentiality trust service criteria. Formal audit reports are provided to customers under mutual non-disclosure agreement.",
-        "category": "Compliance & Audit",
-        "source_file": "04_Standard_Vendor_Security_Questionnaire.csv",
-        "format": "CSV",
-    },
-    {
-        "question": "What APIs and programmatic integration protocols are supported?",
-        "answer": "We provide a complete RESTful API with JSON payloads, OpenAPI 3.1 specifications, and granular OAuth2 scoped access tokens. Webhooks are supported with HMAC-SHA256 signature verification for automated downstream workflow integration.",
-        "category": "Product & Integrations",
-        "source_file": "05_Product_Features_and_API_Integrations.docx",
-        "format": "DOCX",
-    },
-    {
-        "question": "What are the rate limits and API SLAs for enterprise customers?",
-        "answer": "Standard Enterprise rate limits allow 10,000 requests per minute with burst capacity up to 15,000 req/min. API uptime SLA is 99.9% with p95 response latencies under 150ms for cached and indexed lookups.",
-        "category": "Product & Integrations",
-        "source_file": "05_Product_Features_and_API_Integrations.docx",
-        "format": "DOCX",
-    },
-    {
-        "question": "What background checks are performed on employees prior to hire?",
-        "answer": "Comprehensive background screenings are conducted on all full-time employees, contractors, and executives prior to start date. Verifications include 7-year criminal history, identity verification, national sex offender registry, and educational/employment verification.",
-        "category": "HR & Governance",
-        "source_file": "06_Employee_Code_of_Conduct_and_HR_Policies.txt",
-        "format": "TXT",
-    },
-    {
-        "question": "What employee security awareness training is mandated?",
-        "answer": "All new hires must complete security and privacy training within their first 7 days. Annual refresher training is mandatory across all employees, supplemented by unannounced monthly phishing simulations.",
-        "category": "HR & Governance",
-        "source_file": "06_Employee_Code_of_Conduct_and_HR_Policies.txt",
-        "format": "TXT",
-    },
-    {
-        "question": "What aviation and safety standards govern autonomous drone fleet logistics?",
-        "answer": "All operations strictly adhere to FAA Part 107 regulations, FAA Remote ID mandates, and ASTM F3411 standards. Drones feature dual-redundant GPS/IMU navigation, encrypted C2 telemetry links, and automated geo-fenced Return-to-Launch (RTL) fail-safes.",
-        "category": "Aviation & Safety",
-        "source_file": "07_Autonomous_Drone_Fleet_Logistics_and_Aviation_Safety.txt",
-        "format": "TXT",
-    },
-]
+SEEDS_DIR = Path(__file__).resolve().parent.parent / "data" / "seeds"
+
+
+def _load_json_seed(filename: str) -> list:
+    filepath = SEEDS_DIR / filename
+    if not filepath.exists():
+        logger.warning("Seed file not found: %s", filepath)
+        return []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        logger.warning("Failed to load seed file %s: %s", filepath, exc)
+        return []
 
 
 class PostgresService:
     @staticmethod
+    def load_roadmap_seeds() -> List[Dict[str, Any]]:
+        return _load_json_seed("roadmap_initiatives.json")
+
+    @staticmethod
+    def load_kb_seeds() -> List[Dict[str, Any]]:
+        return _load_json_seed("kb_seeds.json")
+
+    @staticmethod
+    def load_workspace_seeds() -> List[Dict[str, Any]]:
+        return _load_json_seed("workspaces.json")
+
+    @staticmethod
+    def load_audit_log_seeds() -> List[Dict[str, Any]]:
+        return _load_json_seed("audit_logs.json")
+
+    @staticmethod
     async def sync_roadmap_seeds(session: AsyncSession, tenant_id: str = "default") -> int:
         """
-        Synchronizes all canonical initiatives from DEFAULT_SEEDS into PostgreSQL.
+        Synchronizes all canonical initiatives from seed files into PostgreSQL.
         Inserts new seeds if missing, or updates baseline fields if existing, ensuring
         PostgreSQL is always the authoritative source of truth.
         """
         synced_count = 0
-        for s in DEFAULT_SEEDS:
+        for s in PostgresService.load_roadmap_seeds():
             existing = await PostgresService.get_roadmap_initiative(session, s["id"])
             if existing is None:
                 init_obj = RoadmapInitiativeModel(
@@ -679,7 +278,7 @@ class PostgresService:
                 return 0
 
             synced = 0
-            for item in DEFAULT_KB_SEEDS:
+            for item in PostgresService.load_kb_seeds():
                 entry = KBEntry(
                     id=f"seed-{tenant_id}-{synced + 1}",
                     tenant_id=tenant_id,
@@ -904,11 +503,47 @@ class PostgresService:
         return result.scalars().first()
 
     @staticmethod
+    async def seed_workspaces_if_empty(session: AsyncSession, tenant_id: str = "acme-corp") -> int:
+        """
+        Auto-seeds default workspaces for tenant if no workspaces exist in PostgreSQL.
+        """
+        try:
+            count_stmt = select(func.count(ResponseWorkspace.id)).where(ResponseWorkspace.tenant_id == tenant_id)
+            count_res = await session.execute(count_stmt)
+            count = count_res.scalar() or 0
+            if count > 0:
+                return 0
+
+            seeds = PostgresService.load_workspace_seeds()
+            synced = 0
+            for item in seeds:
+                ws = ResponseWorkspace(
+                    id=item["id"],
+                    tenant_id=tenant_id,
+                    title=item["title"],
+                    source_mode="url" if item.get("color") == "blue" else "upload",
+                    source_url="",
+                )
+                session.add(ws)
+                synced += 1
+            await session.commit()
+            logger.info("Auto-seeded %d workspaces for tenant '%s'", synced, tenant_id)
+            return synced
+        except Exception as exc:
+            logger.warning("Auto-seed workspaces failed for tenant '%s': %s", tenant_id, exc)
+            return 0
+
+    @staticmethod
     async def list_workspaces(
         session: AsyncSession,
         tenant_id: str,
         limit: int = 10,
     ) -> List[ResponseWorkspace]:
+        try:
+            await PostgresService.seed_workspaces_if_empty(session, tenant_id)
+        except Exception:
+            pass
+
         result = await session.execute(
             select(ResponseWorkspace)
             .where(ResponseWorkspace.tenant_id == tenant_id)
@@ -1269,11 +904,47 @@ class PostgresService:
         return log_entry
 
     @staticmethod
+    async def seed_audit_logs_if_empty(session: AsyncSession, tenant_id: str = "acme-corp") -> int:
+        """
+        Auto-seeds initial audit log records for tenant if table is empty.
+        """
+        try:
+            count_stmt = select(func.count(AuditLogModel.id)).where(AuditLogModel.tenant_id == tenant_id)
+            count_res = await session.execute(count_stmt)
+            count = count_res.scalar() or 0
+            if count > 0:
+                return 0
+
+            seeds = PostgresService.load_audit_log_seeds()
+            synced = 0
+            for item in seeds:
+                log_obj = AuditLogModel(
+                    tenant_id=tenant_id,
+                    user_role=item.get("user_role", "Proposal Drafter"),
+                    action=item["action"],
+                    details=item["details"],
+                    event_type=item.get("event_type", "import"),
+                )
+                session.add(log_obj)
+                synced += 1
+            await session.commit()
+            logger.info("Auto-seeded %d audit logs for tenant '%s'", synced, tenant_id)
+            return synced
+        except Exception as exc:
+            logger.warning("Auto-seed audit logs failed for tenant '%s': %s", tenant_id, exc)
+            return 0
+
+    @staticmethod
     async def list_audit_logs(
         session: AsyncSession,
         tenant_id: str,
         limit: int = 50,
     ) -> List[AuditLogModel]:
+        try:
+            await PostgresService.seed_audit_logs_if_empty(session, tenant_id)
+        except Exception:
+            pass
+
         result = await session.execute(
             select(AuditLogModel)
             .where(AuditLogModel.tenant_id == tenant_id)

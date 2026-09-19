@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityLogItem, DEFAULT_ACTIVITY_LOGS, ReviewerRole } from "../types";
+import { ActivityLogItem, ReviewerRole } from "../types";
 import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
 
 export function useActivityAndAudit(tenantId: string, role: ReviewerRole) {
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(DEFAULT_ACTIVITY_LOGS);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
   const [backendHealth, setBackendHealth] = useState<"ok" | "degraded" | "checking">("checking");
   const [toastNotice, setToastNotice] = useState<string | null>(null);
 

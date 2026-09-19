@@ -1,0 +1,26 @@
+[
+  {
+    "user_role": "Proposal Drafter",
+    "action": "Loaded questionnaire form",
+    "details": "Northstar security review (12 detected questions)",
+    "event_type": "import"
+  },
+  {
+    "user_role": "Gemini 2.5 Flash",
+    "action": "Generated response draft",
+    "details": "Drafted answers for 12 questions grounded in knowledge base",
+    "event_type": "generation"
+  },
+  {
+    "user_role": "Security SME",
+    "action": "Approved response item",
+    "details": "Approved Q01: 'Does the system support SAML 2.0 / Okta SSO?'",
+    "event_type": "approval"
+  },
+  {
+    "user_role": "Security SME",
+    "action": "Promoted Golden Q&A to Knowledge Base",
+    "details": "Upserted approved SOC2 compliance response into Pinecone & Algolia index",
+    "event_type": "kb"
+  }
+]
