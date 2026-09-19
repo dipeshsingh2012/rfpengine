@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Sparkles } from "lucide-react";
 import { ModalPortal } from "../../../common/ModalPortal";
+import { TuningJobFormFields } from "./TuningJobFormFields";
 
 interface Props {
   isOpen: boolean;
@@ -55,71 +56,21 @@ export const NewTuningJobModal: React.FC<Props> = ({
         </button>
       </div>
 
-      <div className="modal-body form-grid">
-        <div className="form-group">
-          <label>Base Gemini Model</label>
-          <select value={baseModel} onChange={(e) => setBaseModel(e.target.value)}>
-            <option value="gemini-1.5-flash-002">Gemini 1.5 Flash-002 (Fast, Cost-efficient)</option>
-            <option value="gemini-1.5-pro-002">Gemini 1.5 Pro-002 (Complex Enterprise Reasoning)</option>
-          </select>
-          <span className="settings-field-hint">
-            Vertex AI Supervised Tuning requires a supported stable base checkpoint.
-          </span>
-        </div>
-
-        <div className="form-group">
-          <label>Supervised Training Datasets</label>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", fontWeight: "normal" }}>
-              <input
-                type="checkbox"
-                checked={includeGoldenQa}
-                onChange={(e) => setIncludeGoldenQa(e.target.checked)}
-              />
-              <span>Include Canonical Golden Q&A ({effectiveGoldenQa} pairs)</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", fontWeight: "normal" }}>
-              <input
-                type="checkbox"
-                checked={includeApprovedReviews}
-                onChange={(e) => setIncludeApprovedReviews(e.target.checked)}
-              />
-              <span>Include SME Approved RFP Responses ({effectiveApprovedReviews} pairs)</span>
-            </label>
-          </div>
-          <span className="settings-field-hint">
-            Curate human-vetted ground truth to tailor the tuned model's answers.
-          </span>
-        </div>
-
-        <div className="settings-grid-2">
-          <div className="form-group">
-            <label>Epochs ({epochs})</label>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={epochs}
-              onChange={(e) => setEpochs(Number(e.target.value))}
-            />
-          </div>
-          <div className="form-group">
-            <label>LR Multiplier ({lrMultiplier}x)</label>
-            <select
-              value={lrMultiplier}
-              onChange={(e) => setLrMultiplier(Number(e.target.value))}
-            >
-              <option value={0.5}>0.5x (Conservative)</option>
-              <option value={1.0}>1.0x (Default)</option>
-              <option value={2.0}>2.0x (Aggressive)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="revision-question-preview">
-          Dataset: <strong>{calculatedPairs} supervised pairs</strong> will be staged to Google Cloud Vertex AI in multi-turn JSONL format.
-        </div>
-      </div>
+      <TuningJobFormFields
+        baseModel={baseModel}
+        setBaseModel={setBaseModel}
+        epochs={epochs}
+        setEpochs={setEpochs}
+        lrMultiplier={lrMultiplier}
+        setLrMultiplier={setLrMultiplier}
+        includeGoldenQa={includeGoldenQa}
+        setIncludeGoldenQa={setIncludeGoldenQa}
+        includeApprovedReviews={includeApprovedReviews}
+        setIncludeApprovedReviews={setIncludeApprovedReviews}
+        effectiveGoldenQa={effectiveGoldenQa}
+        effectiveApprovedReviews={effectiveApprovedReviews}
+        calculatedPairs={calculatedPairs}
+      />
 
       <div className="modal-actions">
         <button type="button" className="secondary-button" onClick={onClose} disabled={isStarting}>

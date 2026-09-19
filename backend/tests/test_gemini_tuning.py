@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
 
@@ -185,4 +185,51 @@ async def test_search_endpoint_with_tuned_model_routing():
             data = res.json()
             assert "suggested_answer" in data
             assert data["confidence_score"] > 0
+
+
+@pytest.mark.asyncio
+async def test_gemini_tuning_service_gcs_upload_and_vertex_tune():
+    service = GeminiTuningService()
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.commit = AsyncMock()
+    mock_db.refresh = AsyncMock()
+
+    mock_blob = MagicMock()
+    mock_bucket = MagicMock()
+    mock_bucket.blob.return_value = mock_blob
+    mock_storage = MagicMock()
+    mock_storage.bucket.return_value = mock_bucket
+    service.storage_client = mock_storage
+
+    mock_tune_result = MagicMock()
+    mock_tune_result.name = "projects/test/locations/us-central1/tuningJobs/tune-test"
+    mock_tune_result.tuned_model = MagicMock(model="projects/test/locations/us-central1/models/tuned-test")
+    mock_genai = MagicMock()
+    mock_genai.tunings.tune.return_value = mock_tune_result
+    service.genai_client = mock_genai
+
+    mock_dataset = [
+        {"messages": [{"role": "system", "content": "test"}, {"role": "user", "content": "q"}, {"role": "model", "content": "a"}]}
+    ]
+
+    with patch.object(service, "extract_tuning_dataset", new=AsyncMock(return_value=mock_dataset)):
+        req = TuningJobCreate(
+            base_model="gemini-1.5-flash-002",
+            epochs=3,
+            learning_rate_multiplier=1.0,
+            include_golden_qa=True,
+            include_approved_reviews=True,
+        )
+        job = await service.create_tuning_job(mock_db, "acme-corp", req)
+
+        assert job.status == "RUNNING"
+        assert job.job_name == "projects/test/locations/us-central1/tuningJobs/tune-test"
+        assert job.tuned_model_name == "projects/test/locations/us-central1/models/tuned-test"
+        assert mock_blob.upload_from_string.called
+        assert mock_genai.tunings.tune.called
+        _, kwargs = mock_genai.tunings.tune.call_args
+        assert kwargs["base_model"] == "gemini-1.5-flash-002"
+        assert hasattr(kwargs["training_dataset"], "gcs_uri") or isinstance(kwargs["training_dataset"], str)
 

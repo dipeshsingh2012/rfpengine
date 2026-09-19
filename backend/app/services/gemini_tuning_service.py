@@ -37,13 +37,20 @@ except ImportError:
     genai = None  # type: ignore
     types = None  # type: ignore
 
+try:
+    from google.cloud import storage
+except ImportError:
+    storage = None  # type: ignore
+
 
 class GeminiTuningService:
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or get_settings()
+        self.credentials: Optional[Any] = None
         self.genai_client: Optional[Any] = None
+        self.storage_client: Optional[Any] = None
 
-        if self.settings.gcp_project_id and genai:
+        if self.settings.gcp_project_id:
             try:
                 creds_path = self.settings.google_application_credentials
                 credentials = None
@@ -60,12 +67,19 @@ class GeminiTuningService:
                             str(path_obj.resolve()),
                             scopes=["https://www.googleapis.com/auth/cloud-platform"],
                         )
-                self.genai_client = genai.Client(
-                    vertexai=True,
-                    project=self.settings.gcp_project_id,
-                    location="us-central1",
-                    credentials=credentials,
-                )
+                self.credentials = credentials
+                if genai:
+                    self.genai_client = genai.Client(
+                        vertexai=True,
+                        project=self.settings.gcp_project_id,
+                        location="us-central1",
+                        credentials=credentials,
+                    )
+                if storage:
+                    self.storage_client = storage.Client(
+                        project=self.settings.gcp_project_id,
+                        credentials=credentials,
+                    )
             except Exception as exc:
                 logger.warning("Gemini tuning client initialization skipped: %s", exc)
 
@@ -180,7 +194,7 @@ class GeminiTuningService:
         request: TuningJobCreate,
     ) -> TuningJobModel:
         """
-        Extracts training pairs, creates a Vertex AI supervised tuning job, and records in DB.
+        Extracts training pairs, stages dataset to GCS, creates a Vertex AI supervised tuning job, and records in DB.
         """
         job_id = f"tune-{uuid.uuid4().hex[:10]}"
         dataset = await self.extract_tuning_dataset(
@@ -190,9 +204,22 @@ class GeminiTuningService:
             include_approved_reviews=request.include_approved_reviews,
         )
 
-        dataset_uri = request.custom_dataset_uri or f"gs://{self.settings.gcs_bucket_name or 'rfp-engine-tuning'}/datasets/{tenant_id}/{job_id}.jsonl"
-        vertex_job_name = f"projects/{self.settings.gcp_project_id or 'rfp-engine'}/locations/us-central1/tuningJobs/{job_id}"
-        tuned_model_dest = f"projects/{self.settings.gcp_project_id or 'rfp-engine'}/locations/us-central1/models/tuned-{job_id}"
+        bucket_name = self.settings.gcs_bucket_name or "rfpengine-tuning-us-central1"
+        blob_path = f"datasets/{tenant_id}/{job_id}.jsonl"
+        dataset_uri = request.custom_dataset_uri or f"gs://{bucket_name}/{blob_path}"
+        vertex_job_name = f"projects/{self.settings.gcp_project_id or 'rfpengine'}/locations/us-central1/tuningJobs/{job_id}"
+        tuned_model_dest = f"projects/{self.settings.gcp_project_id or 'rfpengine'}/locations/us-central1/models/tuned-{job_id}"
+
+        # Stage JSONL dataset to Google Cloud Storage
+        jsonl_data = "\n".join(json.dumps(ex) for ex in dataset)
+        if self.storage_client and not request.custom_dataset_uri:
+            try:
+                bucket = self.storage_client.bucket(bucket_name)
+                blob = bucket.blob(blob_path)
+                blob.upload_from_string(jsonl_data, content_type="application/jsonl")
+                logger.info("Uploaded %d examples to gs://%s/%s", len(dataset), bucket_name, blob_path)
+            except Exception as gcs_err:
+                logger.warning("GCS dataset upload failed or offline fallback: %s", gcs_err)
 
         status = "SUCCEEDED"
         error_msg = None
@@ -206,21 +233,21 @@ class GeminiTuningService:
         # Attempt real Vertex AI job creation if client is live
         if self.genai_client:
             try:
-                # Format dataset lines
-                jsonl_data = "\n".join(json.dumps(ex) for ex in dataset)
                 logger.info("Triggering Vertex AI tuning job: %s with %d examples", job_id, len(dataset))
-                # Note: Real Vertex AI client.tunings.tune call
+                training_dataset_arg = types.TuningDataset(gcs_uri=dataset_uri) if types else dataset_uri
                 tuning_job = self.genai_client.tunings.tune(
                     base_model=request.base_model,
-                    training_dataset=dataset_uri,
+                    training_dataset=training_dataset_arg,
                     config=types.CreateTuningJobConfig(
                         epoch_count=request.epochs,
                         learning_rate_multiplier=request.learning_rate_multiplier,
                         tuned_model_display_name=f"rfp-gemini-{tenant_id}-{job_id}",
                     ) if types else None,
                 )
-                if hasattr(tuning_job, "name"):
+                if hasattr(tuning_job, "name") and tuning_job.name:
                     vertex_job_name = tuning_job.name
+                if hasattr(tuning_job, "tuned_model") and getattr(tuning_job.tuned_model, "model", None):
+                    tuned_model_dest = tuning_job.tuned_model.model
                 status = "RUNNING"
             except Exception as exc:
                 logger.warning("Vertex AI remote tuning invocation fallback: %s", exc)
@@ -253,6 +280,7 @@ class GeminiTuningService:
     ) -> List[TuningJobModel]:
         """
         Lists tuning jobs for a tenant ordered by latest first.
+        Refreshes status against Vertex AI for any active RUNNING jobs.
         """
         stmt = (
             select(TuningJobModel)
@@ -260,7 +288,14 @@ class GeminiTuningService:
             .order_by(TuningJobModel.created_at.desc())
         )
         res = await db.execute(stmt)
-        return list(res.scalars().all())
+        jobs = list(res.scalars().all())
+        for job in jobs:
+            if job.status == "RUNNING":
+                try:
+                    await self.get_tuning_job_status(db, tenant_id, job.id)
+                except Exception as poll_err:
+                    logger.warning("Failed to refresh running job %s: %s", job.id, poll_err)
+        return jobs
 
     async def get_tuning_job_status(
         self,
@@ -286,11 +321,21 @@ class GeminiTuningService:
                 remote_job = self.genai_client.tunings.get(name=job.job_name)
                 state = getattr(remote_job, "state", None)
                 if state:
-                    job.status = str(state)
-                    if hasattr(remote_job, "tuned_model") and remote_job.tuned_model:
-                        job.tuned_model_name = remote_job.tuned_model.model
-                    await db.commit()
-                    await db.refresh(job)
+                    state_str = str(state).upper()
+                    if "SUCCEEDED" in state_str or "JOB_STATE_SUCCEEDED" in state_str:
+                        job.status = "SUCCEEDED"
+                    elif "FAILED" in state_str or "JOB_STATE_FAILED" in state_str:
+                        job.status = "FAILED"
+                    elif "CANCELLED" in state_str or "JOB_STATE_CANCELLED" in state_str:
+                        job.status = "CANCELLED"
+                    elif "RUNNING" in state_str or "JOB_STATE_RUNNING" in state_str:
+                        job.status = "RUNNING"
+                    else:
+                        job.status = str(state)
+                if hasattr(remote_job, "tuned_model") and getattr(remote_job.tuned_model, "model", None):
+                    job.tuned_model_name = remote_job.tuned_model.model
+                await db.commit()
+                await db.refresh(job)
             except Exception as exc:
                 logger.warning("Failed to refresh Vertex AI tuning status: %s", exc)
 

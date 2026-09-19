@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # GCP Configuration
     GCP_PROJECT_ID: str = Field(default="test-project-id")
     GCP_REGION: str = Field(default="us-central1")
+    GCS_BUCKET_NAME: str = Field(default="rfpengine-tuning-us-central1")
 
     # Database Configuration
     DATABASE_URL: str = Field(default="postgresql://postgres:postgres@localhost:5432/postgres")
@@ -77,6 +78,10 @@ class Settings(BaseSettings):
     @property
     def gcp_project_id(self) -> str:
         return self.GCP_PROJECT_ID
+
+    @property
+    def gcs_bucket_name(self) -> str:
+        return self.GCS_BUCKET_NAME
 
     @property
     def pinecone_api_key(self) -> str:

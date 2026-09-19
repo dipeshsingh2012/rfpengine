@@ -23,14 +23,6 @@ export const CustomTuningCard: React.FC<Props> = ({
     (j) => (j.status === "SUCCEEDED" || j.status === "COMPLETED") && (j.tuned_model_name || j.id)
   );
 
-  const handleResetToBase = () => {
-    setSettings({ ...settings, active_tuned_model_id: null });
-  };
-
-  const handleSelectModel = (val: string) => {
-    setSettings({ ...settings, active_tuned_model_id: val || null });
-  };
-
   return (
     <div className="settings-group-card" style={{ marginTop: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -71,26 +63,22 @@ export const CustomTuningCard: React.FC<Props> = ({
           {completedTunedModels.length > 0 && (
             <select
               value={activeModel || ""}
-              onChange={(e) => handleSelectModel(e.target.value)}
+              onChange={(e) => setSettings({ ...settings, active_tuned_model_id: e.target.value || null })}
               style={{ fontSize: "12px", padding: "4px 8px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "transparent" }}
             >
               <option value="">Base Model ({settings.default_model})</option>
-              {completedTunedModels.map((job) => {
-                const id = job.tuned_model_name || job.id;
-                const name = job.tuned_model_name ? job.tuned_model_name.split("/").pop() : job.id;
-                return (
-                  <option key={job.id} value={id}>
-                    {name} ({job.dataset_examples_count} pairs)
-                  </option>
-                );
-              })}
+              {completedTunedModels.map((job) => (
+                <option key={job.id} value={job.tuned_model_name || job.id}>
+                  {(job.tuned_model_name ? job.tuned_model_name.split("/").pop() : job.id)} ({job.dataset_examples_count} pairs)
+                </option>
+              ))}
             </select>
           )}
 
           {activeModel && (
             <button
               type="button"
-              onClick={handleResetToBase}
+              onClick={() => setSettings({ ...settings, active_tuned_model_id: null })}
               style={{ background: "none", border: "1px solid var(--border-color)", borderRadius: "4px", padding: "4px 8px", fontSize: "11px", color: "var(--muted)", cursor: "pointer" }}
             >
               Revert to Base Model
@@ -101,10 +89,7 @@ export const CustomTuningCard: React.FC<Props> = ({
 
       <TuningStudioModal
         isOpen={isStudioOpen}
-        onClose={() => {
-          setIsStudioOpen(false);
-          onRefreshJobs?.();
-        }}
+        onClose={() => { setIsStudioOpen(false); onRefreshJobs?.(); }}
         tenantId={settings.tenant_id}
         settings={settings}
         setSettings={setSettings}
@@ -112,4 +97,3 @@ export const CustomTuningCard: React.FC<Props> = ({
     </div>
   );
 };
-
