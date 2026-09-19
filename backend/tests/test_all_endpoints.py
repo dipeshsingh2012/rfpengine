@@ -338,19 +338,6 @@ async def test_delete_kb_document():
     assert response.status_code in [200, 204]
 
 
-# ==================== CSV ENDPOINTS ====================
-
-@pytest.mark.asyncio
-async def test_csv_export():
-    async with get_client() as ac:
-        response = await ac.get(
-            "/api/v1/csv/export",
-            headers={"X-Tenant-ID": "test_tenant"}
-        )
-    assert response.status_code == 200
-    assert "text/csv" in response.headers.get("content-type", "")
-
-
 # ==================== EXPORT ENDPOINTS ====================
 
 @pytest.mark.asyncio

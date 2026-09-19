@@ -4,7 +4,6 @@ from app.api.v1.endpoints import (
     search,
     responses,
     tuning,
-    csv_endpoints,
     export,
     email,
     mcp,
@@ -21,7 +20,6 @@ api_router.include_router(search.router, tags=["search"])
 api_router.include_router(responses.router, prefix="/responses", tags=["responses"])
 api_router.include_router(tuning.router)
 api_router.include_router(kb_router)
-api_router.include_router(csv_endpoints.router, prefix="/csv", tags=["csv"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
 api_router.include_router(email.router)
 api_router.include_router(mcp.router)
