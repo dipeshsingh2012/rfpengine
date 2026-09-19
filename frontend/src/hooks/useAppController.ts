@@ -73,7 +73,7 @@ export function useAppController() {
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/v1/responses/history`, { headers: { "X-Tenant-ID": tenantId } })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data?.history?.length) workspaces.setRecentRFPs(data.history); })
+      .then((data) => { if (Array.isArray(data?.history)) workspaces.setRecentRFPs(data.history); })
       .catch(() => {});
     workspaces.fetchWorkspaceSummaries();
   }, [tenantId, navigation.route]);

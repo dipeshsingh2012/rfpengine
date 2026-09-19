@@ -7,6 +7,7 @@ import { renderToString } from "react-dom/server";
 import { AppShell } from "../components/layout/AppShell.js";
 import { Topbar } from "../components/layout/Topbar.js";
 import { Sidebar } from "../components/layout/Sidebar.js";
+import { SidebarRecentRFPs } from "../components/layout/sidebar/SidebarRecentRFPs.js";
 
 // Import workspace components
 import { HomeWelcomeView } from "../components/workspace/HomeWelcomeView.js";
@@ -75,6 +76,49 @@ test("Component Sanity: AppShell, Topbar, and Sidebar render without crashing", 
   assert.ok(html.includes("topbar"));
   assert.ok(html.includes("sidebar"));
   assert.ok(html.includes("Test Content"));
+});
+
+test("Component Sanity: SidebarRecentRFPs renders items, truncation, badges, and empty state", () => {
+  const renderedList = renderToString(
+    React.createElement(SidebarRecentRFPs, {
+      recentRFPs: [
+        { id: "ws-1", title: "Enterprise Vendor Security Questionnaire 2026.csv", editedAt: "5 min ago", color: "green", questionsCount: 24 },
+        { id: "ws-2", title: "Meridian SOC2 Compliance Review", editedAt: "Yesterday", color: "blue", questionsCount: 10 },
+      ],
+      isResponsesActive: true,
+      activeResponseId: "ws-1",
+      currentRoute: "/response/workspace/ws-1",
+      onSelectRFP: () => {},
+      onNavigateHome: () => {},
+      onCloseMobile: () => {},
+    })
+  );
+
+  assert.ok(renderedList.includes("recent-section"));
+  assert.ok(renderedList.includes("recent-header"));
+  assert.ok(renderedList.includes("recent-item"));
+  assert.ok(renderedList.includes("recent-item-info"));
+  assert.ok(renderedList.includes("recent-q-badge"));
+  assert.ok(renderedList.includes("24Q"));
+  assert.ok(renderedList.includes("Enterprise Vendor Security Questionnaire 2026.csv"));
+  assert.ok(renderedList.includes("selected"));
+
+  // Test empty state
+  const renderedEmpty = renderToString(
+    React.createElement(SidebarRecentRFPs, {
+      recentRFPs: [],
+      isResponsesActive: false,
+      activeResponseId: "",
+      currentRoute: "/",
+      onSelectRFP: () => {},
+      onNavigateHome: () => {},
+      onCloseMobile: () => {},
+    })
+  );
+
+  assert.ok(renderedEmpty.includes("recent-empty"));
+  assert.ok(renderedEmpty.includes("recent-empty-action"));
+  assert.ok(renderedEmpty.includes("No recent proposals"));
 });
 
 test("Component Sanity: HomeWelcomeView and features render without crashing", () => {

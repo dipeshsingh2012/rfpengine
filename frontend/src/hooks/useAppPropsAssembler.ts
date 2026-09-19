@@ -85,6 +85,7 @@ export function assembleAppProps(p: any) {
     isActivityActive: p.isActivityActive,
     recentRFPs: p.workspaces.recentRFPs,
     activeResponseId: p.activeResponseId,
+    currentRoute: p.route,
     onNavigateHome: () => { p.kb.setShowKBModal(false); p.activity.setShowActivityModal(false); p.navigate("/"); },
     onNavigateResponses: () => { p.kb.setShowKBModal(false); p.activity.setShowActivityModal(false); p.navigate("/responses"); },
     onSelectRFP: (id: string) => { p.kb.setShowKBModal(false); p.activity.setShowActivityModal(false); p.workflow.setResponseId(id); p.navigate(`/response/workspace/${id}`); },

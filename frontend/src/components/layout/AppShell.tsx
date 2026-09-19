@@ -17,6 +17,7 @@ interface AppShellProps {
   isActivityActive: boolean;
   recentRFPs: RecentRFPItem[];
   activeResponseId: string;
+  currentRoute?: string;
   onNavigateHome: () => void;
   onNavigateResponses: () => void;
   onSelectRFP: (id: string) => void;
@@ -52,6 +53,7 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         isActivityActive={p.isActivityActive}
         recentRFPs={p.recentRFPs}
         activeResponseId={p.activeResponseId}
+        currentRoute={p.currentRoute}
         onNavigateHome={p.onNavigateHome}
         onNavigateResponses={p.onNavigateResponses}
         onSelectRFP={p.onSelectRFP}

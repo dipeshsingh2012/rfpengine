@@ -46,6 +46,7 @@ export function useWorkspaceListManager(tenantId: string) {
       if (res.ok) {
         showToast("Questionnaire permanently deleted from PostgreSQL");
         fetchWorkspaceSummaries();
+        setRecentRFPs((prev) => prev.filter((item) => item.id !== id));
       } else showToast("Failed to delete workspace");
     } catch {
       showToast("Network error deleting workspace");

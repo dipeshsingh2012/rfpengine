@@ -14,6 +14,7 @@ interface SidebarProps {
   isActivityActive: boolean;
   recentRFPs: RecentRFPItem[];
   activeResponseId: string;
+  currentRoute?: string;
   onNavigateHome: () => void;
   onNavigateResponses: () => void;
   onSelectRFP: (id: string) => void;
@@ -36,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isActivityActive,
   recentRFPs,
   activeResponseId,
+  currentRoute,
   onNavigateHome,
   onNavigateResponses,
   onSelectRFP,
@@ -72,6 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         recentRFPs={recentRFPs}
         isResponsesActive={isResponsesActive}
         activeResponseId={activeResponseId}
+        currentRoute={currentRoute}
         onCloseMobile={onCloseMobile}
         onSelectRFP={onSelectRFP}
         onNavigateHome={onNavigateHome}
