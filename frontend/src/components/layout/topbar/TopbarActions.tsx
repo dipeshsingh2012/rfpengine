@@ -1,10 +1,23 @@
 import React from "react";
 import { TrendingUp, AlertCircle } from "lucide-react";
+import { ReviewerRole } from "../../../types";
+import { TopbarRoleSelector } from "./TopbarRoleSelector";
 
-export const TopbarActions: React.FC = () => {
+interface TopbarActionsProps {
+  role?: ReviewerRole;
+  setRole?: (role: ReviewerRole) => void;
+  showToast?: (msg: string) => void;
+}
+
+export const TopbarActions: React.FC<TopbarActionsProps> = ({
+  role = "Proposal manager",
+  setRole = () => {},
+  showToast,
+}) => {
   return (
     <>
       <div className="topbar-spacer" />
+      <TopbarRoleSelector role={role} setRole={setRole} showToast={showToast} />
       <a
         href="https://rfpengine.aroadmap.dev/"
         target="_blank"
@@ -24,7 +37,7 @@ export const TopbarActions: React.FC = () => {
         }}
         title="Open live strategy & PRD roadmap on aroadmap.dev"
       >
-        <TrendingUp size={14} /> 🗺️ Roadmap (aroadmap.dev)
+        <TrendingUp size={14} /> 🗺️ Roadmap
       </a>
       <button className="icon-button" title="Open notifications">
         <AlertCircle size={18} />
@@ -35,4 +48,3 @@ export const TopbarActions: React.FC = () => {
     </>
   );
 };
-

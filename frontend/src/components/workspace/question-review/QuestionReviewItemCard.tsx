@@ -2,6 +2,7 @@ import React from "react";
 import { MessageSquare, ThumbsDown, Send, Check, RefreshCw, Sparkles } from "lucide-react";
 import { ReviewerRole } from "../../../types";
 import { getStatusBadgeClass } from "../../../utils/helpers";
+import { getRoleActionLabel, isStageCompletedForRole } from "../../../utils/governanceHelpers";
 
 interface QuestionReviewItemCardProps {
   item: string;
@@ -22,22 +23,12 @@ interface QuestionReviewItemCardProps {
 }
 
 export const QuestionReviewItemCard: React.FC<QuestionReviewItemCardProps> = ({
-  item,
-  index,
-  reviewStatus,
-  reviewComment,
-  answer,
-  onAnswerChange,
-  onRequestChanges,
-  onSendForReview,
-  onApprove,
-  onResetReview,
-  onPromote,
-  isApproved,
-  isBatchApproved,
-  isPromoted,
-  role,
+  item, index, reviewStatus, reviewComment, answer, onAnswerChange, onRequestChanges,
+  onSendForReview, onApprove, onResetReview, onPromote, isApproved, isBatchApproved, isPromoted, role,
 }) => {
+  const isDone = isBatchApproved || isApproved || isStageCompletedForRole(role, reviewStatus);
+  const actionLabel = isApproved ? "Approved" : isStageCompletedForRole(role, reviewStatus) ? `Passed ${role === "Proposal manager" ? "Drafter" : role}` : getRoleActionLabel(role);
+
   return (
     <article className="question-review-card panel">
       <div className="question-review-header">
@@ -68,10 +59,10 @@ export const QuestionReviewItemCard: React.FC<QuestionReviewItemCardProps> = ({
         <button className="outline-button" onClick={onSendForReview} title="Route to Security SME, Legal, or Final Approver">
           <Send size={14} /> Send for review
         </button>
-        <button className="approve-button" onClick={onApprove} disabled={isBatchApproved || isApproved} title={`Approve answer as ${role}`}>
-          <Check size={14} /> Approve as {role === "Proposal manager" ? "Drafter" : role}
+        <button className="approve-button" onClick={onApprove} disabled={isDone} title={`Advance answer as ${role}`}>
+          <Check size={14} /> {actionLabel}
         </button>
-        {(isBatchApproved || isApproved) && (
+        {isDone && (
           <button className="outline-button" onClick={onResetReview} title="Return question to review state" style={{ padding: "4px 10px", fontSize: "12px" }}>
             <RefreshCw size={12} /> Review
           </button>

@@ -6,6 +6,7 @@ import { renderToString } from "react-dom/server";
 // Import layout components
 import { AppShell } from "../components/layout/AppShell.js";
 import { Topbar } from "../components/layout/Topbar.js";
+import { TopbarRoleSelector } from "../components/layout/topbar/TopbarRoleSelector.js";
 import { Sidebar } from "../components/layout/Sidebar.js";
 import { SidebarRecentRFPs } from "../components/layout/sidebar/SidebarRecentRFPs.js";
 
@@ -17,6 +18,7 @@ import { SingleQuestionInputPanel } from "../components/workspace/questionnaire/
 import { BatchQuestionsHeaderBar } from "../components/workspace/questionnaire/BatchQuestionsHeaderBar.js";
 import { EvidenceSourcesPanel } from "../components/workspace/EvidenceSourcesPanel.js";
 import { GovernanceBar } from "../components/workspace/GovernanceBar.js";
+import { GovernanceWaterfallSteps } from "../components/workspace/governance/GovernanceWaterfallSteps.js";
 
 // Import responses dashboard components
 import { ResponsesDashboard } from "../components/responses/ResponsesDashboard.js";
@@ -499,4 +501,38 @@ test("Component Sanity: TuningStudioModal and NewTuningJobModal render cleanly",
   assert.ok(jobHtml.includes("new-tuning-modal"));
   assert.ok(jobHtml.includes("Launch Gemini Tuning Job"));
 });
+
+test("Component Sanity: TopbarRoleSelector renders all roles cleanly", () => {
+  const html = renderToString(
+    React.createElement(TopbarRoleSelector, {
+      role: "Proposal manager",
+      setRole: () => {},
+      showToast: () => {},
+    })
+  );
+  assert.ok(html.includes("topbar-role-selector"));
+  assert.ok(html.includes("Proposal Drafter"));
+  assert.ok(html.includes("Security SME"));
+  assert.ok(html.includes("Legal Reviewer"));
+  assert.ok(html.includes("Final Approver"));
+});
+
+test("Component Sanity: GovernanceWaterfallSteps displays sequential stages and active role", () => {
+  const html = renderToString(
+    React.createElement(GovernanceWaterfallSteps, {
+      role: "Security SME",
+      approvedCount: 0,
+      allQuestionsCount: 45,
+      inReviewCount: 45,
+      changesRequestedCount: 0,
+    })
+  );
+  assert.ok(html.includes("governance-role-select"));
+  assert.ok(html.includes("Drafting"));
+  assert.ok(html.includes("Security SME"));
+  assert.ok(html.includes("Legal Review"));
+  assert.ok(html.includes("Final Sign-off"));
+  assert.ok(html.includes("Active"));
+});
+
 

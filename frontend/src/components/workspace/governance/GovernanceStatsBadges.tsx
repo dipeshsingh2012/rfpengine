@@ -1,6 +1,7 @@
 import React from "react";
 import { Check, Clock, MessageSquare, RefreshCw } from "lucide-react";
 import { ReviewerRole } from "../../../types";
+import { getRoleActionLabel } from "../../../utils/governanceHelpers";
 
 interface GovernanceStatsBadgesProps {
   role: ReviewerRole;
@@ -62,9 +63,9 @@ export const GovernanceStatsBadges: React.FC<GovernanceStatsBadgesProps> = ({
           className="outline-button"
           style={{ padding: "5px 10px", fontSize: "11px" }}
           onClick={handleBatchApproveAll}
-          title={`Batch approve all questions as ${role}`}
+          title={`Batch advance all questions as ${role}`}
         >
-          <Check size={12} /> Approve All as {role === "Proposal manager" ? "Drafter" : role}
+          <Check size={12} /> {getRoleActionLabel(role, true)}
         </button>
       )}
     </div>

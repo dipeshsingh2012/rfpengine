@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ReviewerRole, SourceMode, starterQuestions } from "../types";
 import { getApiBaseUrl } from "../utils/helpers";
+import { getWaterfallStage } from "../utils/governanceHelpers";
 
 const apiBaseUrl = getApiBaseUrl();
 
@@ -36,17 +37,17 @@ export function useQuestionnaireWorkflow(tenantId: string, initialResponseId?: s
   }
 
   function handleApproveQuestion(item: string) {
-    const next = role === "Security SME" ? "Approved by SME" : role === "Legal reviewer" ? "Approved by Legal" : role === "Final approver" ? "Final approved" : "Approved";
+    const next = getWaterfallStage(role);
     saveReviewStatuses({ ...reviewStatusByQuestion, [item]: next });
   }
 
   function handleBatchApproveAll() {
-    const next = role === "Security SME" ? "Approved by SME" : role === "Legal reviewer" ? "Approved by Legal" : role === "Final approver" ? "Final approved" : "Approved";
+    const next = getWaterfallStage(role);
     const all = detectedQuestions.length > 0 ? detectedQuestions : [question];
     const map: Record<string, string> = { ...reviewStatusByQuestion };
     all.forEach((q) => { map[q] = next; });
     saveReviewStatuses(map);
-    setIsBatchApproved(true);
+    if (role === "Final approver") setIsBatchApproved(true);
   }
 
   function handleReviewReset() {

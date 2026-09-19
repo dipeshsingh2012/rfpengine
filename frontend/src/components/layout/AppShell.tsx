@@ -2,7 +2,7 @@ import React from "react";
 import { Topbar } from "./Topbar";
 import { Sidebar } from "./Sidebar";
 import { ToastNotice } from "../common/ToastNotice";
-import { RecentRFPItem } from "../../types";
+import { RecentRFPItem, ReviewerRole } from "../../types";
 
 interface AppShellProps {
   mobileNavOpen: boolean;
@@ -28,6 +28,9 @@ interface AppShellProps {
   kbTotalSources: number;
   tenantId: string;
   toastNotice: string | null;
+  role?: ReviewerRole;
+  setRole?: (r: ReviewerRole) => void;
+  showToast?: (msg: string) => void;
   children: React.ReactNode;
 }
 
@@ -41,6 +44,9 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         onOpenSettings={p.onOpenSettings}
         backendHealth={p.backendHealth}
         onNavigateHome={p.onNavigateHome}
+        role={p.role}
+        setRole={p.setRole}
+        showToast={p.showToast}
       />
 
       <Sidebar

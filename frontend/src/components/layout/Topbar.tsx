@@ -1,5 +1,6 @@
 import React from "react";
 import { Menu, X } from "lucide-react";
+import { ReviewerRole } from "../../types";
 import { TopbarBrand } from "./topbar/TopbarBrand";
 import { TopbarHealthBadge } from "./topbar/TopbarHealthBadge";
 import { TopbarActions } from "./topbar/TopbarActions";
@@ -11,6 +12,9 @@ interface TopbarProps {
   onOpenSettings: () => void;
   backendHealth: "ok" | "degraded" | "checking";
   onNavigateHome: () => void;
+  role?: ReviewerRole;
+  setRole?: (role: ReviewerRole) => void;
+  showToast?: (msg: string) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -20,6 +24,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenSettings,
   backendHealth,
   onNavigateHome,
+  role,
+  setRole,
+  showToast,
 }) => {
   return (
     <header className="topbar">
@@ -36,7 +43,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         companyName={companyName}
       />
       <TopbarHealthBadge backendHealth={backendHealth} />
-      <TopbarActions />
+      <TopbarActions role={role} setRole={setRole} showToast={showToast} />
     </header>
   );
 };

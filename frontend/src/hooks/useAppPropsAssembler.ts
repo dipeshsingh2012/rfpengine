@@ -105,6 +105,9 @@ export function assembleAppProps(p: any) {
     kbTotalSources: p.kb.kbTotalSources,
     tenantId: p.tenantId,
     toastNotice: p.activity.toastNotice,
+    role: p.workflow.role,
+    setRole: p.workflow.setRole,
+    showToast: p.activity.showToast,
   };
 
   const mainViewProps = {

@@ -85,3 +85,37 @@ test("getStatusBadgeClass maps statuses correctly", () => {
   assert.equal(getStatusBadgeClass(undefined), "status-draft");
   assert.equal(getStatusBadgeClass("Unknown status"), "status-draft");
 });
+
+test("governanceHelpers: getWaterfallStage returns proper progression stages", async () => {
+  const { getWaterfallStage } = await import("../utils/governanceHelpers.js");
+  assert.equal(getWaterfallStage("Proposal manager"), "SME review");
+  assert.equal(getWaterfallStage("Security SME"), "Legal review");
+  assert.equal(getWaterfallStage("Legal reviewer"), "Ready for Final Approval");
+  assert.equal(getWaterfallStage("Final approver"), "Final approved");
+});
+
+test("governanceHelpers: getRoleActionLabel returns clear batch and item labels", async () => {
+  const { getRoleActionLabel } = await import("../utils/governanceHelpers.js");
+  assert.equal(getRoleActionLabel("Proposal manager", false), "Advance to Security SME");
+  assert.equal(getRoleActionLabel("Proposal manager", true), "Advance All to Security SME");
+  assert.equal(getRoleActionLabel("Security SME", false), "Approve as Security SME");
+  assert.equal(getRoleActionLabel("Security SME", true), "Approve All as Security SME");
+  assert.equal(getRoleActionLabel("Legal reviewer", false), "Approve as Legal Reviewer");
+  assert.equal(getRoleActionLabel("Legal reviewer", true), "Approve All as Legal Reviewer");
+  assert.equal(getRoleActionLabel("Final approver", false), "👑 Final Approve");
+  assert.equal(getRoleActionLabel("Final approver", true), "👑 Final Approve All");
+});
+
+test("governanceHelpers: isStageCompletedForRole checks role progress", async () => {
+  const { isStageCompletedForRole } = await import("../utils/governanceHelpers.js");
+  assert.equal(isStageCompletedForRole("Proposal manager", "SME review"), true);
+  assert.equal(isStageCompletedForRole("Proposal manager", "Legal review"), true);
+  assert.equal(isStageCompletedForRole("Proposal manager", "In Review"), false);
+  assert.equal(isStageCompletedForRole("Proposal manager", undefined), false);
+  assert.equal(isStageCompletedForRole("Security SME", "SME review"), false);
+  assert.equal(isStageCompletedForRole("Security SME", "Legal review"), true);
+  assert.equal(isStageCompletedForRole("Legal reviewer", "Ready for Final Approval"), true);
+  assert.equal(isStageCompletedForRole("Final approver", "Final approved"), true);
+  assert.equal(isStageCompletedForRole("Proposal manager", "Final approved"), true);
+});
+

@@ -1,6 +1,6 @@
 import React from "react";
 import { ReviewerRole } from "../../types";
-import { GovernanceRolePills } from "./governance/GovernanceRolePills";
+import { GovernanceWaterfallSteps } from "./governance/GovernanceWaterfallSteps";
 import { GovernanceStatsBadges } from "./governance/GovernanceStatsBadges";
 
 interface GovernanceBarProps {
@@ -18,8 +18,6 @@ interface GovernanceBarProps {
 
 export const GovernanceBar: React.FC<GovernanceBarProps> = ({
   role,
-  setRole,
-  showToast,
   approvedCount,
   allQuestionsCount,
   inReviewCount,
@@ -30,7 +28,13 @@ export const GovernanceBar: React.FC<GovernanceBarProps> = ({
 }) => {
   return (
     <div className="governance-bar panel">
-      <GovernanceRolePills role={role} setRole={setRole} showToast={showToast} />
+      <GovernanceWaterfallSteps
+        role={role}
+        approvedCount={approvedCount}
+        allQuestionsCount={allQuestionsCount}
+        inReviewCount={inReviewCount}
+        changesRequestedCount={changesRequestedCount}
+      />
       <GovernanceStatsBadges
         role={role}
         approvedCount={approvedCount}
