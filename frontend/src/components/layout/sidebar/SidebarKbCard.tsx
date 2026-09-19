@@ -1,9 +1,9 @@
 import React from "react";
-import { Settings, FolderOpen } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 
 interface SidebarKbCardProps {
-  showSettingsModal: boolean;
-  onOpenSettings: () => void;
+  showSettingsModal?: boolean;
+  onOpenSettings?: () => void;
   onOpenKB: (tab: "upload" | "connectors" | "playground") => void;
   kbTotalRecords: number;
   kbTotalSources: number;
@@ -12,8 +12,6 @@ interface SidebarKbCardProps {
 }
 
 export const SidebarKbCard: React.FC<SidebarKbCardProps> = ({
-  showSettingsModal,
-  onOpenSettings,
   onOpenKB,
   kbTotalRecords,
   kbTotalSources,
@@ -22,15 +20,6 @@ export const SidebarKbCard: React.FC<SidebarKbCardProps> = ({
 }) => {
   return (
     <div className="sidebar-bottom">
-      <button
-        className={`nav-item ${showSettingsModal ? "active" : ""}`}
-        onClick={() => {
-          onCloseMobile();
-          onOpenSettings();
-        }}
-      >
-        <Settings size={17} /> Settings & Admin
-      </button>
       <div
         className="kb-summary-card"
         title="Open Knowledge Base & Documents"
