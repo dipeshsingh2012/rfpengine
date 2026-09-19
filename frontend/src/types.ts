@@ -160,16 +160,12 @@ export type TuningDatasetPreview = {
   golden_qa_count: number;
   approved_reviews_count: number;
   sample_pairs: Array<{
-    system_instruction?: {
+    system_instruction: {
       parts: Array<{ text: string }>;
     };
-    contents?: Array<{
+    contents: Array<{
       role: "user" | "model";
       parts: Array<{ text: string }>;
-    }>;
-    messages?: Array<{
-      role: "system" | "user" | "model";
-      content: string;
     }>;
   }>;
 };

@@ -133,3 +133,20 @@ async def cancel_tuning_job(
         )
     return TuningJobResponse.model_validate(job)
 
+
+@router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tuning_job(
+    job_id: str,
+    x_tenant_id: str = Header(alias="X-Tenant-ID", default="acme-corp"),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """
+    Delete a tuning job record and its associated GCS training dataset.
+    """
+    deleted = await tuning_service.delete_tuning_job(db, x_tenant_id, job_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tuning job '{job_id}' not found",
+        )
+

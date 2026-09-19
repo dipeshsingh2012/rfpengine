@@ -310,3 +310,14 @@ async def test_tuning_supported_models_endpoint():
         assert flash_model["recommended"] is True
 
 
+@pytest.mark.asyncio
+async def test_delete_tuning_job_endpoint():
+    with patch.object(GeminiTuningService, "delete_tuning_job", new=AsyncMock(return_value=True)):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res = await ac.delete(
+                "/api/v1/tuning/jobs/tune-12345",
+                headers={"X-Tenant-ID": "acme-corp"},
+            )
+            assert res.status_code == 204
+
+

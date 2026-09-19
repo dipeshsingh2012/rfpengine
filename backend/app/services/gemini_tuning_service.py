@@ -548,3 +548,37 @@ class GeminiTuningService:
         await db.commit()
         await db.refresh(job)
         return job
+
+    async def delete_tuning_job(
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        job_id: str,
+    ) -> bool:
+        """
+        Deletes a tuning job from database and cleans up its GCS dataset artifact if exists.
+        """
+        stmt = select(TuningJobModel).where(
+            TuningJobModel.tenant_id == tenant_id,
+            TuningJobModel.id == job_id,
+        )
+        res = await db.execute(stmt)
+        job = res.scalar_one_or_none()
+        if not job:
+            return False
+
+        if job.training_dataset_uri and self.storage_client and job.training_dataset_uri.startswith("gs://"):
+            try:
+                uri_parts = job.training_dataset_uri[5:].split("/", 1)
+                if len(uri_parts) == 2:
+                    bucket_name, blob_name = uri_parts
+                    bucket = self.storage_client.bucket(bucket_name)
+                    blob = bucket.blob(blob_name)
+                    if blob.exists():
+                        blob.delete()
+            except Exception as gcs_del_err:
+                logger.warning("Could not delete GCS dataset for job %s: %s", job_id, gcs_del_err)
+
+        await db.delete(job)
+        await db.commit()
+        return True
