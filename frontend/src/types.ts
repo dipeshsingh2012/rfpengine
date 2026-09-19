@@ -267,3 +267,38 @@ export interface GoogleUser {
   authProvider?: string;
 }
 
+export interface AdminMember {
+  id: string;
+  name: string;
+  email: string;
+  picture?: string;
+  role: string;
+  is_google_sso: boolean;
+  last_active: string;
+  tenant_id: string;
+}
+
+export interface AdminRole {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  workflow_type: "sequential" | "parallel" | "ad_hoc";
+  step_order?: number;
+  is_builtin: boolean;
+  routing_tag?: string;
+  permissions: Record<string, boolean>;
+}
+
+export interface AdminGovernanceSettings {
+  workflow_mode: "waterfall" | "parallel" | "hybrid";
+  security_sme_email?: string;
+  legal_reviewer_email?: string;
+  finance_sme_email?: string;
+  auto_promote_golden_qa: boolean;
+  continuous_learning_enabled: boolean;
+  allowed_domains: string;
+  session_timeout_minutes: number;
+}
+
+

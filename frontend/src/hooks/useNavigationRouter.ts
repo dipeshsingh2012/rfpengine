@@ -54,6 +54,7 @@ export function useNavigationRouter(currentResponseId?: string | null) {
 
   const reviewId = reviewIdFromPath(route);
   const isReviewRoute = (route.startsWith("/review/") && Boolean(reviewId)) || route === "/import";
+  const isAdminRoute = route === "/admin";
   const activeResponseId =
     responseIdFromPath(route) ||
     reviewId ||
@@ -65,6 +66,7 @@ export function useNavigationRouter(currentResponseId?: string | null) {
     setRoute,
     navigate,
     isReviewRoute,
+    isAdminRoute,
     activeResponseId,
   };
 }

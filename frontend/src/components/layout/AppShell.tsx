@@ -14,12 +14,14 @@ interface AppShellProps {
   isResponsesActive: boolean;
   isKbActive: boolean;
   isPlaygroundActive: boolean;
+  isAdminActive?: boolean;
   isActivityActive: boolean;
   recentRFPs: RecentRFPItem[];
   activeResponseId: string;
   currentRoute?: string;
   onNavigateHome: () => void;
   onNavigateResponses: () => void;
+  onNavigateAdmin?: () => void;
   onSelectRFP: (id: string) => void;
   onOpenKB: (tab: "upload" | "connectors" | "playground") => void;
   onOpenActivity: () => void;
@@ -56,7 +58,6 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         googleClientId={p.googleClientId}
         onCredentialSuccess={p.onCredentialSuccess}
       />
-
       <Sidebar
         mobileNavOpen={p.mobileNavOpen}
         setMobileNavOpen={p.setMobileNavOpen}
@@ -64,12 +65,14 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         isResponsesActive={p.isResponsesActive}
         isKbActive={p.isKbActive}
         isPlaygroundActive={p.isPlaygroundActive}
+        isAdminActive={p.isAdminActive}
         isActivityActive={p.isActivityActive}
         recentRFPs={p.recentRFPs}
         activeResponseId={p.activeResponseId}
         currentRoute={p.currentRoute}
         onNavigateHome={p.onNavigateHome}
         onNavigateResponses={p.onNavigateResponses}
+        onNavigateAdmin={p.onNavigateAdmin}
         onSelectRFP={p.onSelectRFP}
         onOpenKB={p.onOpenKB}
         onOpenActivity={p.onOpenActivity}
@@ -79,13 +82,8 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         kbTotalSources={p.kbTotalSources}
         tenantId={p.tenantId}
       />
-
-      <main className="main-content">
-        {p.children}
-      </main>
-
+      <main className="main-content">{p.children}</main>
       <ToastNotice message={p.toastNotice} />
     </div>
   );
 };
-

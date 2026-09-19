@@ -216,6 +216,7 @@ export function useAppController() {
   const isActivityActive = activity.showActivityModal;
   const isResponsesActive = !kb.showKBModal && !activity.showActivityModal && (navigation.route === "/responses" || navigation.route.startsWith("/response"));
   const isOverviewActive = !kb.showKBModal && !activity.showActivityModal && navigation.route === "/";
+  const isAdminActive = !kb.showKBModal && !activity.showActivityModal && navigation.route === "/admin";
 
   const appProps = assembleAppProps({
     navigate: navigation.navigate,
@@ -230,6 +231,7 @@ export function useAppController() {
     isResponsesActive,
     isKbActive,
     isPlaygroundActive,
+    isAdminActive,
     isActivityActive,
     showExportModal,
     setShowExportModal,

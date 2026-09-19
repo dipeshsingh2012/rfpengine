@@ -63,3 +63,4 @@ async def test_auth_me_and_logout():
     assert me_resp.status_code == 200
     assert logout_resp.status_code == 200
     assert logout_resp.json()["status"] == "success"
+

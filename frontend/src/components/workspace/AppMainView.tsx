@@ -3,6 +3,7 @@ import { HomeWelcomeView } from "./HomeWelcomeView";
 import { ResponsesDashboard } from "../responses/ResponsesDashboard";
 import { QuestionnaireWorkspace, QuestionnaireWorkspaceProps } from "./QuestionnaireWorkspace";
 import { WorkspaceSummaryItem } from "../../types";
+import { AdminPage } from "../admin/AdminPage";
 
 interface AppMainViewProps {
   route: string;
@@ -22,6 +23,7 @@ interface AppMainViewProps {
   onNewQuestionnaire: () => void;
   fetchWorkspaceSummaries: () => void;
   questionnaireProps: QuestionnaireWorkspaceProps;
+  onExportTenantData?: () => void;
 }
 
 export const AppMainView: React.FC<AppMainViewProps> = ({
@@ -42,6 +44,7 @@ export const AppMainView: React.FC<AppMainViewProps> = ({
   onNewQuestionnaire,
   fetchWorkspaceSummaries,
   questionnaireProps,
+  onExportTenantData,
 }) => {
   if (route === "/") {
     return (
@@ -72,6 +75,15 @@ export const AppMainView: React.FC<AppMainViewProps> = ({
     );
   }
 
+  if (route === "/admin") {
+    return (
+      <AdminPage
+        tenantId={questionnaireProps.tenantId}
+        showToast={questionnaireProps.showToast}
+        onExport={onExportTenantData}
+      />
+    );
+  }
+
   return <QuestionnaireWorkspace {...questionnaireProps} />;
 };
-

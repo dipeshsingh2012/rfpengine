@@ -59,6 +59,13 @@ async def verify_google_token(payload: GoogleAuthRequest) -> Dict[str, Any]:
     sub = id_info.get("sub", "")
     hd = id_info.get("hd") or "acme-corp"
 
+    from app.api.v1.endpoints.admin import register_member_discovery
+    register_member_discovery(hd, {
+        "name": name,
+        "email": email,
+        "picture": picture,
+    })
+
     return {
         "status": "success",
         "user": {
@@ -85,3 +92,4 @@ async def get_current_user_profile():
 async def logout_user():
     """Logs out user and invalidates session."""
     return {"status": "success", "message": "Signed out successfully"}
+

@@ -11,12 +11,14 @@ interface SidebarProps {
   isResponsesActive: boolean;
   isKbActive: boolean;
   isPlaygroundActive: boolean;
+  isAdminActive?: boolean;
   isActivityActive: boolean;
   recentRFPs: RecentRFPItem[];
   activeResponseId: string;
   currentRoute?: string;
   onNavigateHome: () => void;
   onNavigateResponses: () => void;
+  onNavigateAdmin?: () => void;
   onSelectRFP: (id: string) => void;
   onOpenKB: (tab: "upload" | "connectors" | "playground") => void;
   onOpenActivity: () => void;
@@ -34,12 +36,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isResponsesActive,
   isKbActive,
   isPlaygroundActive,
+  isAdminActive,
   isActivityActive,
   recentRFPs,
   activeResponseId,
   currentRoute,
   onNavigateHome,
   onNavigateResponses,
+  onNavigateAdmin,
   onSelectRFP,
   onOpenKB,
   onOpenActivity,
@@ -58,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isResponsesActive={isResponsesActive}
         isKbActive={isKbActive}
         isPlaygroundActive={isPlaygroundActive}
+        isAdminActive={isAdminActive}
         isActivityActive={isActivityActive}
         recentCount={(recentRFPs || []).length}
         kbTotalSources={kbTotalSources}
@@ -66,10 +71,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onCloseMobile={onCloseMobile}
         onNavigateHome={onNavigateHome}
         onNavigateResponses={onNavigateResponses}
+        onNavigateAdmin={onNavigateAdmin}
         onOpenKB={onOpenKB}
         onOpenActivity={onOpenActivity}
       />
-
       <SidebarRecentRFPs
         recentRFPs={recentRFPs || []}
         isResponsesActive={isResponsesActive}
@@ -79,7 +84,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onSelectRFP={onSelectRFP}
         onNavigateHome={onNavigateHome}
       />
-
       <SidebarKbCard
         onCloseMobile={onCloseMobile}
         onOpenSettings={onOpenSettings}

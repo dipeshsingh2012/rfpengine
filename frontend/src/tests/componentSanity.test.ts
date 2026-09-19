@@ -38,6 +38,10 @@ import { ModalPortal } from "../components/common/ModalPortal.js";
 import { TuningStudioModal } from "../components/modals/workspace-settings/tuning/TuningStudioModal.js";
 import { NewTuningJobModal } from "../components/modals/workspace-settings/tuning/NewTuningJobModal.js";
 import { RevisionFeedbackModal } from "../components/workspace/questionnaire/RevisionFeedbackModal.js";
+import { AdminTabsNav } from "../components/admin/AdminTabsNav.js";
+import { AdminMembersTable } from "../components/admin/tabs/team/AdminMembersTable.js";
+import { AdminPermissionsMatrix } from "../components/admin/tabs/team/AdminPermissionsMatrix.js";
+import { AdminGovernanceTab } from "../components/admin/tabs/AdminGovernanceTab.js";
 
 import { DEFAULT_WORKSPACE_SETTINGS } from "../types.js";
 
@@ -566,6 +570,101 @@ test("Component Sanity: TopbarUserMenu renders signed-out and signed-in states",
   assert.ok(authedHtml.includes("topbar-user-menu"));
   assert.ok(authedHtml.includes("avatar"));
   assert.ok(authedHtml.includes("avatar-img"));
+});
+
+test("Component Sanity: AdminTabsNav renders all 5 admin navigation tabs", () => {
+  const html = renderToString(
+    React.createElement(AdminTabsNav, {
+      currentTab: "team",
+      onSelectTab: () => {},
+    })
+  );
+  assert.ok(html.includes("admin-tabs-nav"));
+  assert.ok(html.includes("Team &amp; RBAC") || html.includes("Team & RBAC"));
+  assert.ok(html.includes("Workflow &amp; Governance") || html.includes("Workflow & Governance"));
+  assert.ok(html.includes("AI &amp; Models") || html.includes("AI & Models"));
+  assert.ok(html.includes("Security &amp; SSO") || html.includes("Security & SSO"));
+  assert.ok(html.includes("Data &amp; Storage") || html.includes("Data & Storage"));
+});
+
+test("Component Sanity: AdminMembersTable and AdminPermissionsMatrix render properly", () => {
+  const mockRoles = [
+    {
+      id: "role-1",
+      name: "Proposal Drafter",
+      icon: "👤",
+      description: "Default drafter",
+      workflow_type: "sequential" as const,
+      is_builtin: true,
+      permissions: { create_rfp: true, edit_draft: true, ai_generate: true, stage_advance: false, manage_kb: false, reset_data: false },
+    },
+    {
+      id: "role-2",
+      name: "Security SME",
+      icon: "🛡️",
+      description: "Infosec approver",
+      workflow_type: "sequential" as const,
+      is_builtin: true,
+      permissions: { create_rfp: false, edit_draft: true, ai_generate: true, stage_advance: true, manage_kb: true, reset_data: false },
+    },
+  ];
+
+  const mockMembers = [
+    {
+      id: "mem-1",
+      name: "Dipesh Singh",
+      email: "dipesh@example.com",
+      role: "Proposal Drafter",
+      is_google_sso: true,
+      last_active: "2026-09-19T10:00:00Z",
+      tenant_id: "acme-corp",
+    },
+  ];
+
+  const tableHtml = renderToString(
+    React.createElement(AdminMembersTable, {
+      members: mockMembers,
+      roles: mockRoles,
+      onRoleChange: () => {},
+    })
+  );
+  assert.ok(tableHtml.includes("admin-table"));
+  assert.ok(tableHtml.includes("Dipesh Singh"));
+  assert.ok(tableHtml.includes("Google SSO"));
+
+  const matrixHtml = renderToString(
+    React.createElement(AdminPermissionsMatrix, {
+      roles: mockRoles,
+    })
+  );
+  assert.ok(matrixHtml.includes("permissions-matrix-card"));
+  assert.ok(matrixHtml.includes("Role Capabilities Matrix"));
+  assert.ok(matrixHtml.includes("Create RFPs &amp; Upload Specs") || matrixHtml.includes("Create RFPs & Upload Specs"));
+});
+
+test("Component Sanity: AdminGovernanceTab displays workflow modes and SME routing", () => {
+  const html = renderToString(
+    React.createElement(AdminGovernanceTab, {
+      governance: {
+        workflow_mode: "waterfall",
+        security_sme_email: "sec@acme.com",
+        legal_reviewer_email: "legal@acme.com",
+        finance_sme_email: "finance@acme.com",
+        auto_promote_golden_qa: true,
+        continuous_learning_enabled: true,
+        allowed_domains: "acme-corp.com",
+        session_timeout_minutes: 120,
+      },
+      onSave: () => {},
+      saveNotice: "Settings saved",
+    })
+  );
+  assert.ok(html.includes("admin-tab-content"));
+  assert.ok(html.includes("Strict Waterfall"));
+  assert.ok(html.includes("Parallel Multi-SME"));
+  assert.ok(html.includes("Hybrid Routing"));
+  assert.ok(html.includes("Active Engine"));
+  assert.ok(html.includes("Settings saved"));
 });
 
 
