@@ -1,7 +1,6 @@
 import React from "react";
 import { Upload, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { KBItem } from "../../../types";
-import { KBSampleFilesGrid } from "./KBSampleFilesGrid";
 import { KBRecordsList } from "./KBRecordsList";
 
 interface KBUploadTabProps {
@@ -65,7 +64,6 @@ export const KBUploadTab: React.FC<KBUploadTabProps> = ({
         </div>
       )}
 
-      <KBSampleFilesGrid />
       <KBRecordsList entries={entries} isFetching={isFetching} onRefresh={onRefresh} onDelete={onDelete} />
     </div>
   );

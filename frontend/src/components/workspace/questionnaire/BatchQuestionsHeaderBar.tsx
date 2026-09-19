@@ -43,7 +43,7 @@ export const BatchQuestionsHeaderBar: React.FC<BatchQuestionsHeaderBarProps> = (
             onChange={(event) => setTenantId(event.target.value)}
           >
             <option value="acme-corp">acme-corp</option>
-            <option value="demo-tenant">demo-tenant</option>
+            <option value="enterprise-corp">enterprise-corp</option>
           </select>
         </div>
         <button

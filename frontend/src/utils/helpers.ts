@@ -1,16 +1,4 @@
-import { SearchResponse, demoResponse } from "../types";
-
 export const API_BASE = "https://rfpengine-api-fwwnzie4dq-uc.a.run.app";
-
-export function demoAnswerFor(question: string): SearchResponse {
-  const q = question.toLowerCase();
-  let ans = demoResponse.suggested_answer;
-  if (q.includes("encrypt")) ans = "Customer data is encrypted in transit using TLS 1.2+ and at rest using AES-256.";
-  else if (q.includes("certif") || q.includes("compliance")) ans = "We maintain current SOC 2 Type II and ISO 27001 certifications.";
-  else if (q.includes("implement") || q.includes("timeline")) ans = "A standard implementation takes 4 to 8 weeks depending on integrations.";
-  else if (q.includes("support")) ans = "Platform includes email support, searchable help center, and customer success.";
-  return { ...demoResponse, suggested_answer: ans, confidence_score: 0.84 };
-}
 
 export function parseCsvLine(line: string): string[] {
   const fields: string[] = [];

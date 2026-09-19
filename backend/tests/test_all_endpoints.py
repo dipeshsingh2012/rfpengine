@@ -365,7 +365,7 @@ async def test_email_sme_review():
                 "question_text": "Do you encrypt data at rest?",
                 "draft_preview": "Yes, AES-256 is used.",
                 "category": "Security & Compliance",
-                "workspace_id": "ws-demo",
+                "workspace_id": "ws-default",
                 "question_index": 0
             },
             headers={"X-Tenant-ID": "test_tenant"}
@@ -383,7 +383,7 @@ async def test_email_completion_digest():
                 "owner_name": "Deal Owner",
                 "workspace_title": "Enterprise RFP",
                 "total_questions": 10,
-                "workspace_id": "ws-demo"
+                "workspace_id": "ws-default"
             },
             headers={"X-Tenant-ID": "test_tenant"}
         )

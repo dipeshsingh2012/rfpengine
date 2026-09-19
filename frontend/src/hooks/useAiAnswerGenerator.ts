@@ -1,8 +1,14 @@
 import { useState } from "react";
-import { SearchResponse, demoResponse } from "../types";
-import { demoAnswerFor, getApiBaseUrl } from "../utils/helpers";
+import { SearchResponse } from "../types";
+import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
+
+const emptyResponse: SearchResponse = {
+  suggested_answer: "",
+  confidence_score: 0,
+  sources: [],
+};
 
 export interface GenerateOptions {
   model?: string | null;
@@ -13,9 +19,9 @@ export interface GenerateOptions {
 export function useAiAnswerGenerator() {
   const [topK, setTopK] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [response, setResponse] = useState<SearchResponse>(demoResponse);
-  const [answer, setAnswer] = useState(demoResponse.suggested_answer);
-  const [activeSource, setActiveSource] = useState(demoResponse.sources[0].id);
+  const [response, setResponse] = useState<SearchResponse>(emptyResponse);
+  const [answer, setAnswer] = useState("");
+  const [activeSource, setActiveSource] = useState("");
 
   async function generateAnswer(
     targetQuestion: string,
@@ -45,18 +51,18 @@ export function useAiAnswerGenerator() {
         const data = (await res.json()) as SearchResponse;
         setResponse(data);
         setAnswer(data.suggested_answer);
+        if (data.sources?.length) setActiveSource(data.sources[0].id);
         onSaveAnswers({ ...currentAnswers, [targetQuestion]: data.suggested_answer });
         return;
       }
+      setResponse(emptyResponse);
+      setAnswer("Failed to generate answer. Please verify backend connection.");
     } catch {
-      // Fallback to local demo answers
+      setResponse(emptyResponse);
+      setAnswer("Network error: unable to reach AI generation service.");
     } finally {
       setIsGenerating(false);
     }
-    const fallback = demoAnswerFor(targetQuestion);
-    setResponse(fallback);
-    setAnswer(fallback.suggested_answer);
-    onSaveAnswers({ ...currentAnswers, [targetQuestion]: fallback.suggested_answer });
   }
 
   async function generateAllAnswers(
@@ -89,9 +95,11 @@ export function useAiAnswerGenerator() {
             headers: { "Content-Type": "application/json", "X-Tenant-ID": tenantId },
             body: JSON.stringify(payload),
           });
-          generated[item] = res.ok ? (await res.json()).suggested_answer : demoAnswerFor(item).suggested_answer;
+          generated[item] = res.ok
+            ? (await res.json()).suggested_answer
+            : "Failed to generate answer.";
         } catch {
-          generated[item] = demoAnswerFor(item).suggested_answer;
+          generated[item] = "Failed to generate answer.";
         }
       })
     );

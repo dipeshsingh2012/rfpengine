@@ -20,7 +20,7 @@ export function useAppController() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [revisionItem, setRevisionItem] = useState<string | null>(null);
-  const [notice, setNotice] = useState("Demo data loaded");
+  const [notice, setNotice] = useState("");
 
   const navigation = useNavigationRouter();
   const review = useReviewGovernanceState();
@@ -136,7 +136,7 @@ export function useAppController() {
     if (!selected.length) return;
     workflow.setDetectedQuestions(selected);
     workflow.setQuestion(selected[0]);
-    if (workflow.responseId && workflow.responseId !== "demo") {
+    if (workflow.responseId) {
       fetch(`${apiBaseUrl}/api/v1/responses/workspaces`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Tenant-ID": tenantId },
@@ -150,7 +150,7 @@ export function useAppController() {
         }),
       }).then(() => workspaces.fetchWorkspaceSummaries()).catch(() => {});
     }
-    navigation.navigate(`/response/workspace/${workflow.responseId || "demo"}`);
+    navigation.navigate(`/response/workspace/${workflow.responseId || ""}`);
   }
 
   function handleRequestChanges(item: string) {
@@ -184,7 +184,7 @@ export function useAppController() {
       comments: review.reviewCommentsByQuestion[qText] || "",
     }));
     await workspaces.handleExportPackage(format, {
-      responseId: workflow.responseId || "demo",
+      responseId: workflow.responseId || "",
       sourceLabel: workflow.sourceLabel,
       items,
       showToast: activity.showToast,

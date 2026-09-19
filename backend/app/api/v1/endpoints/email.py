@@ -15,7 +15,7 @@ class SMEReviewEmailRequest(BaseModel):
     question_text: str
     draft_preview: str
     category: str = "Security & Compliance"
-    workspace_id: str = "ws-demo"
+    workspace_id: str = "ws-default"
     question_index: int = 0
     token: Optional[str] = None
 
@@ -25,7 +25,7 @@ class CompletionDigestEmailRequest(BaseModel):
     owner_name: Optional[str] = None
     workspace_title: str
     total_questions: int
-    workspace_id: str = "ws-demo"
+    workspace_id: str = "ws-default"
 
 
 @router.post("/sme-review", status_code=status.HTTP_200_OK)

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ReviewerRole, SourceMode, starterQuestions, demoResponse } from "../types";
+import { ReviewerRole, SourceMode, starterQuestions } from "../types";
 import { getApiBaseUrl } from "../utils/helpers";
 
 const apiBaseUrl = getApiBaseUrl();
@@ -7,17 +7,17 @@ const apiBaseUrl = getApiBaseUrl();
 export function useQuestionnaireWorkflow(tenantId: string, initialResponseId?: string | null) {
   const [question, setQuestion] = useState(starterQuestions[0]);
   const [detectedQuestions, setDetectedQuestions] = useState<string[]>([]);
-  const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, string>>({ [starterQuestions[0]]: demoResponse.suggested_answer });
+  const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, string>>({});
   const [reviewStatusByQuestion, setReviewStatusByQuestion] = useState<Record<string, string>>({});
   const [promotedQuestions, setPromotedQuestions] = useState<Record<string, boolean>>({});
   const [sourceMode, setSourceMode] = useState<SourceMode>("upload");
-  const [sourceLabel, setSourceLabel] = useState("Demo questionnaire");
+  const [sourceLabel, setSourceLabel] = useState("");
   const [responseId, setResponseId] = useState(initialResponseId);
   const [role, setRole] = useState<ReviewerRole>("Proposal manager");
   const [isBatchApproved, setIsBatchApproved] = useState(false);
 
   function persistDb(nextAnswers?: Record<string, string>, nextStatuses?: Record<string, string>) {
-    if (!responseId || responseId === "demo") return;
+    if (!responseId) return;
     fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${responseId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", "X-Tenant-ID": tenantId },
@@ -63,7 +63,7 @@ export function useQuestionnaireWorkflow(tenantId: string, initialResponseId?: s
   }
 
   async function handlePromoteToKnowledgeBase(itemText: string, index: number, currentAnswer: string) {
-    if (responseId && responseId !== "demo") {
+    if (responseId) {
       await fetch(`${apiBaseUrl}/api/v1/responses/workspaces/${responseId}/questions/${index}/promote`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Tenant-ID": tenantId },

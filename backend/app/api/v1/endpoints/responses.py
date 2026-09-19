@@ -39,7 +39,7 @@ router = APIRouter()
 
 DEFAULT_SEED_HISTORY = [
     {
-        "id": "demo",
+        "id": "ws-northstar",
         "title": "Northstar security review",
         "editedAt": "8 min ago",
         "color": "blue",

@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  demoAnswerFor,
   parseCsvLine,
   extractFormQuestions,
   formatScore,
@@ -15,25 +14,16 @@ test("getApiBaseUrl returns production url", () => {
   assert.match(getApiBaseUrl(), /^https:\/\/rfpengine-api/);
 });
 
-test("demoAnswerFor handles encryption keywords", () => {
-  const res = demoAnswerFor("How do you handle data encryption at rest?");
-  assert.ok(res.suggested_answer.includes("AES-256"));
-  assert.equal(res.confidence_score, 0.84);
+test("responseIdFromPath handles trailing slashes and nested routes", () => {
+  assert.equal(responseIdFromPath("/response/workspace/ws-test-999"), "ws-test-999");
+  assert.equal(responseIdFromPath("/response/workspace/"), "");
+  assert.equal(responseIdFromPath("/response/other"), "");
 });
 
-test("demoAnswerFor handles compliance keywords", () => {
-  const res = demoAnswerFor("What compliance certifications do you have?");
-  assert.ok(res.suggested_answer.includes("SOC 2 Type II"));
-});
-
-test("demoAnswerFor handles implementation timeline", () => {
-  const res = demoAnswerFor("What is the typical timeline for onboarding?");
-  assert.ok(res.suggested_answer.includes("4 to 8 weeks"));
-});
-
-test("demoAnswerFor handles support queries", () => {
-  const res = demoAnswerFor("What support tiers are available?");
-  assert.ok(res.suggested_answer.includes("email support"));
+test("reviewIdFromPath handles various route formats", () => {
+  assert.equal(reviewIdFromPath("/review/doc-upload-123"), "doc-upload-123");
+  assert.equal(reviewIdFromPath("/review/"), "");
+  assert.equal(reviewIdFromPath("/import"), "");
 });
 
 test("parseCsvLine parses simple comma-separated fields", () => {
@@ -75,10 +65,10 @@ test("reviewIdFromPath extracts import IDs", () => {
   assert.equal(reviewIdFromPath("/responses"), "");
 });
 
-test("demoAnswerFor handles generic default fallback", () => {
-  const res = demoAnswerFor("What is the meaning of life?");
-  assert.ok(res.suggested_answer);
-  assert.equal(res.confidence_score, 0.84);
+test("formatScore handles zero and small decimals", () => {
+  assert.equal(formatScore(0), "0%");
+  assert.equal(formatScore(0.004), "0%");
+  assert.equal(formatScore(0.499), "50%");
 });
 
 test("extractFormQuestions handles empty text", () => {

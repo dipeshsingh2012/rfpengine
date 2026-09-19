@@ -666,10 +666,10 @@ class PostgresService:
     @staticmethod
     async def seed_kb_if_empty(session: AsyncSession, tenant_id: str = "acme-corp") -> int:
         """
-        Auto-seeds canonical compliance and architecture Q&A pairs for default/demo tenants
+        Auto-seeds canonical compliance and architecture Q&A pairs for default tenants
         if no entries exist in PostgreSQL.
         """
-        if tenant_id not in ("acme-corp", "demo-tenant"):
+        if tenant_id not in ("acme-corp", "enterprise-corp"):
             return 0
         try:
             count_stmt = select(func.count(KBEntry.id)).where(KBEntry.tenant_id == tenant_id)

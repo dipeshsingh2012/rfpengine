@@ -23,7 +23,7 @@ export const WorkspaceBreadcrumbHeader: React.FC<WorkspaceBreadcrumbHeaderProps>
           <span>/</span>{" "}
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => onOpenImport(responseId || "demo")}
+            onClick={() => onOpenImport(responseId || "")}
           >
             Review questionnaire
           </span>

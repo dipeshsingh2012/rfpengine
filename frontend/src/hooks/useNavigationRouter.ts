@@ -20,7 +20,7 @@ export function useNavigationRouter(currentResponseId?: string | null) {
     responseIdFromPath(route) ||
     reviewIdFromPath(route) ||
     currentResponseId ||
-    "demo";
+    "";
 
   return {
     route,
