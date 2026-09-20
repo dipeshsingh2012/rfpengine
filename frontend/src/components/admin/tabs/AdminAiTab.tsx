@@ -1,5 +1,4 @@
 import React from "react";
-import { Sparkles, ExternalLink } from "lucide-react";
 import { AdminGovernanceSettings, WorkspaceSettings } from "../../../types";
 import { SettingsAiTab } from "../../modals/workspace-settings/SettingsAiTab";
 
@@ -67,24 +66,6 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ governance, onSave, sett
             checked={governance.auto_promote_golden_qa}
             onChange={(e) => onSave({ auto_promote_golden_qa: e.target.checked })}
           />
-        </div>
-
-        <div className="toggle-row" style={{ marginTop: "16px" }}>
-          <div>
-            <div className="toggle-title">Continuous Feedback Fine-Tuning Export</div>
-            <div className="toggle-desc">
-              Export edited drafts into JSONL dataset format for Google AI Studio / Vertex AI fine-tuning.
-            </div>
-          </div>
-          <a
-            href="https://aistudio.google.com"
-            target="_blank"
-            rel="noreferrer"
-            className="secondary-btn sm-btn"
-            style={{ textDecoration: "none" }}
-          >
-            <Sparkles size={14} /> AI Studio <ExternalLink size={12} />
-          </a>
         </div>
       </div>
     </div>
