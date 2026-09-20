@@ -29,6 +29,7 @@ interface AppShellProps {
   kbTotalRecords: number;
   kbTotalSources: number;
   tenantId: string;
+  totalResponsesCount?: number;
   toastNotice: string | null;
   role?: ReviewerRole;
   setRole?: (r: ReviewerRole) => void;
@@ -81,6 +82,7 @@ export const AppShell: React.FC<AppShellProps> = (p) => {
         kbTotalRecords={p.kbTotalRecords}
         kbTotalSources={p.kbTotalSources}
         tenantId={p.tenantId}
+        totalResponsesCount={p.totalResponsesCount}
       />
       <main className="main-content">{p.children}</main>
       <ToastNotice message={p.toastNotice} />

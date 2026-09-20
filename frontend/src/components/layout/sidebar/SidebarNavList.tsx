@@ -9,6 +9,7 @@ interface SidebarNavListProps {
   isAdminActive?: boolean;
   isSettingsActive?: boolean;
   isActivityActive: boolean;
+  totalResponsesCount?: number;
   recentCount: number;
   kbTotalRecords: number;
   kbTotalSources: number;
@@ -30,6 +31,7 @@ export const SidebarNavList: React.FC<SidebarNavListProps> = ({
   isAdminActive,
   isSettingsActive,
   isActivityActive,
+  totalResponsesCount,
   recentCount,
   kbTotalRecords,
   kbTotalSources,
@@ -50,7 +52,7 @@ export const SidebarNavList: React.FC<SidebarNavListProps> = ({
           <LayoutGrid size={17} /> Overview
         </button>
         <button className={`nav-item ${isResponsesActive ? "active" : ""}`} onClick={() => { onCloseMobile(); onNavigateResponses(); }}>
-          <FileText size={17} /> Responses <span className="nav-count">{recentCount}</span>
+          <FileText size={17} /> Responses <span className="nav-count">{totalResponsesCount ?? recentCount}</span>
         </button>
         <button className={`nav-item ${isKbActive ? "active" : ""}`} onClick={() => { onCloseMobile(); onOpenKB("upload"); }}>
           <FolderOpen size={17} /> Knowledge base{" "}

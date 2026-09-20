@@ -781,6 +781,29 @@ test("Component Sanity: SidebarNavList renders unified Settings & Admin item", (
   assert.ok(!html.includes("Admin Console"));
 });
 
+test("Component Sanity: SidebarNavList displays totalResponsesCount over recentCount when provided", () => {
+  const html = renderToString(
+    React.createElement(SidebarNavList, {
+      isOverviewActive: false,
+      isResponsesActive: false,
+      isKbActive: false,
+      isPlaygroundActive: false,
+      isActivityActive: false,
+      totalResponsesCount: 10,
+      recentCount: 3,
+      kbTotalRecords: 10,
+      kbTotalSources: 2,
+      tenantId: "acme-corp",
+      onNavigateHome: () => {},
+      onNavigateResponses: () => {},
+      onOpenKB: () => {},
+      onOpenActivity: () => {},
+      onCloseMobile: () => {},
+    })
+  );
+  assert.ok(html.includes('<span class="nav-count">10</span>'));
+});
+
 test("Component Sanity: Unified AdminPage renders combined Settings & Administration console", () => {
   const html = renderToString(
     React.createElement(AdminPage, {

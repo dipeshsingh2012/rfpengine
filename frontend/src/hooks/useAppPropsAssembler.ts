@@ -94,6 +94,7 @@ export function assembleAppProps(p: any) {
     isAdminActive: p.isAdminActive,
     isSettingsActive: p.isAdminActive,
     isActivityActive: p.isActivityActive,
+    totalResponsesCount: p.workspaces.workspaceSummaries?.length || (p.workspaces.recentRFPs || []).length,
     recentRFPs: p.workspaces.recentRFPs || [],
     activeResponseId: p.activeResponseId,
     currentRoute: p.route,

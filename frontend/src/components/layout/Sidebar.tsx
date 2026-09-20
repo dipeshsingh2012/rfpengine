@@ -27,72 +27,52 @@ interface SidebarProps {
   kbTotalRecords: number;
   kbTotalSources: number;
   tenantId?: string;
+  totalResponsesCount?: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  mobileNavOpen,
-  setMobileNavOpen,
-  isOverviewActive,
-  isResponsesActive,
-  isKbActive,
-  isPlaygroundActive,
-  isAdminActive,
-  isActivityActive,
-  recentRFPs,
-  activeResponseId,
-  currentRoute,
-  onNavigateHome,
-  onNavigateResponses,
-  onNavigateAdmin,
-  onSelectRFP,
-  onOpenKB,
-  onOpenActivity,
-  onOpenSettings,
-  showSettingsModal,
-  kbTotalRecords,
-  kbTotalSources,
-  tenantId = "acme-corp",
-}) => {
-  const onCloseMobile = () => setMobileNavOpen(false);
+export const Sidebar: React.FC<SidebarProps> = (p) => {
+  const onCloseMobile = () => p.setMobileNavOpen(false);
+  const tenantId = p.tenantId || "acme-corp";
 
   return (
-    <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
+    <aside className={`sidebar ${p.mobileNavOpen ? "open" : ""}`}>
       <SidebarNavList
-        isOverviewActive={isOverviewActive}
-        isResponsesActive={isResponsesActive}
-        isKbActive={isKbActive}
-        isPlaygroundActive={isPlaygroundActive}
-        isAdminActive={isAdminActive}
-        isSettingsActive={isAdminActive}
-        isActivityActive={isActivityActive}
-        recentCount={(recentRFPs || []).length}
-        kbTotalSources={kbTotalSources}
-        kbTotalRecords={kbTotalRecords}
+        isOverviewActive={p.isOverviewActive}
+        isResponsesActive={p.isResponsesActive}
+        isKbActive={p.isKbActive}
+        isPlaygroundActive={p.isPlaygroundActive}
+        isAdminActive={p.isAdminActive}
+        isSettingsActive={p.isAdminActive}
+        isActivityActive={p.isActivityActive}
+        totalResponsesCount={p.totalResponsesCount}
+        recentCount={(p.recentRFPs || []).length}
+        kbTotalSources={p.kbTotalSources}
+        kbTotalRecords={p.kbTotalRecords}
         tenantId={tenantId}
         onCloseMobile={onCloseMobile}
-        onNavigateHome={onNavigateHome}
-        onNavigateResponses={onNavigateResponses}
-        onNavigateAdmin={onNavigateAdmin}
-        onNavigateSettings={onNavigateAdmin}
-        onOpenKB={onOpenKB}
-        onOpenActivity={onOpenActivity}
+        onNavigateHome={p.onNavigateHome}
+        onNavigateResponses={p.onNavigateResponses}
+        onNavigateAdmin={p.onNavigateAdmin}
+        onNavigateSettings={p.onNavigateAdmin}
+        onOpenKB={p.onOpenKB}
+        onOpenActivity={p.onOpenActivity}
       />
       <SidebarRecentRFPs
-        recentRFPs={recentRFPs || []}
-        isResponsesActive={isResponsesActive}
-        activeResponseId={activeResponseId}
-        currentRoute={currentRoute}
+        recentRFPs={p.recentRFPs || []}
+        isResponsesActive={p.isResponsesActive}
+        activeResponseId={p.activeResponseId}
+        currentRoute={p.currentRoute}
         onCloseMobile={onCloseMobile}
-        onSelectRFP={onSelectRFP}
-        onNavigateHome={onNavigateHome}
+        onSelectRFP={p.onSelectRFP}
+        onNavigateHome={p.onNavigateHome}
       />
       <SidebarKbCard
         onCloseMobile={onCloseMobile}
-        onOpenSettings={onOpenSettings}
-        showSettingsModal={showSettingsModal}
-        onOpenKB={onOpenKB}
-        kbTotalRecords={kbTotalRecords}
-        kbTotalSources={kbTotalSources}
+        onOpenSettings={p.onOpenSettings}
+        showSettingsModal={p.showSettingsModal}
+        onOpenKB={p.onOpenKB}
+        kbTotalRecords={p.kbTotalRecords}
+        kbTotalSources={p.kbTotalSources}
         tenantId={tenantId}
       />
     </aside>
